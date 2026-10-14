@@ -113,6 +113,10 @@ Regras que pegam gente experiente:
   [RE-003](../reverse-engineering/RE_003_CNV_CODIGO_CURTO.md).
 - **`F` / `Faixas`** (`6 14 Faixas`): os códigos são limites superiores de
   faixas de valor (`99.99`, `499.99`…), para variáveis contínuas.
+- **Código em branco:** espaços antes da vírgula (`  ,`) são o código do
+  campo em branco — é assim que `MESES.CNV` do SIM tem a linha "branco".
+- **Recuo:** espaços no começo do nome mostram a hierarquia (`  001 …` dentro
+  de `001-031 …`); o TabSis mantém, como o TabWin.
 - **Não classificados:** código que nenhuma linha da CNV cobre. No painel:
   - *Ignorar* — o registro sai da tabela;
   - *Incluir* — entra numa linha "Não classificados";

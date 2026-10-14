@@ -190,6 +190,12 @@ export interface ResultAxisItem {
   precalculatedTotal?: number;
   /** Fixed decimal places for this column (TabWin "Quadro → Decimais"); absent = the table setting. */
   decimals?: number;
+  /**
+   * Linha-subtotal que também tem códigos próprios: o que caiu direto nela, sem
+   * passar por um filho. O TabWin conta isso no Total (CID10_BR.CNV do SIM:
+   * "001-031" = A000-B999 pega a sepse A41, que nenhum filho cobre; RE-003).
+   */
+  directTotal?: number[];
 }
 
 export interface TabulationResult {

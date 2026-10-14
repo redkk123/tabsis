@@ -900,3 +900,4 @@ dialog p { color: #676d74; font-size: 13px; line-height: 1.6; }
 #result-table .has-note { position: relative; }
 #result-table .has-note::after { content: ""; position: absolute; top: 0; right: 0; border-style: solid; border-width: 0 7px 7px 0; border-color: transparent var(--danger) transparent transparent; }
 #result-table tfoot .table-note-footer td { text-align: left; font-weight: 400; font-size: 12px; color: var(--danger); }
+#result-table tbody th { white-space: pre-wrap; }

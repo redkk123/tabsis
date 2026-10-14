@@ -41,7 +41,7 @@ export interface HeadlineSource {
    * "Região Norte"): their value is already inside the parent row, so adding
    * them again would double the total — the table's own Total row skips them.
    */
-  rows: readonly { label: string; excludeFromTotal?: boolean }[];
+  rows: readonly { label: string; excludeFromTotal?: boolean; directTotal?: readonly number[] }[];
   cells: readonly (readonly number[])[];
   measureLabel?: string;
   recordsAccepted?: number;
@@ -56,7 +56,9 @@ export function summarizeTable(source: HeadlineSource, topCount = 3): TableHeadl
     label: row.label,
     value: somar(source.cells[index] ?? []),
   }]));
-  const total = somar(pesos.map((peso) => peso.value));
+  // O que caiu direto numa linha-subtotal também conta, como no Total do TabWin.
+  const direto = somar(source.rows.map((row) => (row.excludeFromTotal && row.directTotal ? somar(row.directTotal) : 0)));
+  const total = somar(pesos.map((peso) => peso.value)) + direto;
 
   // Proporção só existe com total positivo. Numa medida que soma valores com
   // sinal — saldo, variação — a fração não significaria nada, e omiti-la é

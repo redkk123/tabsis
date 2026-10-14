@@ -198,3 +198,35 @@ Diferença que fica, de propósito: o `HUF_MEC.DBF` está em CP850, e o TabWin
 mostra "Säo Paulo" onde o arquivo diz "São Paulo" (a conversão de acentos dele
 erra o `ã`). O TabSis mostra "São". A comparação usa o código CNES do começo
 do rótulo.
+
+## SIM e SINASC com os DEF e CNV oficiais (2026-10-14)
+
+Pacotes auxiliares oficiais `OBITOS_CID10_TAB.zip` e `NASC_NOV_TAB.zip` e
+dados do Acre (`DOAC2024.dbc`, 4.267 óbitos; `DNAC2022.dbc`, 14.483 nascidos
+vivos), todos de `ftp.datasus.gov.br/dissemin/publicos`. Uma varredura de todas
+as variáveis dos DEFs oficiais apontou onde a leitura antiga e a atual
+divergiam; essas variáveis foram tabuladas no TabWin e salvas como `.TAB`
+(`fixtures/oracle/re003-sim-sinasc`, `npm run verify:sim-sinasc -- <pasta SIM>
+<pasta SINASC>`). Começou em 10/16 e terminou em **16/16**, depois de quatro
+correções:
+
+| Achado | No TabWin | Correção no TabSis |
+| --- | --- | --- |
+| **Código "em branco"**: `MESES.CNV` do SIM tem a linha `branco` com código `  ,`; `HORAOBITO.CNV` tem `Ign` com `    ,`; `diasINVEST1.cnv`, `Sem informação` com `   ,` | o branco vai para essa linha (3.451 em "branco" no Mês de investigação) | o leitor aparava os espaços e jogava o código fora; agora espaços antes da vírgula são o código "em branco" (vale 000, e ganha do `00-99` por vir depois) |
+| **Recuo dos rótulos** (`CID10_BR.CNV`: `  001 Doencas…`, `    004.1 …`) | mostra o recuo, que é a hierarquia | o rótulo só é aparado no fim; a tabela mostra o recuo |
+| **Linha-subtotal com códigos próprios** (`001-031` = `A000-B999` pega a sepse `A41`, que nenhum filho cobre) | conta no Total (4.267) | contava na linha mas não no Total (3.976); agora a linha guarda `directTotal`, somado no Total |
+| **Subtotal com texto** (`E249,` no `CID10_04_ST.CNV` e outros `_ST`) | abre o arquivo | recusava o arquivo inteiro; agora a categoria fica sem subtotal, com aviso |
+
+Confirmado também no SINASC:
+- **País de residência**: `CODPAISRES` (3) com `PAIS.CNV` literal de 8 — o
+  TabWin atravessa os campos e não acha nenhum país (BRASIL = 0, "Não
+  classificados" = 14.483), igual ao TabSis desde a leitura atravessada;
+- **Ano de recebimento** em branco → "2000" (o `00` do `ANO.CNV`);
+- **Anomalia** `Q02X` → "Outras anomalias" (o `X` da 4ª posição vale 0).
+
+E sobre o DEF:
+- **`x` minúsculo** (linha 410 do `Obito_1996_CID10.def`): o TabWin lista em
+  Linhas, Colunas e Seleções, como `X`; o TabSis já fazia igual.
+- **`MUNICDF.CNV`** começa com um `s` solto no cabeçalho: o TabWin recusa
+  ("'s' is not a valid integer value", tela 18), como o TabSis. O arquivo
+  oficial está quebrado.

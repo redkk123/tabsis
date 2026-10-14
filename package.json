@@ -22,6 +22,7 @@
     "verify:painel": "npm run build && node scripts/verify-painel-oracle.mjs",
     "verify:re003": "npm run build && node scripts/verify-re003-real.mjs",
     "verify:dbf-lookup": "npm run build && node scripts/verify-dbf-lookup.mjs",
+    "verify:sim-sinasc": "npm run build && node scripts/verify-sim-sinasc.mjs",
     "verify:goldens:second": "npm run build && node scripts/verify-second-goldens-local.mjs",
     "verify:implode-paths": "npm run build && node scripts/verify-implode-paths.mjs",
     "verify:record-stream": "npm run build && node scripts/verify-record-stream.mjs",

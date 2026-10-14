@@ -127,3 +127,26 @@ test('"----" das linhas-título não é código: não pega o CID M000 (RE-003, S
   assert.equal(classifyCnv(cnv, 'M000'), undefined);
   assert.equal(classifyCnv(cnv, 'O230')?.sequence, 2);
 });
+
+// RE-003, SIM e SINASC oficiais contra o TabWin 4.15 (verify-sim-sinasc 16/16).
+test('código "em branco" (espaços antes da vírgula) vale como código, e ganha do 00-99', () => {
+  const meses = parseCnv(['3 2', row(3, 'Ign', '00-99'), row(1, 'Jan', '01'), row(2, 'branco', '  ,')].join('\n'));
+  assert.equal(classifyCnv(meses, null)?.label, 'branco');
+  assert.equal(classifyCnv(meses, '01')?.label, 'Jan');
+  assert.equal(classifyCnv(meses, '77')?.label, 'Ign');
+  // Linha-título com espaço sobrando no fim, sem vírgula, não vira código.
+  const titulo = parseCnv(['2 2', row(1, 'Grupo', '    '), row(2, 'Jan', '01')].join('\n'), { strict: false });
+  assert.equal(classifyCnv(titulo, null), undefined);
+});
+
+test('rótulo mantém o recuo do começo (hierarquia do CID10_BR), só apara o fim', () => {
+  const cnv = parseCnv(['2 4', row(1, '001-031 Infecciosas', 'A000-B999'), row(2, '  001 Intestinais', 'A000-A099', '1')].join('\n'));
+  assert.equal(cnv.categories[1].label, '  001 Intestinais');
+});
+
+test('subtotal que não é número: a categoria fica sem subtotal, com aviso, e o arquivo abre', () => {
+  const text = ['N 2   4 L', '     0001  E00 Iodo', 'E249,0002  E24 Cushing                                                                                          E24'].join('\n');
+  const cnv = parseCnv(text, { strict: false });
+  assert.equal(cnv.categories.find((c) => c.sequence === 2).subtotalTarget, undefined);
+  assert.match(cnv.warnings.join('\n'), /não é número/);
+});

@@ -40,3 +40,8 @@ test('Gera CNV: um código por categoria, curta até 4 posições, e o arquivo s
   assert.throws(() => generateCnvFromValues(['', '  ']), /não tem valores/);
   assert.throws(() => generateCnvFromValues(['a,b']), /vírgula/);
 });
+
+test('x minúsculo no DEF vale como X (o TabWin lista em Linhas, Colunas e Seleções)', () => {
+  const def = parseDef([';t', 'AX*.DBF', 'xCausa (minusculo), CAUSABAS, 1, CID10_BR.CNV'].join('\r\n'));
+  assert.deepEqual(def.options[0].roles.sort(), ['column', 'row', 'selection']);
+});

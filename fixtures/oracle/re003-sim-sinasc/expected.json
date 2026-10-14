@@ -1,0 +1,4431 @@
+{
+ "schema": "tabsis.tabwin-real-oracle",
+ "version": 1,
+ "capturedAt": "2026-10-14",
+ "referenceEngine": "TabWin 4.15 (TabWin415.exe) under Wine 10.0",
+ "evidence": "tabelas salvas pelo próprio TabWin (.TAB); DEF/CNV oficiais de OBITOS_CID10_TAB.zip e NASC_NOV_TAB.zip (ftp.datasus.gov.br)",
+ "notes": [
+  "Munic Resid - DF (MUNICDF.CNV): o TabWin recusa o arquivo (\"s is not a valid integer value\"), como o TabSis; fica fora.",
+  "xCausa (x minúsculo no DEF oficial): o TabWin lista em Linhas, Colunas e Seleções, como X."
+ ],
+ "sources": [
+  {
+   "name": "SIM",
+   "data": "DOAC2024.dbc",
+   "defText": ";RE-003 SIM AC 2024\nAC:\\TabWin\\SIM\\DO*.DBC\nL*DO epidemiologica,        STDOEPIDEM,    1,    DONOVA.CNV\nLOport invetig (120d), NUDIASOBIN, 1, diasINVEST1.cnv\nLMunic Resid - DF,          CODMUNRES,     1,    MUNICDF.CNV\nLIdade Mae,                 IDADEMAE,      1,    IDADEMAE.CNV\nLPeso Nascer,              PESO,           1,    PESO.CNV\nLCausa (CID10 BR),          CAUSABAS,      1,    CID10_BR.CNV\nLCID10 4C Cap 04 c subtotal,CAUSABAS,      1,    CID10_04_ST.CNV\nLMes de Investigac,         DTINVESTIG,    3,    MESES.CNV\nxCausa (minusculo),          CAUSABAS,      1,    CID10_BR.CNV\n",
+   "cases": [
+    {
+     "id": "S0",
+     "linha": "*DO epidemiologica",
+     "naoClassificados": "incluir",
+     "rows": [
+      [
+       "Sim",
+       0
+      ],
+      [
+       "Não",
+       4267
+      ]
+     ],
+     "total": 4267
+    },
+    {
+     "id": "S1",
+     "linha": "Oport invetig (120d)",
+     "naoClassificados": "incluir",
+     "rows": [
+      [
+       "Até 120 dias (invest oportuna)",
+       0
+      ],
+      [
+       "121 a 150 dias",
+       0
+      ],
+      [
+       "151-180 dias",
+       0
+      ],
+      [
+       "Acima de 180 dias",
+       0
+      ],
+      [
+       "Sem informação",
+       4267
+      ]
+     ],
+     "total": 4267
+    },
+    {
+     "id": "S3",
+     "linha": "Idade Mae",
+     "naoClassificados": "incluir",
+     "rows": [
+      [
+       "<de 10",
+       0
+      ],
+      [
+       "10-14",
+       8
+      ],
+      [
+       "15-20",
+       47
+      ],
+      [
+       "21-30",
+       76
+      ],
+      [
+       "31-40",
+       48
+      ],
+      [
+       "41-50",
+       10
+      ],
+      [
+       "51-55",
+       1
+      ],
+      [
+       "56-60",
+       0
+      ],
+      [
+       "61e+",
+       0
+      ],
+      [
+       "Ign",
+       4077
+      ]
+     ],
+     "total": 4267
+    },
+    {
+     "id": "S4",
+     "linha": "Peso Nascer",
+     "naoClassificados": "incluir",
+     "rows": [
+      [
+       "1g a <100g",
+       1
+      ],
+      [
+       "101g a <500g",
+       2
+      ],
+      [
+       "501g a <1Kg",
+       31
+      ],
+      [
+       "1kg a 1,4kg",
+       25
+      ],
+      [
+       "1,5Kg a 2,4Kg",
+       54
+      ],
+      [
+       "2,5Kg a 2,9Kg",
+       29
+      ],
+      [
+       "3Kg a 3,9Kg",
+       36
+      ],
+      [
+       "4Kg e +",
+       1
+      ],
+      [
+       "ignorado",
+       4088
+      ]
+     ],
+     "total": 4267
+    },
+    {
+     "id": "S5",
+     "linha": "Causa (CID10 BR)",
+     "naoClassificados": "incluir",
+     "rows": [
+      [
+       "001-031 Algumas Doencas Infecciosas e Parasitar",
+       209
+      ],
+      [
+       "  001 Doencas Infecciosas intestinais",
+       21
+      ],
+      [
+       "  002 Colera",
+       0
+      ],
+      [
+       "  003 Diarr e Gastroenter orig infec presumivel",
+       20
+      ],
+      [
+       "  004 Outras Doencas Infecciosas Intestinais",
+       1
+      ],
+      [
+       "    004.1 Febres Tifoide e Paratifoide",
+       0
+      ],
+      [
+       "005-006 Tuberculose",
+       34
+      ],
+      [
+       "  005 Tuberculose respiratoria",
+       31
+      ],
+      [
+       "  006 Outras tuberculoses",
+       3
+      ],
+      [
+       "007-015 Outras Doencas bacterianas",
+       68
+      ],
+      [
+       "  007 Peste",
+       0
+      ],
+      [
+       "  008 Leptospirose",
+       1
+      ],
+      [
+       "  009 Hanseniase",
+       1
+      ],
+      [
+       "  010 Tetano",
+       0
+      ],
+      [
+       "    010.1 Tetano neonatal",
+       0
+      ],
+      [
+       "    010.2 Tetano obstetrico",
+       0
+      ],
+      [
+       "    010.3 Tetano acidental",
+       0
+      ],
+      [
+       "  011 Difteria",
+       0
+      ],
+      [
+       "  012 Coqueluche",
+       0
+      ],
+      [
+       "  013 Infeccao meningococica",
+       0
+      ],
+      [
+       "  014 Septicemia",
+       57
+      ],
+      [
+       "  015 Infeccoes com transm predominant sexual",
+       1
+      ],
+      [
+       "016-023 Doencas virais",
+       55
+      ],
+      [
+       "  016 Poliomielite aguda",
+       0
+      ],
+      [
+       "  017 Raiva",
+       0
+      ],
+      [
+       "  018 Dengue",
+       3
+      ],
+      [
+       "  019 Febre Amarela",
+       0
+      ],
+      [
+       "  020 Out febres p/arbovirus e febr hemorr virais",
+       3
+      ],
+      [
+       "  021 Sarampo",
+       0
+      ],
+      [
+       "  022 Hepatite viral",
+       16
+      ],
+      [
+       "  023 Doen p/Virus da Imunodefic Humana (HIV)",
+       31
+      ],
+      [
+       "024-027 Doencas devidas a Protozoarios",
+       4
+      ],
+      [
+       "  024 Malaria",
+       0
+      ],
+      [
+       "  025 Leishmaniose",
+       0
+      ],
+      [
+       "  026 Doenca de Chagas",
+       3
+      ],
+      [
+       "  027 Toxoplasmose",
+       0
+      ],
+      [
+       "028-031 Helmintiases",
+       0
+      ],
+      [
+       "  028 Esquistossomose",
+       0
+      ],
+      [
+       "  029 Cisticercose",
+       0
+      ],
+      [
+       "  030 Restante de Helmintiases",
+       0
+      ],
+      [
+       "  031 Restante de algumas doenc infecc e parasit",
+       27
+      ],
+      [
+       "032-052 Neoplasias",
+       726
+      ],
+      [
+       "  032 Neopl malig do labio, cav oral e faringe",
+       24
+      ],
+      [
+       "  033 Neoplasia maligna do esofago",
+       15
+      ],
+      [
+       "  034 Neoplasia maligna do estomago",
+       54
+      ],
+      [
+       "  035 Neoplasia maligna do colo,reto e anus",
+       41
+      ],
+      [
+       "  036 Neopl malig do figado e vias bil intrahepat",
+       53
+      ],
+      [
+       "  037 Neoplasia maligna do pancreas",
+       38
+      ],
+      [
+       "  038 Neoplasia maligna da laringe",
+       17
+      ],
+      [
+       "  039 Neopl malig da traqueia,bronquios e pulmoes",
+       106
+      ],
+      [
+       "  040 Neoplasia maligna da pele",
+       3
+      ],
+      [
+       "  041 Neoplasia maligna da mama",
+       45
+      ],
+      [
+       "  042 Neoplasia maligna do colo do utero",
+       47
+      ],
+      [
+       "  043 Neopl malig de corpo e partes n/esp utero",
+       9
+      ],
+      [
+       "  044 Neoplasia maligna do ovario",
+       7
+      ],
+      [
+       "  045 Neoplasia maligna da prostata",
+       63
+      ],
+      [
+       "  046 Neoplasia maligna da bexiga",
+       11
+      ],
+      [
+       "  047 Neopl malig mening,encef e out partes SNC",
+       32
+      ],
+      [
+       "  048 Linfoma nao-Hodgkin",
+       11
+      ],
+      [
+       "  049 Mieloma mult e neopl malig de plasmocitos",
+       10
+      ],
+      [
+       "  050 Leucemia",
+       22
+      ],
+      [
+       "  051 Neoplasias in situ, Benig, Comport Incert",
+       18
+      ],
+      [
+       "  052 Restante de neoplasias malignas",
+       100
+      ],
+      [
+       "053-054 D Sangue e Org Hemat e Alguns Trans Imunit",
+       26
+      ],
+      [
+       "  053 Anemias",
+       14
+      ],
+      [
+       "  054 Rest d sangue, org hemat e alg transt imuni",
+       12
+      ],
+      [
+       "055-057 D Endocrinas, Nutricionais e Metabolicas",
+       188
+      ],
+      [
+       "  055 Diabetes Mellitus",
+       122
+      ],
+      [
+       "  056 Desnutricao",
+       31
+      ],
+      [
+       "  057 Rest doencas endocr, nutricion e metabol",
+       35
+      ],
+      [
+       "058-059 Transtornos Mentais e Comportamentais",
+       18
+      ],
+      [
+       "  058 Transt ment e comport uso subst psicoativas",
+       6
+      ],
+      [
+       "    058.1 Trans ment e comport devid uso alcool",
+       3
+      ],
+      [
+       "  059 Rest transtornos mentais e comportamentais",
+       12
+      ],
+      [
+       "060-063 Doencas do Sistema Nervoso",
+       134
+      ],
+      [
+       "  060 Meningite",
+       7
+      ],
+      [
+       "  061 Doenca de Alzheimer",
+       46
+      ],
+      [
+       "  062 Epilepsia",
+       14
+      ],
+      [
+       "  063 Restante das doencas do Sistema Nervoso",
+       67
+      ],
+      [
+       "064 Doencas dos Olhos e Anexos",
+       0
+      ],
+      [
+       "065 Doencas do Ouvido e da Apofise Mastoide",
+       0
+      ],
+      [
+       "066-072 Doencas do Aparelho Circulatorio",
+       985
+      ],
+      [
+       "  066 Febre reumat aguda e doen reum cron coracao",
+       7
+      ],
+      [
+       "  067 Doencas hipertensivas",
+       71
+      ],
+      [
+       "  068 Doencas isquemicas do coracao",
+       307
+      ],
+      [
+       "    068.1 Infarto agudo do miocardio",
+       268
+      ],
+      [
+       "  069 Outras doencas cardiacas",
+       272
+      ],
+      [
+       "  070 Doencas cerebrovasculares",
+       279
+      ],
+      [
+       "  071 Aterosclerose",
+       1
+      ],
+      [
+       "  072 Rest doencas do aparelho circulatorio",
+       48
+      ],
+      [
+       "073-077 Doencas do Aparelho Respiratorio",
+       611
+      ],
+      [
+       "  073 Influenza (Gripe)",
+       6
+      ],
+      [
+       "  074 Pneumonia",
+       280
+      ],
+      [
+       "  075 Out infec agudas das vias aereas inferiores",
+       20
+      ],
+      [
+       "    075.1 Bronquiolite",
+       19
+      ],
+      [
+       "  076 Doencas cronicas das vias aereas inferiores",
+       241
+      ],
+      [
+       "    076.1 Asma",
+       5
+      ],
+      [
+       "  077 Restante  doencas do aparelho respiratorio",
+       64
+      ],
+      [
+       "078-082 Doencas do Aparelho Digestivo",
+       210
+      ],
+      [
+       "  078 Ulcera gastrica, duodenal e peptica",
+       10
+      ],
+      [
+       "  079 Peritonite",
+       5
+      ],
+      [
+       "  080 Doencas do figado",
+       85
+      ],
+      [
+       "    080.1 Doenca alcoolica do figado",
+       16
+      ],
+      [
+       "    080.2 Fibrose e cirrose do figado",
+       39
+      ],
+      [
+       "    080.3 Outras doencas do figado",
+       30
+      ],
+      [
+       "  081 Colecistite",
+       5
+      ],
+      [
+       "  082 Rest doencas do aparelho digestivo",
+       105
+      ],
+      [
+       "083 Doencas da Pele e Tecido Subcutaneo",
+       16
+      ],
+      [
+       "084 Doencas Sist Osteomusc e Tecido Conjuntivo",
+       14
+      ],
+      [
+       "085-087 Doencas do Aparelho Geniturinario",
+       129
+      ],
+      [
+       "  085 D glomerulares e d renais tubulo-interstic",
+       4
+      ],
+      [
+       "  086 Insuficiencia renal",
+       92
+      ],
+      [
+       "  087 Rest doencas do aparelho geniturinario",
+       33
+      ],
+      [
+       "088-091 Gravidez, Parto e Puerperio",
+       8
+      ],
+      [
+       "  088 Gravidez que termina em aborto",
+       0
+      ],
+      [
+       "  089 Outras mortes obstetricas diretas",
+       7
+      ],
+      [
+       "  090 Mortes obstetricas indiretas",
+       0
+      ],
+      [
+       "  091 Morte obstetrica tardia",
+       0
+      ],
+      [
+       "  092 Sequela de causa obstetrica",
+       1
+      ],
+      [
+       "  093 Restante de gravidez, parto e puerperio",
+       0
+      ],
+      [
+       "092-096 Alg Afeccoes origin no periodo perinatal",
+       105
+      ],
+      [
+       "  092 Feto e recem-nasc afet fat mat e compl grav",
+       43
+      ],
+      [
+       "  093 Transt relac duracao gestacao e cresc fetal",
+       9
+      ],
+      [
+       "  094 Traumatismo de parto",
+       1
+      ],
+      [
+       "  095 Trans resp e cardiovas espec per perinatal",
+       29
+      ],
+      [
+       "  096 Rest afec originadas no periodo perinatal",
+       23
+      ],
+      [
+       "097-099 Malf Congen, Deform e Anomal Cromossomicas",
+       66
+      ],
+      [
+       "  097 Malformacoes congenitas do Sistema Nervoso",
+       17
+      ],
+      [
+       "  098 Malf congenitas do aparelho circulatorio",
+       19
+      ],
+      [
+       "  099 Rest de malf cong, deform e anomal cromoss",
+       30
+      ],
+      [
+       "100-102 Sint, Sin e Ach Anorm Clin e Lab, NCOP",
+       253
+      ],
+      [
+       "  100 Senilidade",
+       5
+      ],
+      [
+       "  101 Morte sem assistencia medica",
+       30
+      ],
+      [
+       "  102 Rest sint, sin e ach anorm clin e laborat",
+       218
+      ],
+      [
+       "103-112 Causas externas de morbidade e mortalidade",
+       569
+      ],
+      [
+       "  103 Acidentes de transporte terrestre",
+       137
+      ],
+      [
+       "  103.1 Demais ac transporte",
+       3
+      ],
+      [
+       "  104 Quedas",
+       26
+      ],
+      [
+       "  105 Afogamento e submersoes acidentais",
+       35
+      ],
+      [
+       "  106 Exposicao a fumaca, ao fogo e as chamas",
+       5
+      ],
+      [
+       "  107 Envenen, intoxic por ou expos a subst nociv",
+       1
+      ],
+      [
+       "  108 Lesoes autoprovocadas voluntariamente",
+       113
+      ],
+      [
+       "  109 Agressoes",
+       173
+      ],
+      [
+       "  110 Eventos(fatos) cuja intencao e indetermin",
+       20
+      ],
+      [
+       "  111 Intervencoes legais e operacoes de guerra",
+       1
+      ],
+      [
+       "  112 Demais causas externas",
+       55
+      ],
+      [
+       "  Campo da causa básica em branco",
+       0
+      ]
+     ],
+     "total": 4267
+    },
+    {
+     "id": "S6",
+     "linha": "CID10 4C Cap 04 c subtotal",
+     "naoClassificados": "incluir",
+     "rows": [
+      [
+       "E00 Síndrome de deficiência congênita de iodo",
+       0
+      ],
+      [
+       "---.0 Síndrome da deficiência congênita de iodo do tipo neurológico",
+       0
+      ],
+      [
+       "---.1 Síndrome da deficiência congênita de iodo do tipo mixedematoso",
+       0
+      ],
+      [
+       "---.2 Síndrome da deficiência congênita de iodo do tipo misto",
+       0
+      ],
+      [
+       "---.9 Síndrome da deficiência congênita de iodo, não especificada",
+       0
+      ],
+      [
+       "E01 Transtornos tireoidianos e afecções associadas, relacionados à deficiência de iodo",
+       0
+      ],
+      [
+       "---.0 Bócio (endêmico) difuso por deficiência de iodo",
+       0
+      ],
+      [
+       "---.1 Bócio (endêmico) multinodular por deficiência de iodo",
+       0
+      ],
+      [
+       "---.2 Bócio (endêmico) não especificado, por deficiência de iodo",
+       0
+      ],
+      [
+       "---.8 Outros transtornos tireoidianos e afecções associadas, relacionados com a deficiência de iodo",
+       0
+      ],
+      [
+       "E02 Hipotireoidismo subclínico por deficiência de iodo",
+       0
+      ],
+      [
+       "E03 Outros hipotireoidismos",
+       2
+      ],
+      [
+       "---.0 Hipotireoidismo congênito com bócio difuso",
+       0
+      ],
+      [
+       "---.1 Hipotireoidismo congênito sem bócio",
+       1
+      ],
+      [
+       "---.2 Hipotireoidismo devido a medicamentos e outras substâncias exógenas",
+       0
+      ],
+      [
+       "---.3 Hipotireoidismo pós-infeccioso",
+       0
+      ],
+      [
+       "---.4 Atrofia (adquirida) da tireóide",
+       0
+      ],
+      [
+       "---.5 Coma mixedematoso",
+       0
+      ],
+      [
+       "---.8 Outros hipotireoidismos especificados",
+       0
+      ],
+      [
+       "---.9 Hipotireoidismo não especificado",
+       1
+      ],
+      [
+       "E04 Outros bócios não-tóxicos",
+       0
+      ],
+      [
+       "---.0 Bócio não-tóxico difuso",
+       0
+      ],
+      [
+       "---.1 Bócio não-tóxico uninodular",
+       0
+      ],
+      [
+       "---.2 Bócio não-tóxico multinodular",
+       0
+      ],
+      [
+       "---.8 Outro bócio não-tóxico especificado",
+       0
+      ],
+      [
+       "---.9 Bócio não-tóxico, não especificado",
+       0
+      ],
+      [
+       "E05 Tireotoxicose [hipertireoidismo]",
+       1
+      ],
+      [
+       "---.0 Tireotoxicose com bócio difuso",
+       0
+      ],
+      [
+       "---.1 Tireotoxicose com bócio tóxico uninodular",
+       0
+      ],
+      [
+       "---.2 Tireotoxicose com bócio tóxico multinodular",
+       0
+      ],
+      [
+       "---.3 Tireotoxicose causada por tecido tireoidiano ectópico",
+       0
+      ],
+      [
+       "---.4 Tireotoxicose factícia",
+       0
+      ],
+      [
+       "---.5 Crise ou ´tempestade´ tireotóxica",
+       1
+      ],
+      [
+       "---.8 Outras tireotoxicoses",
+       0
+      ],
+      [
+       "---.9 Tireotoxicose não especificada",
+       0
+      ],
+      [
+       "E06 Tireoidite",
+       0
+      ],
+      [
+       "---.0 Tireoidite aguda",
+       0
+      ],
+      [
+       "---.1 Tireoidite subaguda",
+       0
+      ],
+      [
+       "---.2 Tireoidite crônica com tireotoxicose transitória",
+       0
+      ],
+      [
+       "---.3 Tireoidite auto-imune",
+       0
+      ],
+      [
+       "---.4 Tireoidite induzida por droga",
+       0
+      ],
+      [
+       "---.5 Outras tireoidites crônicas",
+       0
+      ],
+      [
+       "---.9 Tireoidite não especificada",
+       0
+      ],
+      [
+       "E07 Outros transtornos da tireóide",
+       0
+      ],
+      [
+       "---.0 Hipersecreção de calcitonina",
+       0
+      ],
+      [
+       "---.1 Bócio disormonogênico",
+       0
+      ],
+      [
+       "---.8 Outros transtornos especificados da tireóide",
+       0
+      ],
+      [
+       "---.9 Transtorno não especificado da tireóide",
+       0
+      ],
+      [
+       "@E10 Diabetes melito tipo 1",
+       18
+      ],
+      [
+       "---.0 Diabetes mellitus insulino-dependente - com coma",
+       0
+      ],
+      [
+       "---.1 Diabetes mellitus insulino-dependente - com cetoacidose",
+       2
+      ],
+      [
+       "---.2 Diabetes mellitus insulino-dependente - com complicações renais",
+       1
+      ],
+      [
+       "---.3 Diabetes mellitus insulino-dependente - com complicações oftálmicas",
+       0
+      ],
+      [
+       "---.4 Diabetes mellitus insulino-dependente - com complicações neurológicas",
+       0
+      ],
+      [
+       "---.5 Diabetes mellitus insulino-dependente - com complicações circulatórias periféricas",
+       2
+      ],
+      [
+       "---.6 Diabetes mellitus insulino-dependente - com outras complicações especificadas",
+       0
+      ],
+      [
+       "---.7 Diabetes mellitus insulino-dependente - com complicações múltiplas",
+       9
+      ],
+      [
+       "---.8 Diabetes mellitus insulino-dependente - com complicações não especificadas",
+       1
+      ],
+      [
+       "---.9 Diabetes mellitus insulino-dependente - sem complicações",
+       3
+      ],
+      [
+       "@E11 Diabetes melito tipo 2",
+       32
+      ],
+      [
+       "---.0 Diabetes mellitus não-insulino-dependente - com coma",
+       4
+      ],
+      [
+       "---.1 Diabetes mellitus não-insulino-dependente - com cetoacidose",
+       5
+      ],
+      [
+       "---.2 Diabetes mellitus não-insulino-dependente - com complicações renais",
+       8
+      ],
+      [
+       "---.3 Diabetes mellitus não-insulino-dependente - com complicações oftálmicas",
+       0
+      ],
+      [
+       "---.4 Diabetes mellitus não-insulino-dependente - com complicações neurológicas",
+       0
+      ],
+      [
+       "---.5 Diabetes mellitus não-insulino-dependente - com complicações circulatórias periféricas",
+       1
+      ],
+      [
+       "---.6 Diabetes mellitus não-insulino-dependente - com outras complicações especificadas",
+       0
+      ],
+      [
+       "---.7 Diabetes mellitus não-insulino-dependente - com complicações múltiplas",
+       4
+      ],
+      [
+       "---.8 Diabetes mellitus não-insulino-dependente - com complicações não especificadas",
+       1
+      ],
+      [
+       "---.9 Diabetes mellitus não-insulino-dependente - sem complicações",
+       9
+      ],
+      [
+       "E12 Diabetes mellitus relacionado com a desnutrição",
+       1
+      ],
+      [
+       "---.0 Diabetes mellitus relacionado com a desnutrição - com coma",
+       0
+      ],
+      [
+       "---.1 Diabetes mellitus relacionado com a desnutrição - com cetoacidose",
+       0
+      ],
+      [
+       "---.2 Diabetes mellitus relacionado com a desnutrição - com complicações renais",
+       0
+      ],
+      [
+       "---.3 Diabetes mellitus relacionado com a desnutrição - com complicações oftálmicas",
+       0
+      ],
+      [
+       "---.4 Diabetes mellitus relacionado com a desnutrição - com complicações neurológicas",
+       0
+      ],
+      [
+       "---.5 Diabetes mellitus relacionado com a desnutrição - com complicações circulatórias periféricas",
+       0
+      ],
+      [
+       "---.6 Diabetes mellitus relacionado com a desnutrição - com outras complicações especificadas",
+       0
+      ],
+      [
+       "---.7 Diabetes mellitus relacionado com a desnutrição - com complicações múltiplas",
+       0
+      ],
+      [
+       "---.8 Diabetes mellitus relacionado com a desnutrição - com complicações não especificadas",
+       0
+      ],
+      [
+       "---.9 Diabetes mellitus relacionado com a desnutrição - sem complicações",
+       1
+      ],
+      [
+       "E13 Outros tipos especificados de diabetes mellitus",
+       10
+      ],
+      [
+       "---.0 Outros tipos especificados de diabetes mellitus - com coma",
+       0
+      ],
+      [
+       "---.1 Outros tipos especificados de diabetes mellitus - com cetoacidose",
+       0
+      ],
+      [
+       "---.2 Outros tipos especificados de diabetes mellitus - com complicações renais",
+       1
+      ],
+      [
+       "---.3 Outros tipos especificados de diabetes mellitus - com complicações oftálmicas",
+       0
+      ],
+      [
+       "---.4 Outros tipos especificados de diabetes mellitus - com complicações neurológicas",
+       0
+      ],
+      [
+       "---.5 Outros tipos especificados de diabetes mellitus - com complicações circulatórias periféricas",
+       0
+      ],
+      [
+       "---.6 Outros tipos especificados de diabetes mellitus - com outras complicações especificadas",
+       0
+      ],
+      [
+       "---.7 Outros tipos especificados de diabetes mellitus - com complicações múltiplas",
+       5
+      ],
+      [
+       "---.8 Outros tipos especificados de diabetes mellitus - com complicações não especificadas",
+       3
+      ],
+      [
+       "---.9 Outros tipos especificados de diabetes mellitus - sem complicações",
+       1
+      ],
+      [
+       "E14 Diabetes mellitus não especificado",
+       61
+      ],
+      [
+       "---.0 Diabetes mellitus não especificado - com coma",
+       1
+      ],
+      [
+       "---.1 Diabetes mellitus não especificado - com cetoacidose",
+       3
+      ],
+      [
+       "---.2 Diabetes mellitus não especificado - com complicações renais",
+       27
+      ],
+      [
+       "---.3 Diabetes mellitus não especificado - com complicações oftálmicas",
+       0
+      ],
+      [
+       "---.4 Diabetes mellitus não especificado - com complicações neurológicas",
+       0
+      ],
+      [
+       "---.5 Diabetes mellitus não especificado - com complicações circulatórias periféricas",
+       2
+      ],
+      [
+       "---.6 Diabetes mellitus não especificado - com outras complicações especificadas",
+       2
+      ],
+      [
+       "---.7 Diabetes mellitus não especificado - com complicações múltiplas",
+       10
+      ],
+      [
+       "---.8 Diabetes mellitus não especificado - com complicações não especificadas",
+       3
+      ],
+      [
+       "---.9 Diabetes mellitus não especificado - sem complicações",
+       13
+      ],
+      [
+       "E15 Coma hipoglicêmico não-diabético",
+       0
+      ],
+      [
+       "E16 Outros transtornos da secreção pancreática interna",
+       2
+      ],
+      [
+       "---.0 Hipoglicemia induzida por droga sem coma",
+       0
+      ],
+      [
+       "---.1 Outra hipoglicemia",
+       0
+      ],
+      [
+       "---.2 Hipoglicemia não especificada",
+       2
+      ],
+      [
+       "---.3 Aumento da secreção de glucagon",
+       0
+      ],
+      [
+       "---.4 Secreção anormal de gastrina",
+       0
+      ],
+      [
+       "---.8 Outros transtornos especificados da secreção pancreática interna",
+       0
+      ],
+      [
+       "---.9 Transtorno não especificado da secreção pancreática interna",
+       0
+      ],
+      [
+       "E20 Hipoparatireoidismo",
+       0
+      ],
+      [
+       "---.0 Hipoparatireoidismo idiopático",
+       0
+      ],
+      [
+       "---.1 Pseudohipoparatireoidismo",
+       0
+      ],
+      [
+       "---.8 Outro hipoparatireoidismo",
+       0
+      ],
+      [
+       "---.9 Hipoparatireoidismo não especificado",
+       0
+      ],
+      [
+       "E21 Hiperparatireoidismo e outros transtornos da glândula paratireóide",
+       0
+      ],
+      [
+       "---.0 Hiperparatireoidismo primário",
+       0
+      ],
+      [
+       "---.1 Hiperparatireoidismo secundário não classificado em outra parte",
+       0
+      ],
+      [
+       "---.2 Outro hiperparatireoidismo",
+       0
+      ],
+      [
+       "---.3 Hiperparatireoidismo não especificado",
+       0
+      ],
+      [
+       "---.4 Outros transtornos especificados da glândula paratireóide",
+       0
+      ],
+      [
+       "---.5 Transtorno não especificado da glândula paratireóide",
+       0
+      ],
+      [
+       "E22 Hiperfunção da hipófise",
+       0
+      ],
+      [
+       "---.0 Acromegalia e gigantismo hipofisário",
+       0
+      ],
+      [
+       "---.1 Hiperprolactinemia",
+       0
+      ],
+      [
+       "---.2 Síndrome da secreção inadequada de hormônio antidiurético",
+       0
+      ],
+      [
+       "---.8 Outras hiperfunções da hipófise",
+       0
+      ],
+      [
+       "---.9 Hiperfunção não especificada da hipófise",
+       0
+      ],
+      [
+       "E23 Hipofunção e outros transtornos da hipófise",
+       0
+      ],
+      [
+       "---.0 Hipopituitarismo",
+       0
+      ],
+      [
+       "---.1 Hipopituitarismo induzido por droga",
+       0
+      ],
+      [
+       "---.2 Diabetes insípido",
+       0
+      ],
+      [
+       "---.3 Disfunção hipotalâmica não classificada em outra parte",
+       0
+      ],
+      [
+       "---.6 Outros transtornos da hipófise",
+       0
+      ],
+      [
+       "---.7 Transtorno não especificado da hipófise",
+       0
+      ],
+      [
+       "E24 Síndrome de Cushing",
+       0
+      ],
+      [
+       "---.0 Síndrome de Cushing dependente da hipófise",
+       0
+      ],
+      [
+       "---.1 Síndrome de Nelson",
+       0
+      ],
+      [
+       "---.2 Síndrome de Cushing induzida por droga",
+       0
+      ],
+      [
+       "---.3 Síndrome do ACTH ectópico",
+       0
+      ],
+      [
+       "---.4 Síndrome de pseudo-Cushing induzida pelo álcool",
+       0
+      ],
+      [
+       "---.8 Outra síndrome de Cushing",
+       0
+      ],
+      [
+       "---.9 Síndrome de Cushing não especificada",
+       0
+      ],
+      [
+       "E25 Transtornos adrenogenitais",
+       0
+      ],
+      [
+       "---.0 Transtornos adrenogenitais congênitos associados à deficiência enzimática",
+       0
+      ],
+      [
+       "---.8 Outros transtornos adrenogenitais",
+       0
+      ],
+      [
+       "---.9 Transtorno adrenogenital não especificado",
+       0
+      ],
+      [
+       "E26 Hiperaldosteronismo",
+       0
+      ],
+      [
+       "---.0 Hiperaldosteronismo primário",
+       0
+      ],
+      [
+       "---.1 Hiperaldosteronismo secundário",
+       0
+      ],
+      [
+       "---.8 Outro hiperaldosteronismo",
+       0
+      ],
+      [
+       "---.9 Hiperaldosteronismo não especificado",
+       0
+      ],
+      [
+       "E27 Outros transtornos da glândula supra-renal",
+       1
+      ],
+      [
+       "---.0 Outros excessos de atividade adrenocortical",
+       0
+      ],
+      [
+       "---.1 Insuficiência adrenocortical primária",
+       0
+      ],
+      [
+       "---.2 Crise addisoniana",
+       0
+      ],
+      [
+       "---.3 Insuficiência adrenocortical induzida por drogas",
+       0
+      ],
+      [
+       "---.4 Outras insuficiências adrenocorticais e as não especificadas",
+       0
+      ],
+      [
+       "---.5 Hiperfunção adrenomedular",
+       0
+      ],
+      [
+       "---.8 Outros transtornos especificados da supra-renal",
+       1
+      ],
+      [
+       "---.9 Transtorno não especificado da supra-renal",
+       0
+      ],
+      [
+       "E28 Disfunção ovariana",
+       0
+      ],
+      [
+       "---.0 Excesso de estrógeno",
+       0
+      ],
+      [
+       "---.1 Excesso de andrógenos",
+       0
+      ],
+      [
+       "---.2 Síndrome do ovário policístico",
+       0
+      ],
+      [
+       "---.3 Insuficiência ovariana primária",
+       0
+      ],
+      [
+       "---.8 Outra disfunção ovariana",
+       0
+      ],
+      [
+       "---.9 Disfunção ovariana não especificada",
+       0
+      ],
+      [
+       "E29 Disfunção testicular",
+       0
+      ],
+      [
+       "---.0 Hiperfunção testicular",
+       0
+      ],
+      [
+       "---.1 Hipofunção testicular",
+       0
+      ],
+      [
+       "---.8 Outra disfunção testicular",
+       0
+      ],
+      [
+       "---.9 Disfunção testicular não especificada",
+       0
+      ],
+      [
+       "E30 Transtornos da puberdade não classificados em outra parte",
+       0
+      ],
+      [
+       "---.0 Puberdade retardada",
+       0
+      ],
+      [
+       "---.1 Puberdade precoce",
+       0
+      ],
+      [
+       "---.8 Outros transtornos da puberdade",
+       0
+      ],
+      [
+       "---.9 Transtorno não especificado da puberdade",
+       0
+      ],
+      [
+       "E31 Disfunção poliglandular",
+       0
+      ],
+      [
+       "---.0 Insuficiência poliglandular auto-imune",
+       0
+      ],
+      [
+       "---.1 Hiperfunção poliglandular",
+       0
+      ],
+      [
+       "---.8 Outra disfunção poliglandular",
+       0
+      ],
+      [
+       "---.9 Disfunção poliglandular não especificada",
+       0
+      ],
+      [
+       "E32 Doenças do timo",
+       0
+      ],
+      [
+       "---.0 Hiperplasia persistente do timo",
+       0
+      ],
+      [
+       "---.1 Abscesso do timo",
+       0
+      ],
+      [
+       "---.8 Outras doenças do timo",
+       0
+      ],
+      [
+       "---.9 Doença do timo não especificada",
+       0
+      ],
+      [
+       "E34 Outros transtornos endócrinos",
+       1
+      ],
+      [
+       "---.0 Síndrome carcinóide",
+       0
+      ],
+      [
+       "---.1 Outra hipersecreção de hormônios intestinais",
+       0
+      ],
+      [
+       "---.2 Secreção hormonal ectópica, não classificada em outra parte",
+       0
+      ],
+      [
+       "---.3 Nanismo, não classificado em outra parte",
+       0
+      ],
+      [
+       "---.4 Alta estatura constitucional",
+       0
+      ],
+      [
+       "---.5 Síndrome de resistência a andrógenos",
+       0
+      ],
+      [
+       "---.8 Outros transtornos endócrinos especificados",
+       1
+      ],
+      [
+       "---.9 Transtorno endócrino não especificado",
+       0
+      ],
+      [
+       "E35 Transtornos das glândulas endócrinas em doenças classificadas em outra parte",
+       0
+      ],
+      [
+       "---.0 Transtornos da glândula tireóide em doenças classificadas em outra parte",
+       0
+      ],
+      [
+       "---.1 Transtornos das supra-renais em doenças classificadas em outra parte",
+       0
+      ],
+      [
+       "---.8 Transtornos de outras glândulas endócrinas em doenças classificadas em outra parte",
+       0
+      ],
+      [
+       "E40 Kwashiorkor",
+       1
+      ],
+      [
+       "E41 Marasmo nutricional",
+       1
+      ],
+      [
+       "E42 Kwashiorkor marasmático",
+       0
+      ],
+      [
+       "E43 Desnutrição protéico-calórica grave não especificada",
+       23
+      ],
+      [
+       "E44 Desnutrição protéico-calórica de graus moderado e leve",
+       2
+      ],
+      [
+       "---.0 Desnutrição protéico-calórica moderada",
+       2
+      ],
+      [
+       "---.1 Desnutrição protéico-calórica leve",
+       0
+      ],
+      [
+       "E45 Atraso do desenvolvimento devido à desnutrição protéico-calórica",
+       0
+      ],
+      [
+       "E46 Desnutrição protéico-calórica não especificada",
+       4
+      ],
+      [
+       "E50 Deficiência de vitamina A",
+       0
+      ],
+      [
+       "---.0 Deficiência de vitamina A com xerose conjuntival",
+       0
+      ],
+      [
+       "---.1 Deficiência de vitamina A com mancha de Bitot e xerose conjuntival",
+       0
+      ],
+      [
+       "---.2 Deficiência de vitamina A com xerose da córnea",
+       0
+      ],
+      [
+       "---.3 Deficiência de vitamina A com ulceração e xerose da córnea",
+       0
+      ],
+      [
+       "---.4 Deficiência de vitamina A com ceratomalácia",
+       0
+      ],
+      [
+       "---.5 Deficiência de vitamina A com cegueira noturna",
+       0
+      ],
+      [
+       "---.6 Deficiência de vitamina A com cicatrizes xeroftálmicas da córnea",
+       0
+      ],
+      [
+       "---.7 Outras manifestações oculares devidas a deficiência de vitamina A",
+       0
+      ],
+      [
+       "---.8 Outras manifestações devidas a deficiência de vitamina A",
+       0
+      ],
+      [
+       "---.9 Deficiência não especificada de vitamina A",
+       0
+      ],
+      [
+       "E51 Deficiência de tiamina",
+       0
+      ],
+      [
+       "---.1 Beribéri",
+       0
+      ],
+      [
+       "---.2 Encefalopatia de Wernicke",
+       0
+      ],
+      [
+       "---.8 Outras manifestações da deficiência de tiamina",
+       0
+      ],
+      [
+       "---.9 Deficiência não especificada de tiamina",
+       0
+      ],
+      [
+       "E52 Deficiência de niacina [pelagra]",
+       0
+      ],
+      [
+       "E53 Deficiência de outras vitaminas do grupo B",
+       0
+      ],
+      [
+       "---.0 Deficiência de riboflavina",
+       0
+      ],
+      [
+       "---.1 Deficiência de piridoxina",
+       0
+      ],
+      [
+       "---.8 Deficiência de outras vitaminas especificadas do grupo B",
+       0
+      ],
+      [
+       "---.9 Deficiência não especificada de vitamina B",
+       0
+      ],
+      [
+       "E54 Deficiência de ácido ascórbico",
+       0
+      ],
+      [
+       "E55 Deficiência de vitamina D",
+       0
+      ],
+      [
+       "---.0 Raquitismo ativo",
+       0
+      ],
+      [
+       "---.9 Deficiência não especificada de vitamina D",
+       0
+      ],
+      [
+       "E56 Outras deficiências vitamínicas",
+       0
+      ],
+      [
+       "---.0 Deficiência de vitamina E",
+       0
+      ],
+      [
+       "---.1 Deficiência de vitamina K",
+       0
+      ],
+      [
+       "---.8 Deficiência de outras vitaminas",
+       0
+      ],
+      [
+       "---.9 Deficiência vitamínica não especificada",
+       0
+      ],
+      [
+       "E58 Deficiência de cálcio da dieta",
+       0
+      ],
+      [
+       "E59 Deficiência de selênio da dieta",
+       0
+      ],
+      [
+       "E60 Deficiência de zinco da dieta",
+       0
+      ],
+      [
+       "E61 Deficiência de outros elementos nutrientes",
+       0
+      ],
+      [
+       "---.0 Deficiência de cobre",
+       0
+      ],
+      [
+       "---.1 Deficiência de ferro",
+       0
+      ],
+      [
+       "---.2 Deficiência de magnésio",
+       0
+      ],
+      [
+       "---.3 Deficiência de manganês",
+       0
+      ],
+      [
+       "---.4 Deficiência de cromo",
+       0
+      ],
+      [
+       "---.5 Deficiência de molibdênio",
+       0
+      ],
+      [
+       "---.6 Deficiência de vanádio",
+       0
+      ],
+      [
+       "---.7 Deficiência de múltiplos elementos nutrientes",
+       0
+      ],
+      [
+       "---.8 Deficiência de outros elementos nutrientes especificados",
+       0
+      ],
+      [
+       "---.9 Deficiência de elementos nutrientes não especificados",
+       0
+      ],
+      [
+       "E63 Outras deficiências nutricionais",
+       0
+      ],
+      [
+       "---.0 Deficiência de ácido graxo essencial",
+       0
+      ],
+      [
+       "---.1 Desequilíbrio de constituintes da ingestão de alimentos",
+       0
+      ],
+      [
+       "---.8 Outras deficiências nutricionais especificadas",
+       0
+      ],
+      [
+       "---.9 Deficiência nutricional não especificada",
+       0
+      ],
+      [
+       "E64 Seqüelas de desnutrição e de outras deficiências nutricionais",
+       0
+      ],
+      [
+       "---.0 Seqüelas de desnutrição protéico-calórica",
+       0
+      ],
+      [
+       "---.1 Seqüelas da deficiência de vitamina A",
+       0
+      ],
+      [
+       "---.2 Seqüelas da deficiência de vitamina C",
+       0
+      ],
+      [
+       "---.3 Seqüelas do raquitismo",
+       0
+      ],
+      [
+       "---.8 Seqüelas de outras deficiências nutricionais",
+       0
+      ],
+      [
+       "---.9 Seqüelas de deficiência nutricional não especificada",
+       0
+      ],
+      [
+       "E65 Adiposidade localizada",
+       0
+      ],
+      [
+       "E66 Obesidade",
+       4
+      ],
+      [
+       "---.0 Obesidade devida a excesso de calorias",
+       0
+      ],
+      [
+       "---.1 Obesidade induzida por drogas",
+       0
+      ],
+      [
+       "---.2 Obesidade extrema com hipoventilação alveolar",
+       0
+      ],
+      [
+       "---.8 Outra obesidade",
+       0
+      ],
+      [
+       "---.9 Obesidade não especificada",
+       4
+      ],
+      [
+       "E67 Outras formas de hiperalimentação",
+       0
+      ],
+      [
+       "---.0 Hipervitaminose A",
+       0
+      ],
+      [
+       "---.1 Hipercarotenemia",
+       0
+      ],
+      [
+       "---.2 Síndrome de megavitamina B6",
+       0
+      ],
+      [
+       "---.3 Hipervitaminose D",
+       0
+      ],
+      [
+       "---.8 Outras formas especificadas de hiperalimentação",
+       0
+      ],
+      [
+       "E68 Seqüelas de hiperalimentação",
+       0
+      ],
+      [
+       "E70 Distúrbios do metabolismo de aminoácidos aromáticos",
+       0
+      ],
+      [
+       "---.0 Fenilcetonúria clássica",
+       0
+      ],
+      [
+       "---.1 Outras hiperfenilalaninemias",
+       0
+      ],
+      [
+       "---.2 Distúrbios do metabolismo da tirosina",
+       0
+      ],
+      [
+       "---.3 Albinismo",
+       0
+      ],
+      [
+       "---.8 Outros distúrbios do metabolismo de aminoácidos aromáticos",
+       0
+      ],
+      [
+       "---.9 Distúrbio não especificado do metabolismo de aminoácidos aromáticos",
+       0
+      ],
+      [
+       "E71 Distúrbios do metabolismo de aminoácidos de cadeia ramificada e do metabolismo dos ácidos graxos",
+       0
+      ],
+      [
+       "---.0 Doença da urina em xarope de ácer (ou bordo) (Maple-syrup urine disease)",
+       0
+      ],
+      [
+       "---.1 Outros distúrbios do metabolismo de aminoácidos de cadeia ramificada",
+       0
+      ],
+      [
+       "---.2 Distúrbio não especificado do metabolismo de aminoácidos de cadeia ramificada",
+       0
+      ],
+      [
+       "---.3 Distúrbios do metabolismo de ácidos graxos",
+       0
+      ],
+      [
+       "E72 Outros distúrbios do metabolismo de aminoácidos",
+       0
+      ],
+      [
+       "---.0 Distúrbios do transporte de aminoácidos",
+       0
+      ],
+      [
+       "---.1 Distúrbios do metabolismo dos aminoácidos que contêm enxofre",
+       0
+      ],
+      [
+       "---.2 Distúrbios do metabolismo do ciclo da uréia",
+       0
+      ],
+      [
+       "---.3 Distúrbios do metabolismo da lisina e da hidroxilisina",
+       0
+      ],
+      [
+       "---.4 Distúrbios do metabolismo da ornitina",
+       0
+      ],
+      [
+       "---.5 Distúrbios do metabolismo da glicina",
+       0
+      ],
+      [
+       "---.8 Outros distúrbios especificados do metabolismo dos aminoácidos",
+       0
+      ],
+      [
+       "---.9 Distúrbio não especificado do metabolismo dos aminoácidos",
+       0
+      ],
+      [
+       "E73 Intolerância à lactose",
+       0
+      ],
+      [
+       "---.0 Deficiência congênita de lactase",
+       0
+      ],
+      [
+       "---.1 Deficiência secundária de lactase",
+       0
+      ],
+      [
+       "---.8 Outras intolerâncias à lactose",
+       0
+      ],
+      [
+       "---.9 Intolerância à lactose, não especificada",
+       0
+      ],
+      [
+       "E74 Outros distúrbios do metabolismo de carboidratos",
+       0
+      ],
+      [
+       "---.0 Doença de depósito de glicogênio",
+       0
+      ],
+      [
+       "---.1 Distúrbios do metabolismo da frutose",
+       0
+      ],
+      [
+       "---.2 Distúrbios do metabolismo da galactose",
+       0
+      ],
+      [
+       "---.3 Outros distúrbios da absorção intestinal de carboidratos",
+       0
+      ],
+      [
+       "---.4 Distúrbios do metabolismo do piruvato e da gliconeogênese",
+       0
+      ],
+      [
+       "---.8 Outros distúrbios especificados do metabolismo de carboidratos",
+       0
+      ],
+      [
+       "---.9 Distúrbio não especificado do metabolismo de carboidratos",
+       0
+      ],
+      [
+       "E75 Distúrbios do metabolismo de esfingolípides e outros distúrbios de depósito de lípides",
+       0
+      ],
+      [
+       "---.0 Gangliosidose GM2",
+       0
+      ],
+      [
+       "---.1 Outras gangliosidoses",
+       0
+      ],
+      [
+       "---.2 Outras esfingolipidoses",
+       0
+      ],
+      [
+       "---.3 Esfingolipidose não especificada",
+       0
+      ],
+      [
+       "---.4 Lipofuscinose neuronal ceróide",
+       0
+      ],
+      [
+       "---.5 Outros distúrbios do depósito de lípides",
+       0
+      ],
+      [
+       "---.6 Distúrbio não especificado do depósito de lípides",
+       0
+      ],
+      [
+       "E76 Distúrbios do metabolismo do glicosaminoglicano",
+       1
+      ],
+      [
+       "---.0 Mucopolissacaridose do tipo I",
+       0
+      ],
+      [
+       "---.1 Mucopolissacaridose do tipo II",
+       0
+      ],
+      [
+       "---.2 Outras mucopolissacaridoses",
+       0
+      ],
+      [
+       "---.3 Mucopolissacaridose não especificada",
+       0
+      ],
+      [
+       "---.8 Outros distúrbios do metabolismo do glicosaminoglicano",
+       0
+      ],
+      [
+       "---.9 Distúrbio não especificado do metabolismo do glicosaminoglicano",
+       1
+      ],
+      [
+       "E77 Distúrbios do metabolismo de glicoproteínas",
+       0
+      ],
+      [
+       "---.0 Defeitos na modificação pós-translacional de enzimas lisossômicas",
+       0
+      ],
+      [
+       "---.1 Defeitos na degradação das glicoproteínas",
+       0
+      ],
+      [
+       "---.8 Outros distúrbios do metabolismo de glicoproteínas",
+       0
+      ],
+      [
+       "---.9 Distúrbio não especificado do metabolismo de glicoproteínas",
+       0
+      ],
+      [
+       "E78 Distúrbios do metabolismo de lipoproteínas e outras lipidemias",
+       6
+      ],
+      [
+       "---.0 Hipercolesterolemia pura",
+       0
+      ],
+      [
+       "---.1 Hipergliceridemia pura",
+       0
+      ],
+      [
+       "---.2 Hiperlipidemia mista",
+       2
+      ],
+      [
+       "---.3 Hiperquilomicronemia",
+       0
+      ],
+      [
+       "---.4 Outras hiperlipidemias",
+       0
+      ],
+      [
+       "---.5 Hiperlipidemia não especificada",
+       0
+      ],
+      [
+       "---.6 Deficiências de lipoproteínas",
+       0
+      ],
+      [
+       "---.8 Outros distúrbios do metabolismo de lipoproteínas",
+       0
+      ],
+      [
+       "---.9 Distúrbio não especificado do metabolismo de lipoproteínas",
+       4
+      ],
+      [
+       "E79 Distúrbios do metabolismo de purina e pirimidina",
+       0
+      ],
+      [
+       "---.0 Hiperuricemia sem sinais de artrite inflamatória e de doença com tofos",
+       0
+      ],
+      [
+       "---.1 Síndrome de Lesch-Nyhan",
+       0
+      ],
+      [
+       "---.8 Outros distúrbios do metabolismo da purina e pirimidina",
+       0
+      ],
+      [
+       "---.9 Distúrbio não especificado do metabolismo da purina e pirimidina",
+       0
+      ],
+      [
+       "E80 Distúrbios do metabolismo da porfirina e da bilirrubina",
+       0
+      ],
+      [
+       "---.0 Porfiria hereditária eritropoética",
+       0
+      ],
+      [
+       "---.1 Porfiria cutânea tardia",
+       0
+      ],
+      [
+       "---.2 Outras porfirias",
+       0
+      ],
+      [
+       "---.3 Defeitos da catalase e da peroxidase",
+       0
+      ],
+      [
+       "---.4 Síndrome de Gilbert",
+       0
+      ],
+      [
+       "---.5 Síndrome da Crigler-Najjar",
+       0
+      ],
+      [
+       "---.6 Outros distúrbios do metabolismo da bilirrubina",
+       0
+      ],
+      [
+       "---.7 Distúrbio não especificado do metabolismo da bilirrubina",
+       0
+      ],
+      [
+       "E83 Distúrbios do metabolismo de minerais",
+       0
+      ],
+      [
+       "---.0 Distúrbios do metabolismo do cobre",
+       0
+      ],
+      [
+       "---.1 Doença do metabolismo do ferro",
+       0
+      ],
+      [
+       "---.2 Distúrbios do metabolismo do zinco",
+       0
+      ],
+      [
+       "@---.3 Disturbios do metabolismo do fosforo e das fosfatases",
+       0
+      ],
+      [
+       "---.4 Distúrbios do metabolismo do magnésio",
+       0
+      ],
+      [
+       "---.5 Distúrbios do metabolismo do cálcio",
+       0
+      ],
+      [
+       "---.8 Outros distúrbios do metabolismo mineral",
+       0
+      ],
+      [
+       "---.9 Distúrbio não especificado do metabolismo mineral",
+       0
+      ],
+      [
+       "E84 Fibrose cística",
+       2
+      ],
+      [
+       "---.0 Fibrose cística com manifestações pulmonares",
+       1
+      ],
+      [
+       "---.1 Fibrose cística com manifestações intestinais",
+       0
+      ],
+      [
+       "---.8 Fibrose cística com outras manifestações",
+       0
+      ],
+      [
+       "---.9 Fibrose cística não especificada",
+       1
+      ],
+      [
+       "E85 Amiloidose",
+       0
+      ],
+      [
+       "---.0 Amiloidose heredofamiliar não-neuropática",
+       0
+      ],
+      [
+       "---.1 Amiloidose heredofamiliar neuropática",
+       0
+      ],
+      [
+       "---.2 Amiloidose heredofamiliar não especificada",
+       0
+      ],
+      [
+       "---.3 Amiloidose sistêmica secundária",
+       0
+      ],
+      [
+       "---.4 Amiloidose limitada a órgãos",
+       0
+      ],
+      [
+       "---.8 Outras amiloidoses",
+       0
+      ],
+      [
+       "---.9 Amiloidose não especificada",
+       0
+      ],
+      [
+       "E86 Depleção de volume",
+       1
+      ],
+      [
+       "E87 Outros transtornos do equilíbrio hidroeletrolítico e ácido-básico",
+       13
+      ],
+      [
+       "---.0 Hiperosmolaridade e hipernatremia",
+       0
+      ],
+      [
+       "---.1 Hiposmolaridade e hiponatremia",
+       2
+      ],
+      [
+       "---.2 Acidose",
+       3
+      ],
+      [
+       "---.3 Alcalose",
+       0
+      ],
+      [
+       "---.4 Distúrbio misto do equilíbrio ácido-básico",
+       1
+      ],
+      [
+       "---.5 Hiperpotassemia",
+       0
+      ],
+      [
+       "---.6 Hipopotassemia",
+       0
+      ],
+      [
+       "---.7 Sobrecarga de líquidos",
+       0
+      ],
+      [
+       "---.8 Outros transtornos do equilíbrio hidroeletrolítico não classificados em outra parte",
+       7
+      ],
+      [
+       "E88 Outros distúrbios metabólicos",
+       1
+      ],
+      [
+       "---.0 Distúrbios do metabolismo das proteínas plasmáticas não classificados em outra parte",
+       0
+      ],
+      [
+       "---.1 Lipodistrofia não classificada em outra parte",
+       0
+      ],
+      [
+       "---.2 Lipomatose não classificada em outra parte",
+       0
+      ],
+      [
+       "&---.3 Síndrome de lise tumoral",
+       0
+      ],
+      [
+       "---.8 Outros distúrbios especificados do metabolismo",
+       1
+      ],
+      [
+       "---.9 Distúrbio metabólico não especificado",
+       0
+      ],
+      [
+       "E89 Transtornos endócrinos e metabólicos pós-procedimentos, não classificados em outra parte",
+       0
+      ],
+      [
+       "---.0 Hipotireoidismo pós-procedimento",
+       0
+      ],
+      [
+       "---.1 Hipoinsulinemia pós-procedimento",
+       0
+      ],
+      [
+       "---.2 Hipoparatireoidismo pós-procedimento",
+       0
+      ],
+      [
+       "---.3 Hipopituitarismo pós-procedimento",
+       0
+      ],
+      [
+       "---.4 Insuficiência ovariana pós-procedimento",
+       0
+      ],
+      [
+       "---.5 Hipofunção testicular pós-procedimento",
+       0
+      ],
+      [
+       "---.6 Hipofunção adrenocortical(-medular) pós-procedimento",
+       0
+      ],
+      [
+       "---.8 Outros transtornos endócrinos e metabólicos pós-procedimento",
+       0
+      ],
+      [
+       "---.9 Transtornos endócrinos e metabólicos não especificados pós-procedimento",
+       0
+      ],
+      [
+       "E90 Transtornos nutricionais e metabólicos em doenças classificadas em outra parte",
+       0
+      ],
+      [
+       "Não classificados",
+       4079
+      ]
+     ],
+     "total": 4267
+    },
+    {
+     "id": "S7",
+     "linha": "Mes de Investigac",
+     "naoClassificados": "incluir",
+     "rows": [
+      [
+       "Jan",
+       58
+      ],
+      [
+       "Fev",
+       100
+      ],
+      [
+       "Mar",
+       55
+      ],
+      [
+       "Abr",
+       66
+      ],
+      [
+       "Mai",
+       55
+      ],
+      [
+       "Jun",
+       54
+      ],
+      [
+       "Jul",
+       54
+      ],
+      [
+       "Ago",
+       63
+      ],
+      [
+       "Set",
+       26
+      ],
+      [
+       "Out",
+       54
+      ],
+      [
+       "Nov",
+       152
+      ],
+      [
+       "Dez",
+       79
+      ],
+      [
+       "branco",
+       3451
+      ],
+      [
+       "Ign",
+       0
+      ]
+     ],
+     "total": 4267
+    },
+    {
+     "id": "S8",
+     "linha": "Causa (minusculo)",
+     "naoClassificados": "incluir",
+     "rows": [
+      [
+       "001-031 Algumas Doencas Infecciosas e Parasitar",
+       209
+      ],
+      [
+       "  001 Doencas Infecciosas intestinais",
+       21
+      ],
+      [
+       "  002 Colera",
+       0
+      ],
+      [
+       "  003 Diarr e Gastroenter orig infec presumivel",
+       20
+      ],
+      [
+       "  004 Outras Doencas Infecciosas Intestinais",
+       1
+      ],
+      [
+       "    004.1 Febres Tifoide e Paratifoide",
+       0
+      ],
+      [
+       "005-006 Tuberculose",
+       34
+      ],
+      [
+       "  005 Tuberculose respiratoria",
+       31
+      ],
+      [
+       "  006 Outras tuberculoses",
+       3
+      ],
+      [
+       "007-015 Outras Doencas bacterianas",
+       68
+      ],
+      [
+       "  007 Peste",
+       0
+      ],
+      [
+       "  008 Leptospirose",
+       1
+      ],
+      [
+       "  009 Hanseniase",
+       1
+      ],
+      [
+       "  010 Tetano",
+       0
+      ],
+      [
+       "    010.1 Tetano neonatal",
+       0
+      ],
+      [
+       "    010.2 Tetano obstetrico",
+       0
+      ],
+      [
+       "    010.3 Tetano acidental",
+       0
+      ],
+      [
+       "  011 Difteria",
+       0
+      ],
+      [
+       "  012 Coqueluche",
+       0
+      ],
+      [
+       "  013 Infeccao meningococica",
+       0
+      ],
+      [
+       "  014 Septicemia",
+       57
+      ],
+      [
+       "  015 Infeccoes com transm predominant sexual",
+       1
+      ],
+      [
+       "016-023 Doencas virais",
+       55
+      ],
+      [
+       "  016 Poliomielite aguda",
+       0
+      ],
+      [
+       "  017 Raiva",
+       0
+      ],
+      [
+       "  018 Dengue",
+       3
+      ],
+      [
+       "  019 Febre Amarela",
+       0
+      ],
+      [
+       "  020 Out febres p/arbovirus e febr hemorr virais",
+       3
+      ],
+      [
+       "  021 Sarampo",
+       0
+      ],
+      [
+       "  022 Hepatite viral",
+       16
+      ],
+      [
+       "  023 Doen p/Virus da Imunodefic Humana (HIV)",
+       31
+      ],
+      [
+       "024-027 Doencas devidas a Protozoarios",
+       4
+      ],
+      [
+       "  024 Malaria",
+       0
+      ],
+      [
+       "  025 Leishmaniose",
+       0
+      ],
+      [
+       "  026 Doenca de Chagas",
+       3
+      ],
+      [
+       "  027 Toxoplasmose",
+       0
+      ],
+      [
+       "028-031 Helmintiases",
+       0
+      ],
+      [
+       "  028 Esquistossomose",
+       0
+      ],
+      [
+       "  029 Cisticercose",
+       0
+      ],
+      [
+       "  030 Restante de Helmintiases",
+       0
+      ],
+      [
+       "  031 Restante de algumas doenc infecc e parasit",
+       27
+      ],
+      [
+       "032-052 Neoplasias",
+       726
+      ],
+      [
+       "  032 Neopl malig do labio, cav oral e faringe",
+       24
+      ],
+      [
+       "  033 Neoplasia maligna do esofago",
+       15
+      ],
+      [
+       "  034 Neoplasia maligna do estomago",
+       54
+      ],
+      [
+       "  035 Neoplasia maligna do colo,reto e anus",
+       41
+      ],
+      [
+       "  036 Neopl malig do figado e vias bil intrahepat",
+       53
+      ],
+      [
+       "  037 Neoplasia maligna do pancreas",
+       38
+      ],
+      [
+       "  038 Neoplasia maligna da laringe",
+       17
+      ],
+      [
+       "  039 Neopl malig da traqueia,bronquios e pulmoes",
+       106
+      ],
+      [
+       "  040 Neoplasia maligna da pele",
+       3
+      ],
+      [
+       "  041 Neoplasia maligna da mama",
+       45
+      ],
+      [
+       "  042 Neoplasia maligna do colo do utero",
+       47
+      ],
+      [
+       "  043 Neopl malig de corpo e partes n/esp utero",
+       9
+      ],
+      [
+       "  044 Neoplasia maligna do ovario",
+       7
+      ],
+      [
+       "  045 Neoplasia maligna da prostata",
+       63
+      ],
+      [
+       "  046 Neoplasia maligna da bexiga",
+       11
+      ],
+      [
+       "  047 Neopl malig mening,encef e out partes SNC",
+       32
+      ],
+      [
+       "  048 Linfoma nao-Hodgkin",
+       11
+      ],
+      [
+       "  049 Mieloma mult e neopl malig de plasmocitos",
+       10
+      ],
+      [
+       "  050 Leucemia",
+       22
+      ],
+      [
+       "  051 Neoplasias in situ, Benig, Comport Incert",
+       18
+      ],
+      [
+       "  052 Restante de neoplasias malignas",
+       100
+      ],
+      [
+       "053-054 D Sangue e Org Hemat e Alguns Trans Imunit",
+       26
+      ],
+      [
+       "  053 Anemias",
+       14
+      ],
+      [
+       "  054 Rest d sangue, org hemat e alg transt imuni",
+       12
+      ],
+      [
+       "055-057 D Endocrinas, Nutricionais e Metabolicas",
+       188
+      ],
+      [
+       "  055 Diabetes Mellitus",
+       122
+      ],
+      [
+       "  056 Desnutricao",
+       31
+      ],
+      [
+       "  057 Rest doencas endocr, nutricion e metabol",
+       35
+      ],
+      [
+       "058-059 Transtornos Mentais e Comportamentais",
+       18
+      ],
+      [
+       "  058 Transt ment e comport uso subst psicoativas",
+       6
+      ],
+      [
+       "    058.1 Trans ment e comport devid uso alcool",
+       3
+      ],
+      [
+       "  059 Rest transtornos mentais e comportamentais",
+       12
+      ],
+      [
+       "060-063 Doencas do Sistema Nervoso",
+       134
+      ],
+      [
+       "  060 Meningite",
+       7
+      ],
+      [
+       "  061 Doenca de Alzheimer",
+       46
+      ],
+      [
+       "  062 Epilepsia",
+       14
+      ],
+      [
+       "  063 Restante das doencas do Sistema Nervoso",
+       67
+      ],
+      [
+       "064 Doencas dos Olhos e Anexos",
+       0
+      ],
+      [
+       "065 Doencas do Ouvido e da Apofise Mastoide",
+       0
+      ],
+      [
+       "066-072 Doencas do Aparelho Circulatorio",
+       985
+      ],
+      [
+       "  066 Febre reumat aguda e doen reum cron coracao",
+       7
+      ],
+      [
+       "  067 Doencas hipertensivas",
+       71
+      ],
+      [
+       "  068 Doencas isquemicas do coracao",
+       307
+      ],
+      [
+       "    068.1 Infarto agudo do miocardio",
+       268
+      ],
+      [
+       "  069 Outras doencas cardiacas",
+       272
+      ],
+      [
+       "  070 Doencas cerebrovasculares",
+       279
+      ],
+      [
+       "  071 Aterosclerose",
+       1
+      ],
+      [
+       "  072 Rest doencas do aparelho circulatorio",
+       48
+      ],
+      [
+       "073-077 Doencas do Aparelho Respiratorio",
+       611
+      ],
+      [
+       "  073 Influenza (Gripe)",
+       6
+      ],
+      [
+       "  074 Pneumonia",
+       280
+      ],
+      [
+       "  075 Out infec agudas das vias aereas inferiores",
+       20
+      ],
+      [
+       "    075.1 Bronquiolite",
+       19
+      ],
+      [
+       "  076 Doencas cronicas das vias aereas inferiores",
+       241
+      ],
+      [
+       "    076.1 Asma",
+       5
+      ],
+      [
+       "  077 Restante  doencas do aparelho respiratorio",
+       64
+      ],
+      [
+       "078-082 Doencas do Aparelho Digestivo",
+       210
+      ],
+      [
+       "  078 Ulcera gastrica, duodenal e peptica",
+       10
+      ],
+      [
+       "  079 Peritonite",
+       5
+      ],
+      [
+       "  080 Doencas do figado",
+       85
+      ],
+      [
+       "    080.1 Doenca alcoolica do figado",
+       16
+      ],
+      [
+       "    080.2 Fibrose e cirrose do figado",
+       39
+      ],
+      [
+       "    080.3 Outras doencas do figado",
+       30
+      ],
+      [
+       "  081 Colecistite",
+       5
+      ],
+      [
+       "  082 Rest doencas do aparelho digestivo",
+       105
+      ],
+      [
+       "083 Doencas da Pele e Tecido Subcutaneo",
+       16
+      ],
+      [
+       "084 Doencas Sist Osteomusc e Tecido Conjuntivo",
+       14
+      ],
+      [
+       "085-087 Doencas do Aparelho Geniturinario",
+       129
+      ],
+      [
+       "  085 D glomerulares e d renais tubulo-interstic",
+       4
+      ],
+      [
+       "  086 Insuficiencia renal",
+       92
+      ],
+      [
+       "  087 Rest doencas do aparelho geniturinario",
+       33
+      ],
+      [
+       "088-091 Gravidez, Parto e Puerperio",
+       8
+      ],
+      [
+       "  088 Gravidez que termina em aborto",
+       0
+      ],
+      [
+       "  089 Outras mortes obstetricas diretas",
+       7
+      ],
+      [
+       "  090 Mortes obstetricas indiretas",
+       0
+      ],
+      [
+       "  091 Morte obstetrica tardia",
+       0
+      ],
+      [
+       "  092 Sequela de causa obstetrica",
+       1
+      ],
+      [
+       "  093 Restante de gravidez, parto e puerperio",
+       0
+      ],
+      [
+       "092-096 Alg Afeccoes origin no periodo perinatal",
+       105
+      ],
+      [
+       "  092 Feto e recem-nasc afet fat mat e compl grav",
+       43
+      ],
+      [
+       "  093 Transt relac duracao gestacao e cresc fetal",
+       9
+      ],
+      [
+       "  094 Traumatismo de parto",
+       1
+      ],
+      [
+       "  095 Trans resp e cardiovas espec per perinatal",
+       29
+      ],
+      [
+       "  096 Rest afec originadas no periodo perinatal",
+       23
+      ],
+      [
+       "097-099 Malf Congen, Deform e Anomal Cromossomicas",
+       66
+      ],
+      [
+       "  097 Malformacoes congenitas do Sistema Nervoso",
+       17
+      ],
+      [
+       "  098 Malf congenitas do aparelho circulatorio",
+       19
+      ],
+      [
+       "  099 Rest de malf cong, deform e anomal cromoss",
+       30
+      ],
+      [
+       "100-102 Sint, Sin e Ach Anorm Clin e Lab, NCOP",
+       253
+      ],
+      [
+       "  100 Senilidade",
+       5
+      ],
+      [
+       "  101 Morte sem assistencia medica",
+       30
+      ],
+      [
+       "  102 Rest sint, sin e ach anorm clin e laborat",
+       218
+      ],
+      [
+       "103-112 Causas externas de morbidade e mortalidade",
+       569
+      ],
+      [
+       "  103 Acidentes de transporte terrestre",
+       137
+      ],
+      [
+       "  103.1 Demais ac transporte",
+       3
+      ],
+      [
+       "  104 Quedas",
+       26
+      ],
+      [
+       "  105 Afogamento e submersoes acidentais",
+       35
+      ],
+      [
+       "  106 Exposicao a fumaca, ao fogo e as chamas",
+       5
+      ],
+      [
+       "  107 Envenen, intoxic por ou expos a subst nociv",
+       1
+      ],
+      [
+       "  108 Lesoes autoprovocadas voluntariamente",
+       113
+      ],
+      [
+       "  109 Agressoes",
+       173
+      ],
+      [
+       "  110 Eventos(fatos) cuja intencao e indetermin",
+       20
+      ],
+      [
+       "  111 Intervencoes legais e operacoes de guerra",
+       1
+      ],
+      [
+       "  112 Demais causas externas",
+       55
+      ],
+      [
+       "  Campo da causa básica em branco",
+       0
+      ]
+     ],
+     "total": 4267
+    }
+   ]
+  },
+  {
+   "name": "SINASC",
+   "data": "DNAC2022.dbc",
+   "defText": ";RE-003 SINASC AC 2022\nAC:\\TabWin\\NASC\\DN*.DBC\nLHora Nasc,              HORANASC,   1,  HORAOBITO.CNV\nLMes Recebimento,        DTRECEBIM,  3,  MESES.CNV\nLAno Recebimento,        DTRECEBIM,  7,  ANO.CNV\nLPeso ao Nascer em gramas,      PESO,      1,   PESO1.CNV\nLFx.Etaria Mae(5),       IDADEMAE,   1, IDADE5.CNV\nLPais Residencia,        CODPAISRES, 1,  PAIS.CNV\nLUF Natural Mae,         CODUFNATU,  1,  UFC.CNV\nLAnomal Agrup 1,         CODANOMAL,  1,  ECLAMC.CNV\n",
+   "cases": [
+    {
+     "id": "N0",
+     "linha": "Hora Nasc",
+     "naoClassificados": "incluir",
+     "rows": [
+      [
+       "01:00 a 01:59",
+       418
+      ],
+      [
+       "02:00 a 02:59",
+       375
+      ],
+      [
+       "03:00 a 03:59",
+       353
+      ],
+      [
+       "04:00 a 04:59",
+       330
+      ],
+      [
+       "05:00 a 05:59",
+       356
+      ],
+      [
+       "06:00 a 06:59",
+       355
+      ],
+      [
+       "07:00 a 07:59",
+       391
+      ],
+      [
+       "08:00 a 08:59",
+       571
+      ],
+      [
+       "09:00 a 09:59",
+       812
+      ],
+      [
+       "10:00 a 10:59",
+       900
+      ],
+      [
+       "11:00 a 11:59",
+       859
+      ],
+      [
+       "12:00 a 12:59",
+       578
+      ],
+      [
+       "13:00 a 13:59",
+       490
+      ],
+      [
+       "14:00 a 14:59",
+       693
+      ],
+      [
+       "15:00 a 15:59",
+       798
+      ],
+      [
+       "16:00 a 16:59",
+       780
+      ],
+      [
+       "17:00 a 17:59",
+       786
+      ],
+      [
+       "18:00 a 18:59",
+       764
+      ],
+      [
+       "19:00 a 19:59",
+       498
+      ],
+      [
+       "20:00 a 20:59",
+       733
+      ],
+      [
+       "21:00 a 21:59",
+       797
+      ],
+      [
+       "22:00 a 22:59",
+       714
+      ],
+      [
+       "23:00 a 23:59",
+       585
+      ],
+      [
+       "00:00 a 00:59",
+       500
+      ],
+      [
+       "Ign",
+       47
+      ]
+     ],
+     "total": 14483
+    },
+    {
+     "id": "N1",
+     "linha": "Mes Recebimento",
+     "naoClassificados": "incluir",
+     "rows": [
+      [
+       "Jan",
+       579
+      ],
+      [
+       "Fev",
+       809
+      ],
+      [
+       "Mar",
+       1106
+      ],
+      [
+       "Abr",
+       688
+      ],
+      [
+       "Mai",
+       1603
+      ],
+      [
+       "Jun",
+       2440
+      ],
+      [
+       "Jul",
+       1086
+      ],
+      [
+       "Ago",
+       2641
+      ],
+      [
+       "Set",
+       631
+      ],
+      [
+       "Out",
+       850
+      ],
+      [
+       "Nov",
+       847
+      ],
+      [
+       "Dez",
+       799
+      ],
+      [
+       "Ign",
+       404
+      ]
+     ],
+     "total": 14483
+    },
+    {
+     "id": "N2",
+     "linha": "Ano Recebimento",
+     "naoClassificados": "incluir",
+     "rows": [
+      [
+       "1996",
+       0
+      ],
+      [
+       "1997",
+       0
+      ],
+      [
+       "1998",
+       0
+      ],
+      [
+       "1999",
+       0
+      ],
+      [
+       "2000",
+       404
+      ],
+      [
+       "2001",
+       0
+      ],
+      [
+       "2002",
+       0
+      ],
+      [
+       "2003",
+       0
+      ],
+      [
+       "2004",
+       0
+      ],
+      [
+       "2005",
+       0
+      ],
+      [
+       "2006",
+       0
+      ],
+      [
+       "2007",
+       0
+      ],
+      [
+       "2008",
+       0
+      ],
+      [
+       "2009",
+       0
+      ],
+      [
+       "2010",
+       0
+      ],
+      [
+       "2011",
+       0
+      ],
+      [
+       "2012",
+       0
+      ],
+      [
+       "2013",
+       0
+      ],
+      [
+       "2014",
+       0
+      ],
+      [
+       "2015",
+       0
+      ],
+      [
+       "2016",
+       0
+      ],
+      [
+       "2017",
+       0
+      ],
+      [
+       "2018",
+       0
+      ],
+      [
+       "2019",
+       0
+      ],
+      [
+       "2020",
+       0
+      ],
+      [
+       "2021",
+       0
+      ],
+      [
+       "2022",
+       9236
+      ],
+      [
+       "Não classificados",
+       4843
+      ]
+     ],
+     "total": 14483
+    },
+    {
+     "id": "N3",
+     "linha": "Peso ao Nascer em gramas",
+     "naoClassificados": "incluir",
+     "rows": [
+      [
+       "0g a 999g",
+       69
+      ],
+      [
+       "1000g a 1499g",
+       114
+      ],
+      [
+       "1500g a 2499g",
+       1029
+      ],
+      [
+       "2500g a 2999g",
+       3245
+      ],
+      [
+       "3000g a 3999g",
+       9163
+      ],
+      [
+       "4000g e mais",
+       769
+      ],
+      [
+       "ignorado",
+       94
+      ]
+     ],
+     "total": 14483
+    },
+    {
+     "id": "N4",
+     "linha": "Fx.Etaria Mae(5)",
+     "naoClassificados": "incluir",
+     "rows": [
+      [
+       "< 14a",
+       229
+      ],
+      [
+       "15-19a",
+       2914
+      ],
+      [
+       "20-34a",
+       9392
+      ],
+      [
+       "35 e+",
+       1935
+      ],
+      [
+       "Ign",
+       13
+      ]
+     ],
+     "total": 14483
+    },
+    {
+     "id": "N5",
+     "linha": "Pais Residencia",
+     "naoClassificados": "incluir",
+     "rows": [
+      [
+       "BRASIL",
+       0
+      ],
+      [
+       "GABAO",
+       0
+      ],
+      [
+       "GEORGIA",
+       0
+      ],
+      [
+       "IEMEM",
+       0
+      ],
+      [
+       "LIBIA",
+       0
+      ],
+      [
+       "MARROCOS",
+       0
+      ],
+      [
+       "PERU",
+       0
+      ],
+      [
+       "SEYCHELLES",
+       0
+      ],
+      [
+       "SUICA",
+       0
+      ],
+      [
+       "TURCOMENISTAO",
+       0
+      ],
+      [
+       "SOMALIA",
+       0
+      ],
+      [
+       "BARBADOS",
+       0
+      ],
+      [
+       "CAMBOJA",
+       0
+      ],
+      [
+       "CAZAQUISTAO",
+       0
+      ],
+      [
+       "GUINE",
+       0
+      ],
+      [
+       "IRAQUE",
+       0
+      ],
+      [
+       "IRLANDA",
+       0
+      ],
+      [
+       "ISLANDIA",
+       0
+      ],
+      [
+       "ITALIA",
+       0
+      ],
+      [
+       "LIECHTENSTEIN",
+       0
+      ],
+      [
+       "MEXICO",
+       0
+      ],
+      [
+       "MOCAMBIQUE",
+       0
+      ],
+      [
+       "SUECIA",
+       0
+      ],
+      [
+       "NORUEGA",
+       0
+      ],
+      [
+       "POLONIA",
+       0
+      ],
+      [
+       "REPUBLICA TCHECA",
+       0
+      ],
+      [
+       "SANTA LUCIA",
+       0
+      ],
+      [
+       "SUDAO",
+       0
+      ],
+      [
+       "TAIWAN (ILHA FORMOSA)",
+       0
+      ],
+      [
+       "UZBEQUISTAO",
+       0
+      ],
+      [
+       "ANGOLA",
+       0
+      ],
+      [
+       "ARGENTINA",
+       0
+      ],
+      [
+       "BRUNEI",
+       0
+      ],
+      [
+       "COREIA DO SUL",
+       0
+      ],
+      [
+       "LUXEMBURGO",
+       0
+      ],
+      [
+       "MALDIVAS",
+       0
+      ],
+      [
+       "PAISES BAIXOS",
+       0
+      ],
+      [
+       "REINO UNIDO",
+       0
+      ],
+      [
+       "UCRANIA",
+       0
+      ],
+      [
+       "VIETNA",
+       0
+      ],
+      [
+       "ALEMANHA",
+       0
+      ],
+      [
+       "ANTIGUA E  BARBUDA",
+       0
+      ],
+      [
+       "BELGICA",
+       0
+      ],
+      [
+       "ESPANHA",
+       0
+      ],
+      [
+       "ESTADOS UNIDOS",
+       0
+      ],
+      [
+       "FRANCA",
+       0
+      ],
+      [
+       "KUWEIT",
+       0
+      ],
+      [
+       "ROMENIA",
+       0
+      ],
+      [
+       "RUSSIA",
+       0
+      ],
+      [
+       "SIRIA",
+       0
+      ],
+      [
+       "ZAIRE",
+       0
+      ],
+      [
+       "BAHAMAS",
+       0
+      ],
+      [
+       "ISRAEL",
+       0
+      ],
+      [
+       "JAPAO",
+       0
+      ],
+      [
+       "MONACO",
+       0
+      ],
+      [
+       "PORTO RICO",
+       0
+      ],
+      [
+       "GUADALUPE",
+       0
+      ],
+      [
+       "ANTILHAS HOLANDESAS",
+       0
+      ],
+      [
+       "DJIBUTI",
+       0
+      ],
+      [
+       "BUTAO",
+       0
+      ],
+      [
+       "MYANMAR",
+       0
+      ],
+      [
+       "NAURU",
+       0
+      ],
+      [
+       "TUVALU",
+       0
+      ],
+      [
+       "ALBANIA",
+       0
+      ],
+      [
+       "ARGELIA",
+       0
+      ],
+      [
+       "BELIZE",
+       0
+      ],
+      [
+       "BOLIVIA",
+       0
+      ],
+      [
+       "BOTSUANA",
+       0
+      ],
+      [
+       "ERITREIA",
+       0
+      ],
+      [
+       "EQUADOR",
+       0
+      ],
+      [
+       "HONDURAS",
+       0
+      ],
+      [
+       "LAOS",
+       0
+      ],
+      [
+       "LESOTO",
+       0
+      ],
+      [
+       "LIBANO",
+       0
+      ],
+      [
+       "LIBERIA",
+       0
+      ],
+      [
+       "MALI",
+       0
+      ],
+      [
+       "MONGOLIA",
+       0
+      ],
+      [
+       "NAMIBIA",
+       0
+      ],
+      [
+       "NIUE",
+       0
+      ],
+      [
+       "QUIRGUISTAO",
+       0
+      ],
+      [
+       "QUIRIBATI",
+       0
+      ],
+      [
+       "SUAZILANDIA",
+       0
+      ],
+      [
+       "SURINAME",
+       0
+      ],
+      [
+       "TADJIQUISTAO",
+       0
+      ],
+      [
+       "TANZANIA",
+       0
+      ],
+      [
+       "TOGO",
+       0
+      ],
+      [
+       "TONGA",
+       0
+      ],
+      [
+       "TRINIDAD E TOBAGO",
+       0
+      ],
+      [
+       "TUNISIA",
+       0
+      ],
+      [
+       "AUSTRALIA",
+       0
+      ],
+      [
+       "BAHREIN",
+       0
+      ],
+      [
+       "BIELORUSSIA",
+       0
+      ],
+      [
+       "CABO VERDE",
+       0
+      ],
+      [
+       "CANADA",
+       0
+      ],
+      [
+       "CATAR",
+       0
+      ],
+      [
+       "CHADE",
+       0
+      ],
+      [
+       "CHIPRE",
+       0
+      ],
+      [
+       "COSTA RICA",
+       0
+      ],
+      [
+       "DOMINICA",
+       0
+      ],
+      [
+       "EGITO",
+       0
+      ],
+      [
+       "EL SALVADOR",
+       0
+      ],
+      [
+       "ESLOVAQUIA",
+       0
+      ],
+      [
+       "ESTONIA",
+       0
+      ],
+      [
+       "FIJI",
+       0
+      ],
+      [
+       "FILIPINAS",
+       0
+      ],
+      [
+       "GAMBIA",
+       0
+      ],
+      [
+       "GANA",
+       0
+      ],
+      [
+       "GUATEMALA",
+       0
+      ],
+      [
+       "GUIANA FRANCESA",
+       0
+      ],
+      [
+       "GUINE-BISSAU",
+       0
+      ],
+      [
+       "GUINE EQUATORIAL",
+       0
+      ],
+      [
+       "HAITI",
+       0
+      ],
+      [
+       "ILHAS MARSHAL",
+       0
+      ],
+      [
+       "IRA",
+       0
+      ],
+      [
+       "LITUANIA",
+       0
+      ],
+      [
+       "MACEDONIA",
+       0
+      ],
+      [
+       "MALAVI",
+       0
+      ],
+      [
+       "MAURITANIA",
+       0
+      ],
+      [
+       "MOLDOVA",
+       0
+      ],
+      [
+       "NEPAL",
+       0
+      ],
+      [
+       "PANAMA",
+       0
+      ],
+      [
+       "PAQUISTAO",
+       0
+      ],
+      [
+       "PARAGUAI",
+       0
+      ],
+      [
+       "QUENIA",
+       0
+      ],
+      [
+       "REPUBLICA CENTRO-AFRICANA",
+       0
+      ],
+      [
+       "REPUBLICA DOMINICANA",
+       0
+      ],
+      [
+       "ILHAS SALOMAO",
+       0
+      ],
+      [
+       "SAMOA OCIDENTAL",
+       0
+      ],
+      [
+       "SAN MARINO",
+       0
+      ],
+      [
+       "SENEGAL",
+       0
+      ],
+      [
+       "SERRA LEOA",
+       0
+      ],
+      [
+       "SRI LANKA",
+       0
+      ],
+      [
+       "TURQUIA",
+       0
+      ],
+      [
+       "URUGUAI",
+       0
+      ],
+      [
+       "VENEZUELA",
+       0
+      ],
+      [
+       "ZIMBABUE",
+       0
+      ],
+      [
+       "AFRICA DO SUL",
+       0
+      ],
+      [
+       "ARABIA SAUDITA",
+       0
+      ],
+      [
+       "ARMENIA",
+       0
+      ],
+      [
+       "AUSTRIA",
+       0
+      ],
+      [
+       "AZERBAIJAO",
+       0
+      ],
+      [
+       "BANGLADESH",
+       0
+      ],
+      [
+       "BENIN",
+       0
+      ],
+      [
+       "BOSNIA-HERZEGOVINA",
+       0
+      ],
+      [
+       "BULGARIA",
+       0
+      ],
+      [
+       "BURKINA FASO",
+       0
+      ],
+      [
+       "BURUNDI",
+       0
+      ],
+      [
+       "COLOMBIA",
+       0
+      ],
+      [
+       "CAMAROES",
+       0
+      ],
+      [
+       "CONGO",
+       0
+      ],
+      [
+       "COSTA DO MARFIM",
+       0
+      ],
+      [
+       "CROACIA",
+       0
+      ],
+      [
+       "CUBA",
+       0
+      ],
+      [
+       "EMIRADOS ARABES UNIDOS",
+       0
+      ],
+      [
+       "ESLOVENIA",
+       0
+      ],
+      [
+       "ETIOPIA",
+       0
+      ],
+      [
+       "FINLANDIA",
+       0
+      ],
+      [
+       "GRANADA",
+       0
+      ],
+      [
+       "GRECIA",
+       0
+      ],
+      [
+       "HUNGRIA",
+       0
+      ],
+      [
+       "INDIA",
+       0
+      ],
+      [
+       "INDONESIA",
+       0
+      ],
+      [
+       "JAMAICA",
+       0
+      ],
+      [
+       "JORDANIA",
+       0
+      ],
+      [
+       "LETONIA",
+       0
+      ],
+      [
+       "MADAGASCAR",
+       0
+      ],
+      [
+       "MALASIA",
+       0
+      ],
+      [
+       "MALTA",
+       0
+      ],
+      [
+       "MAURICIO",
+       0
+      ],
+      [
+       "MICRONESIA",
+       0
+      ],
+      [
+       "NICARAGUA",
+       0
+      ],
+      [
+       "NIGER",
+       0
+      ],
+      [
+       "NIGERIA",
+       0
+      ],
+      [
+       "NOVA ZELANDIA",
+       0
+      ],
+      [
+       "OMA",
+       0
+      ],
+      [
+       "PALAU",
+       0
+      ],
+      [
+       "PAPUA NOVA GUINE",
+       0
+      ],
+      [
+       "PORTUGAL",
+       0
+      ],
+      [
+       "SAO CRISTOVAO E NEVES",
+       0
+      ],
+      [
+       "SAO VICENTE E GRANABINAS",
+       0
+      ],
+      [
+       "SAO TOME E PRINCIPE",
+       0
+      ],
+      [
+       "TAILANDIA",
+       0
+      ],
+      [
+       "TAITI",
+       0
+      ],
+      [
+       "UGANDA",
+       0
+      ],
+      [
+       "VANUATU",
+       0
+      ],
+      [
+       "ZAMBIA",
+       0
+      ],
+      [
+       "AFEGANISTAO",
+       0
+      ],
+      [
+       "CHILE",
+       0
+      ],
+      [
+       "REPUBLICA POPULAR DA CHINA",
+       0
+      ],
+      [
+       "SINGAPURA",
+       0
+      ],
+      [
+       "COREIA DO NORTE",
+       0
+      ],
+      [
+       "DINAMARCA",
+       0
+      ],
+      [
+       "TIMOR LESTE",
+       0
+      ],
+      [
+       "GUIANA",
+       0
+      ],
+      [
+       "ILHAS FALKLAND",
+       0
+      ],
+      [
+       "ANDORRA",
+       0
+      ],
+      [
+       "ILHAS COMORES",
+       0
+      ],
+      [
+       "ILHAS COOK",
+       0
+      ],
+      [
+       "SERVIA E MONTENEGRO",
+       0
+      ],
+      [
+       "RUANDA",
+       0
+      ],
+      [
+       "NAO INFORMADO",
+       0
+      ],
+      [
+       "Não classificados",
+       14483
+      ]
+     ],
+     "total": 14483
+    },
+    {
+     "id": "N6",
+     "linha": "UF Natural Mae",
+     "naoClassificados": "incluir",
+     "rows": [
+      [
+       "RO",
+       227
+      ],
+      [
+       "AC",
+       13267
+      ],
+      [
+       "AM",
+       611
+      ],
+      [
+       "RR",
+       5
+      ],
+      [
+       "PA",
+       22
+      ],
+      [
+       "AP",
+       1
+      ],
+      [
+       "TO",
+       1
+      ],
+      [
+       "MA",
+       8
+      ],
+      [
+       "PI",
+       1
+      ],
+      [
+       "CE",
+       21
+      ],
+      [
+       "RN",
+       10
+      ],
+      [
+       "PB",
+       3
+      ],
+      [
+       "PE",
+       4
+      ],
+      [
+       "AL",
+       5
+      ],
+      [
+       "SE",
+       1
+      ],
+      [
+       "BA",
+       5
+      ],
+      [
+       "MG",
+       13
+      ],
+      [
+       "ES",
+       4
+      ],
+      [
+       "RJ",
+       17
+      ],
+      [
+       "SP",
+       32
+      ],
+      [
+       "PR",
+       16
+      ],
+      [
+       "SC",
+       3
+      ],
+      [
+       "RS",
+       0
+      ],
+      [
+       "MS",
+       13
+      ],
+      [
+       "MT",
+       16
+      ],
+      [
+       "GO",
+       8
+      ],
+      [
+       "DF",
+       5
+      ],
+      [
+       "IG",
+       164
+      ]
+     ],
+     "total": 14483
+    },
+    {
+     "id": "N7",
+     "linha": "Anomal Agrup 1",
+     "naoClassificados": "incluir",
+     "rows": [
+      [
+       "Q00 Anencefalia",
+       1
+      ],
+      [
+       "Q03 Hidrocefalia",
+       1
+      ],
+      [
+       "Q05 Espinha bifida",
+       0
+      ],
+      [
+       "Q35   Fenda palatina",
+       0
+      ],
+      [
+       "Q36,Q37 Fenda labial",
+       5
+      ],
+      [
+       "Q39 Atresia esofago",
+       0
+      ],
+      [
+       "Q42 Atresia ano retal",
+       1
+      ],
+      [
+       "Q54 Hipospadias",
+       2
+      ],
+      [
+       "Q71-Q73 Reducao de membros",
+       4
+      ],
+      [
+       "Q90   Sindr de Down",
+       3
+      ],
+      [
+       "Q20-Q26 Anomalias cardiacas",
+       7
+      ],
+      [
+       "Q60-Q64 Anomalia renal",
+       4
+      ],
+      [
+       "Outras anomalias",
+       35
+      ],
+      [
+       "Não classificados",
+       14420
+      ]
+     ],
+     "total": 14483
+    }
+   ]
+  }
+ ]
+}

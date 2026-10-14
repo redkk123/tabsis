@@ -63,3 +63,14 @@ test('Incluir: a linha "Não classificados" só aparece se houver algum (TabWin 
   assert.deepEqual(comUm.rows.map((r) => r.label), ['Masculino', 'Feminino', 'Não classificados']);
   assert.equal(comUm.cells.at(-1)[0], 1);
 });
+
+test('o que cai direto numa linha-subtotal entra no Total (CID10_BR: A41 só no grupo A000-B999)', async () => {
+  const { calculateColumnTotal } = await import('../dist/packages/analysis/src/table-operations.js');
+  const cid = parseCnv(['3 4', row(1, '001-031 Infecciosas', 'A000-B999'), row(2, '  001 Intestinais', 'A000-A099'), row(3, '  005 Tuberculose', 'A150-A169')]
+    .map((line, i) => (i >= 2 ? `  1${line.slice(3)}` : line)).join('\n'));
+  const spec = { compatibilityProfile: 'tabwin-4.15', rows: { field: 'CAUSABAS', conversionId: 'CID' }, measure: { kind: 'count' }, filters: [] };
+  const result = executeInMemory([{ CAUSABAS: 'A09' }, { CAUSABAS: 'A150' }, { CAUSABAS: 'A419' }], compileQueryPlan(spec), { CID: cid });
+  const counts = Object.fromEntries(result.rows.map((r, i) => [r.label.trim(), result.cells[i][0]]));
+  assert.deepEqual(counts, { '001-031 Infecciosas': 3, '001 Intestinais': 1, '005 Tuberculose': 1 });
+  assert.equal(calculateColumnTotal(result, result.columns[0].key, 'sum'), 3);
+});
