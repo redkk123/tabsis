@@ -105,3 +105,16 @@ test('retains unresolved trailing lookup fields from contemporary real DEF recor
   assert.deepEqual(option?.trailingFields, ['CD_DESCR', 'DBF\\CID10.DBF']);
   assert.match(def.warnings.join('\n'), /2 retained trailing field/);
 });
+
+test('linhas-título do CNES não derrubam o DEF: X sem campo e I com vírgula sobrando (RE-004)', () => {
+  const def = parseDef([
+    'AESTABEL\\ST*.DB?',
+    'X* EQUIPES_AC *,    , TITULO , TITULO_REFERENTES_A_EQUIPES_DO_UF',
+    'I* ATENDIMIMENTO PRESTADO *, ATEND_PR,',
+    'IINTERNAÇÃO/SUS,     AP01CV01',
+    'XTipo de Gestão,     TPGESTAO,   1, CNV\\TPGESTAO.CNV',
+  ].join('\n'));
+  assert.equal(def.options.length, 2);
+  assert.equal(def.options[0]?.field, '');
+  assert.deepEqual(def.increments.map((increment) => [increment.label, increment.field]), [['* ATENDIMIMENTO PRESTADO *', 'ATEND_PR'], ['INTERNAÇÃO/SUS', 'AP01CV01']]);
+});

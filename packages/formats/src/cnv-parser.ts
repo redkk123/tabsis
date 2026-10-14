@@ -115,7 +115,8 @@ function parseRuleLine(
   // (" 1- 5" pega " 1".." 5"; "01-05" não pega o número 1, que é " 1";
   // RE-003, testes T5–T7). Só o fim da linha é aparado.
   const literal = mode === 'literal';
-  const codesList = literal ? codesArea.replace(/\s+$/, '') : codesRaw;
+  // Na curta os espaços do começo também importam: "    -zzzz" é faixa (RE-004).
+  const codesList = literal || mode === 'short' ? codesArea.replace(/\s+$/, '') : codesRaw;
 
   if (!/^\d+$/.test(sequenceRaw)) {
     throw new CnvParseError(
@@ -169,6 +170,15 @@ function parseRuleLine(
   } else if (codesRaw || blankCode) {
     if (blankCode) { exactCodes.push(' '); if (literal) literalTokens.push(' '); }
     for (const rawToken of codesList.split(',')) {
+      // CNV curta: espaços e depois o hífen ("    -zzzz" na NATJUR.CNV, "  -99"
+      // na TP_ESTAB.CNV) são uma faixa que começa no branco — pega o que as
+      // outras linhas não pegam. Medido no TabWin (RE-004, H5–H8): "   -500"
+      // dá o mesmo que "000-500". Sem os espaços ("-500") é outra coisa, que
+      // não está entendida e fica de fora.
+      if (mode === 'short' && /^ +-\S/.test(rawToken)) {
+        ranges.push({ from: ' ', to: rawToken.trim().slice(1).trim() });
+        continue;
+      }
       const token = literal ? rawToken : rawToken.trim();
       // No literal, espaços entre vírgulas são o código em branco
       // ("000000-999999,      ," no TP_FINAN.CNV: 3.642 registros sem FAEC_TP

@@ -3,7 +3,7 @@
  "version": 1,
  "capturedAt": "2026-10-14",
  "referenceEngine": "TabWin 4.15 (TabWin415.exe) under Wine 10.0",
- "evidence": "tabelas salvas pelo próprio TabWin (.TAB); DEF/CNV oficiais de OBITOS_CID10_TAB.zip e NASC_NOV_TAB.zip (ftp.datasus.gov.br); SIA: TAB_SIA.zip + PAAC2501.dbc; SINAN: TAB_SINANNET.zip + HANSBR23.dbc",
+ "evidence": "tabelas salvas pelo próprio TabWin (.TAB); DEF/CNV oficiais de OBITOS_CID10_TAB.zip e NASC_NOV_TAB.zip (ftp.datasus.gov.br); SIA: TAB_SIA.zip + PAAC2501.dbc; SINAN: TAB_SINANNET.zip + HANSBR23.dbc; CNES (STAC2501, LTAC2501; RE-004)",
  "notes": [
   "Munic Resid - DF (MUNICDF.CNV): o TabWin recusa o arquivo (\"s is not a valid integer value\"), como o TabSis; fica fora.",
   "xCausa (x minúsculo no DEF oficial): o TabWin lista em Linhas, Colunas e Seleções, como X."
@@ -5333,6 +5333,1281 @@
      ],
      "total": [
       30114
+     ]
+    }
+   ]
+  },
+  {
+   "name": "CNES",
+   "data": "STAC2501.dbc",
+   "defText": ";RE-004 CNES estabelecimentos AC 2025-01\nAC:\\TabWin\\CNES\\ESTABEL\\ST*.DBC\nLNatureza Jurídica, NAT_JUR ,    1, CNV\\NATJUR.CNV\nLEsfera Jurídica,   NAT_JUR ,    1, CNV\\ESFERAJUR.CNV\nLTipo de Estabelecimento,TP_UNID,1, CNV\\TP_ESTAB.CNV\nLRetenção Tributos Estabel.,  RETENCAO,   1, CNV\\RETENCAO.CNV\nLAmbulatorial Atenção Básica,GESPRG1E,  1, CNV\\GESPROG1.CNV\nLServiço Social,     SERAP02P,   1, CNV\\Srv_AP02.CNV\nLINTERNAÇÃO,         AP01CV01,  1, CNV\\ATPRES01.cnv\nLINT. Seguro Próprio/Terceiro, AP01CV03,  1, CNV\\ATPRES1X.cnv\n",
+   "cases": [
+    {
+     "id": "C0",
+     "linha": "Natureza Jurídica",
+     "incrementos": [
+      "Freqüência"
+     ],
+     "naoClassificados": "incluir",
+     "rows": [
+      [
+       "1. Administração Pública",
+       0
+      ],
+      [
+       "101-5 Órgão Público do Poder Executivo Federal",
+       705
+      ],
+      [
+       "102-3 Órgão Público do Poder Executivo Estadual ou do Distrito Federal",
+       118
+      ],
+      [
+       "103-1 Órgão Público do Poder Executivo Municipal",
+       0
+      ],
+      [
+       "104-0 Órgão Público do Poder Legislativo Federal",
+       29
+      ],
+      [
+       "105-8 Órgão Público do Poder Legislativo Estadual ou do Distrito Federal",
+       0
+      ],
+      [
+       "106-6 Órgão Público do Poder Legislativo Municipal",
+       0
+      ],
+      [
+       "107-4 Órgão Público do Poder Judiciário Federal",
+       0
+      ],
+      [
+       "108-2 Órgão Público do Poder Judiciário Estadual",
+       0
+      ],
+      [
+       "110-4 Autarquia Federal",
+       0
+      ],
+      [
+       "111-2 Autarquia Estadual ou do Distrito Federal",
+       1
+      ],
+      [
+       "112-0 Autarquia Municipal",
+       0
+      ],
+      [
+       "113-9 Fundação Pública de Direito Público Federal",
+       0
+      ],
+      [
+       "114-7 Fundação Pública de Direito Público Estadual ou do Distrito Federal",
+       1
+      ],
+      [
+       "115-5 Fundação Pública de Direito Público Municipal",
+       0
+      ],
+      [
+       "116-3 Órgão Público Autônomo Federal",
+       0
+      ],
+      [
+       "117-1 Órgão Público Autônomo Estadual ou do Distrito Federal",
+       0
+      ],
+      [
+       "118-0 Órgão Público Autônomo Municipal",
+       0
+      ],
+      [
+       "119-8 Comissão Polinacional",
+       0
+      ],
+      [
+       "120-1 Fundo Público",
+       0
+      ],
+      [
+       "121-0 Consórcio Público de Direito Público (Associação Pública)",
+       0
+      ],
+      [
+       "122-8 Consórcio Público de Direito Privado",
+       0
+      ],
+      [
+       "123-6 Estado ou Distrito Federal",
+       1
+      ],
+      [
+       "124-4 Município",
+       414
+      ],
+      [
+       "125-2 Fundação Pública de Direito Privado Federal",
+       0
+      ],
+      [
+       "126-0 Fundação Pública de Direito Privado Estadual ou do Distrito Federal",
+       0
+      ],
+      [
+       "127-9 Fundação Pública de Direito Privado Municipal",
+       0
+      ],
+      [
+       "2. Entidades Empresariais",
+       0
+      ],
+      [
+       "201-1 Empresa Pública",
+       0
+      ],
+      [
+       "203-8 Sociedade de Economia Mista",
+       0
+      ],
+      [
+       "204-6 Sociedade Anônima Aberta",
+       18
+      ],
+      [
+       "205-4 Sociedade Anônima Fechada",
+       2
+      ],
+      [
+       "206-2 Sociedade Empresária Limitada",
+       488
+      ],
+      [
+       "207-0 Sociedade Empresária em Nome Coletivo",
+       0
+      ],
+      [
+       "208-9 Sociedade Empresária em Comandita Simples",
+       0
+      ],
+      [
+       "209-7 Sociedade Empresária em Comandita por Ações",
+       0
+      ],
+      [
+       "212-7 Sociedade em Conta de Participação",
+       1
+      ],
+      [
+       "213-5 Empresário (Individual)",
+       110
+      ],
+      [
+       "214-3 Cooperativa",
+       6
+      ],
+      [
+       "215-1 Consórcio de Sociedades",
+       0
+      ],
+      [
+       "216-0 Grupo de Sociedades",
+       0
+      ],
+      [
+       "217-8 Estabelecimento, no Brasil, de Sociedade Estrangeira",
+       0
+      ],
+      [
+       "219-4 Estabelecimento, no Brasil, de Empresa Binacional Argentino-Brasileira",
+       0
+      ],
+      [
+       "221-6 Empresa Domiciliada no Exterior",
+       0
+      ],
+      [
+       "222-4 Clube/Fundo de Investimento",
+       0
+      ],
+      [
+       "223-2 Sociedade Simples Pura",
+       46
+      ],
+      [
+       "224-0 Sociedade Simples Limitada",
+       13
+      ],
+      [
+       "225-9 Sociedade Simples em Nome Coletivo",
+       0
+      ],
+      [
+       "226-7 Sociedade Simples em Comandita Simples",
+       0
+      ],
+      [
+       "227-5 Empresa Binacional",
+       0
+      ],
+      [
+       "228-3 Consórcio de Empregadores",
+       0
+      ],
+      [
+       "229-1 Consórcio Simples",
+       0
+      ],
+      [
+       "230-5 Empresa Individual de Responsabilidade Limitada (de Natureza Empresária)",
+       2
+      ],
+      [
+       "231-3 Empresa Individual de Responsabilidade Limitada (de Natureza Simples)",
+       0
+      ],
+      [
+       "232-1 Sociedade Unipessoal de Advogados",
+       0
+      ],
+      [
+       "233-0 Cooperativas de Consumo",
+       0
+      ],
+      [
+       "3. Entidades sem Fins Lucrativos",
+       2
+      ],
+      [
+       "303-4 Serviço Notarial e Registral (Cartório)",
+       0
+      ],
+      [
+       "306-9 Fundação Privada",
+       3
+      ],
+      [
+       "307-7 Serviço Social Autônomo",
+       5
+      ],
+      [
+       "308-5 Condomínio Edilício",
+       0
+      ],
+      [
+       "310-7 Comissão de Conciliação Prévia",
+       0
+      ],
+      [
+       "311-5 Entidade de Mediação e Arbitragem",
+       0
+      ],
+      [
+       "312-3 Partido Político",
+       0
+      ],
+      [
+       "313-1 Entidade Sindical",
+       1
+      ],
+      [
+       "320-4 Estabelecimento, no Brasil, de Fundação ou Associação Estrangeiras",
+       0
+      ],
+      [
+       "321-2 Fundação ou Associação Domiciliada no Exterior",
+       0
+      ],
+      [
+       "322-0 Organização Religiosa",
+       0
+      ],
+      [
+       "323-9 Comunidade Indígena",
+       0
+      ],
+      [
+       "324-7 Fundo Privado",
+       0
+      ],
+      [
+       "325-5 Órgão de Direção Nacional de Partido Político",
+       0
+      ],
+      [
+       "326-3 Órgão de Direção Regional de Partido Político",
+       0
+      ],
+      [
+       "327-1 Órgão de Direção Local de Partido Político",
+       0
+      ],
+      [
+       "328-0 Comitê Financeiro de Partido Político",
+       0
+      ],
+      [
+       "329-8 Frente Plebiscitária ou Referendária",
+       0
+      ],
+      [
+       "330-6 Organização Social (OS)",
+       0
+      ],
+      [
+       "331-0 Demais Condomínios",
+       0
+      ],
+      [
+       "399-9 Associação Privada",
+       20
+      ],
+      [
+       "4. Pessoas Físicas",
+       195
+      ],
+      [
+       "401-4 Empresa Individual Imobiliária",
+       0
+      ],
+      [
+       "402-2 Segurado Especial",
+       0
+      ],
+      [
+       "408-1 Contribuinte individual",
+       0
+      ],
+      [
+       "409-0 Candidato a Cargo Político Eletivo",
+       0
+      ],
+      [
+       "411-1 Leiloeiro",
+       0
+      ],
+      [
+       "412-4 Produtor Rural (Pessoa Física)",
+       0
+      ],
+      [
+       "5. Org Internacionais e Outras Instituições Extraterritoriais",
+       0
+      ],
+      [
+       "501-0 Organização Internacional",
+       0
+      ],
+      [
+       "502-9 Representação Diplomática Estrangeira",
+       0
+      ],
+      [
+       "503-7 Outras Instituições Extraterritoriais",
+       0
+      ],
+      [
+       "--- Não especificado ou ignorado",
+       1
+      ]
+     ],
+     "total": [
+      1467
+     ]
+    },
+    {
+     "id": "C1",
+     "linha": "Esfera Jurídica",
+     "incrementos": [
+      "Freqüência"
+     ],
+     "naoClassificados": "incluir",
+     "rows": [
+      [
+       "Administração Pública",
+       554
+      ],
+      [
+       ".. Federal",
+       19
+      ],
+      [
+       ".. Estadual ou Distrito Federal",
+       121
+      ],
+      [
+       ".. Municipal",
+       414
+      ],
+      [
+       ".. Outros",
+       0
+      ],
+      [
+       "Entidades Empresariais",
+       686
+      ],
+      [
+       ".. Empresa Pública ou Sociedade de Economia Mista",
+       0
+      ],
+      [
+       ".. Demais Entidades Empresariais",
+       686
+      ],
+      [
+       "Entidades sem Fins Lucrativos",
+       31
+      ],
+      [
+       "Pessoas Físicas",
+       195
+      ],
+      [
+       "Instituições Extraterritoriais",
+       0
+      ],
+      [
+       "Não especificado ou ignorado",
+       0
+      ],
+      [
+       "Não classificados",
+       1
+      ]
+     ],
+     "total": [
+      1467
+     ]
+    },
+    {
+     "id": "C2",
+     "linha": "Tipo de Estabelecimento",
+     "incrementos": [
+      "Freqüência"
+     ],
+     "naoClassificados": "incluir",
+     "rows": [
+      [
+       "POSTO DE SAUDE",
+       16
+      ],
+      [
+       "CENTRO DE SAUDE/UNIDADE BASICA",
+       239
+      ],
+      [
+       "POLICLINICA",
+       14
+      ],
+      [
+       "HOSPITAL GERAL",
+       18
+      ],
+      [
+       "HOSPITAL ESPECIALIZADO",
+       6
+      ],
+      [
+       "PRONTO SOCORRO DE HOSPITAL GERAL (ANTIGO)",
+       0
+      ],
+      [
+       "PRONTO SOCORRO TRAUMATO-ORTOPEDICO (ANTIGO)",
+       0
+      ],
+      [
+       "UNIDADE MISTA",
+       10
+      ],
+      [
+       "PRONTO SOCORRO GERAL",
+       0
+      ],
+      [
+       "PRONTO SOCORRO ESPECIALIZADO",
+       0
+      ],
+      [
+       "CONSULTORIO ISOLADO",
+       539
+      ],
+      [
+       "UNIDADE MOVEL FLUVIAL",
+       6
+      ],
+      [
+       "CLINICA/CENTRO DE ESPECIALIDADE",
+       216
+      ],
+      [
+       "UNIDADE DE APOIO DIAGNOSE E TERAPIA (SADT ISOLADO)",
+       80
+      ],
+      [
+       "UNIDADE MOVEL TERRESTRE",
+       11
+      ],
+      [
+       "UNIDADE MOVEL DE NIVEL PRE-HOSPITALAR NA AREA DE URGENCIA",
+       34
+      ],
+      [
+       "FARMACIA",
+       85
+      ],
+      [
+       "UNIDADE DE SAUDE DA FAMILIA",
+       0
+      ],
+      [
+       "UNIDADE DE VIGILANCIA EM SAUDE",
+       33
+      ],
+      [
+       "COOPERATIVA OU EMPRESA DE CESSAO DE TRABALHADORES NA SAUDE",
+       0
+      ],
+      [
+       "CENTRO DE PARTO NORMAL - ISOLADO",
+       0
+      ],
+      [
+       "HOSPITAL/DIA - ISOLADO",
+       2
+      ],
+      [
+       "UNIDADE AUTORIZADORA",
+       0
+      ],
+      [
+       "CENTRAL DE REGULACAO DE SERVICOS DE SAUDE",
+       0
+      ],
+      [
+       "UNIDADE DE VIGILANCIA EPIDEMIOLOGIA (ANTIGO)",
+       0
+      ],
+      [
+       "UNIDADE DE VIGILANCIA SANITARIA (ANTIGO)",
+       0
+      ],
+      [
+       "LABORATORIO CENTRAL DE SAUDE PUBLICA LACEN",
+       0
+      ],
+      [
+       "CENTRAL DE GESTAO EM SAUDE",
+       24
+      ],
+      [
+       "CENTRO DE ATENCAO HEMOTERAPIA E OU HEMATOLOGICA",
+       3
+      ],
+      [
+       "CENTRO DE ATENCAO PSICOSSOCIAL",
+       11
+      ],
+      [
+       "CENTRO DE APOIO A SAUDE DA FAMILIA",
+       0
+      ],
+      [
+       "UNIDADE DE ATENCAO A SAUDE INDIGENA",
+       20
+      ],
+      [
+       "PRONTO ATENDIMENTO",
+       5
+      ],
+      [
+       "POLO ACADEMIA DA SAUDE",
+       37
+      ],
+      [
+       "TELESSAUDE",
+       1
+      ],
+      [
+       "CENTRAL DE REGULACAO MEDICA DAS URGENCIAS",
+       2
+      ],
+      [
+       "SERVICO DE ATENCAO DOMICILIAR ISOLADO(HOME CARE)",
+       6
+      ],
+      [
+       "UNIDADE DE ATENCAO EM REGIME RESIDENCIAL",
+       0
+      ],
+      [
+       "OFICINA ORTOPEDICA",
+       1
+      ],
+      [
+       "LABORATORIO DE SAUDE PUBLICA",
+       7
+      ],
+      [
+       "CENTRAL DE REGULACAO DO ACESSO",
+       4
+      ],
+      [
+       "CENTRAL DE NOTIFICACAO,CAPTACAO E DISTRIB DE ORGAOS ESTADUAL",
+       2
+      ],
+      [
+       "POLO DE PREVENCAO DE DOENCAS E AGRAVOS E PROMOCAO DA SAUDE",
+       6
+      ],
+      [
+       "CENTRAL DE ABASTECIMENTO",
+       27
+      ],
+      [
+       "CENTRO DE IMUNIZACAO",
+       2
+      ]
+     ],
+     "total": [
+      1467
+     ]
+    },
+    {
+     "id": "C3",
+     "linha": "Retenção Tributos Estabel.",
+     "incrementos": [
+      "Freqüência"
+     ],
+     "naoClassificados": "incluir",
+     "rows": [
+      [
+       "Estabelecimento PUBLICO",
+       0
+      ],
+      [
+       "Estabelecimento FILANTROPICO",
+       0
+      ],
+      [
+       "Estabelecimento SEM FINS LUCRATIVOS",
+       0
+      ],
+      [
+       "Estabelecimento PRIVADO LUCRATIVA SIMPLES",
+       0
+      ],
+      [
+       "Estabelecimento PRIVADO LUCRATIVA",
+       0
+      ],
+      [
+       "Estabelecimento SINDICAL",
+       0
+      ],
+      [
+       "Estabelecimento PESSOA FISICA",
+       0
+      ],
+      [
+       "Retenção estab. não  informada",
+       1467
+      ]
+     ],
+     "total": [
+      1467
+     ]
+    },
+    {
+     "id": "C4",
+     "linha": "Ambulatorial Atenção Básica",
+     "incrementos": [
+      "Freqüência"
+     ],
+     "naoClassificados": "incluir",
+     "rows": [
+      [
+       "ATENÇÃO BÁSICA MUNICIPAL",
+       771
+      ],
+      [
+       "ATENÇÃO BÁSICA ESTADUAL",
+       36
+      ],
+      [
+       "ATENÇÃO BÁSICA MUNICIPAL e ESTADUAL",
+       0
+      ],
+      [
+       "SEM NÍVEL de ATENÇÃO _ ATENÇÃO BÁSICA",
+       660
+      ]
+     ],
+     "total": [
+      1467
+     ]
+    },
+    {
+     "id": "C5",
+     "linha": "Serviço Social",
+     "incrementos": [
+      "Freqüência"
+     ],
+     "naoClassificados": "incluir",
+     "rows": [
+      [
+       "Serviço Social Próprio",
+       71
+      ],
+      [
+       "Serviço Social Terceirizado",
+       0
+      ],
+      [
+       "Serviço Social Próprio/Terceirizado",
+       0
+      ],
+      [
+       "Serviço Social Inexistente",
+       1396
+      ]
+     ],
+     "total": [
+      1467
+     ]
+    },
+    {
+     "id": "C6",
+     "linha": "INTERNAÇÃO",
+     "incrementos": [
+      "Freqüência"
+     ],
+     "naoClassificados": "incluir",
+     "rows": [
+      [
+       "Sem Internação SUS/Partic./Pl.S.Público/Pl.S.Priv.",
+       1431
+      ],
+      [
+       "Estabelecimentos com Atendim.Prestado Internação",
+       36
+      ],
+      [
+       "..Internação SUS",
+       29
+      ],
+      [
+       "..Internação SUS/Particular",
+       3
+      ],
+      [
+       "..Internação SUS/Particular/Plano Saúde Público",
+       0
+      ],
+      [
+       "..Internação SUS/Particular/Plano Saúde Privado",
+       0
+      ],
+      [
+       "..Internação SUS/Partic./Pl.S.Público/Pl.S.Privado",
+       0
+      ],
+      [
+       "..Internação SUS/Plano Saúde Público",
+       0
+      ],
+      [
+       "..Internação SUS/Plano S.Público/Plano S.Privado",
+       0
+      ],
+      [
+       "..Internação SUS/Plano Saúde Privado",
+       0
+      ],
+      [
+       "..Internação Particular",
+       4
+      ],
+      [
+       "..Internação Particular/Plano Saúde Público",
+       0
+      ],
+      [
+       "..Internação Particular/Plano Saúde Privado",
+       0
+      ],
+      [
+       "..Internação Particular/Pl.S.Público/Pl.S.Privado",
+       0
+      ],
+      [
+       "..Internação Plano Saúde Público",
+       0
+      ],
+      [
+       "..Internação Plano Saúde Público/Plano S.Privado",
+       0
+      ],
+      [
+       "..Internação Plano Saúde Privado",
+       0
+      ]
+     ],
+     "total": [
+      1467
+     ]
+    },
+    {
+     "id": "C7",
+     "linha": "INT. Seguro Próprio/Terceiro",
+     "incrementos": [
+      "Freqüência"
+     ],
+     "naoClassificados": "incluir",
+     "rows": [
+      [
+       "Estab.sem Atend.Internação Seg.Próprio/Seg.Terceir",
+       1467
+      ],
+      [
+       "Internação Seguro Próprio",
+       0
+      ],
+      [
+       "Internação Seguro Próprio/Seguro Terceiro",
+       0
+      ],
+      [
+       "Internação Seguro Terceiro",
+       0
+      ]
+     ],
+     "total": [
+      1467
+     ]
+    }
+   ]
+  },
+  {
+   "name": "CNES",
+   "data": "LTAC2501.dbc",
+   "defText": ";RE-004 CNES leitos AC 2025-01\nAC:\\TabWin\\CNES\\LEITO\\LT*.DBC\nGQT_EXIST\nIQuantidade Leitos SUS   ,     QT_SUS\nLTipo/Especialidade, TP_LEITO,  1, CNV\\TIP1LEIT.CNV\nLEspecialidade     , CODLEITO,  1, CNV\\ESP_LEIT.CNV\nLLeito Hosp/Lt Complem, TP_LEITO,  1, CNV\\LT_H_COM.CNV\nLRetenção Tributo Estabel.,  RETENCAO,  1, CNV\\RETENCAO.CNV\n",
+   "cases": [
+    {
+     "id": "L0",
+     "linha": "Tipo/Especialidade",
+     "incrementos": [
+      "Freqüência",
+      "Quantidade Leitos SUS"
+     ],
+     "naoClassificados": "incluir",
+     "rows": [
+      [
+       "1-Cirúrgico",
+       400,
+       342
+      ],
+      [
+       "2-Clínico",
+       616,
+       580
+      ],
+      [
+       "3-Complementar",
+       239,
+       199
+      ],
+      [
+       "4-Obstétrico",
+       229,
+       222
+      ],
+      [
+       "5-Pediátrico",
+       207,
+       165
+      ],
+      [
+       "6-Outras Especialidades",
+       111,
+       111
+      ],
+      [
+       "7-Hospital/DIA",
+       14,
+       13
+      ]
+     ],
+     "total": [
+      1816,
+      1632
+     ]
+    },
+    {
+     "id": "L1",
+     "linha": "Especialidade",
+     "incrementos": [
+      "Freqüência"
+     ],
+     "naoClassificados": "incluir",
+     "rows": [
+      [
+       "BUCO MAXILO FACIAL",
+       6
+      ],
+      [
+       "CARDIOLOGIA",
+       10
+      ],
+      [
+       "CIRURGIA GERAL",
+       197
+      ],
+      [
+       "ENDOCRINOLOGIA",
+       1
+      ],
+      [
+       "GASTROENTEROLOGIA",
+       2
+      ],
+      [
+       "GINECOLOGIA",
+       43
+      ],
+      [
+       "CIRURGICO/DIAGNOSTICO/TERAPEUTICO",
+       7
+      ],
+      [
+       "NEFROLOGIAUROLOGIA",
+       15
+      ],
+      [
+       "NEUROCIRURGIA",
+       19
+      ],
+      [
+       "OBSTETRICIA CIRURGICA",
+       101
+      ],
+      [
+       "OFTALMOLOGIA",
+       3
+      ],
+      [
+       "ONCOLOGIA",
+       4
+      ],
+      [
+       "ORTOPEDIATRAUMATOLOGIA",
+       58
+      ],
+      [
+       "OTORRINOLARINGOLOGIA",
+       12
+      ],
+      [
+       "PLASTICA",
+       14
+      ],
+      [
+       "TORAXICA",
+       10
+      ],
+      [
+       "AIDS",
+       1
+      ],
+      [
+       "CARDIOLOGIA",
+       14
+      ],
+      [
+       "CLINICA GERAL",
+       463
+      ],
+      [
+       "CRONICOS",
+       21
+      ],
+      [
+       "DERMATOLOGIA",
+       2
+      ],
+      [
+       "GERIATRIA",
+       47
+      ],
+      [
+       "HANSENOLOGIA",
+       1
+      ],
+      [
+       "HEMATOLOGIA",
+       3
+      ],
+      [
+       "LEITO/DIA",
+       0
+      ],
+      [
+       "NEFROUROLOGIA",
+       15
+      ],
+      [
+       "NEONATOLOGIA",
+       10
+      ],
+      [
+       "NEUROLOGIA",
+       5
+      ],
+      [
+       "OBSTETRICIA CLINICA",
+       128
+      ],
+      [
+       "ONCOLOGIA",
+       19
+      ],
+      [
+       "PEDIATRIA CLINICA",
+       178
+      ],
+      [
+       "PNEUMOLOGIA",
+       18
+      ],
+      [
+       "PSIQUIATRIA",
+       67
+      ],
+      [
+       "REABILITACAO",
+       4
+      ],
+      [
+       "PNEUMOLOGIA SANITARIA",
+       9
+      ],
+      [
+       "UTI ADULTO",
+       0
+      ],
+      [
+       "UTI INFANTIL",
+       0
+      ],
+      [
+       "UTI NEONATAL",
+       0
+      ],
+      [
+       "UNIDADE INTERMEDIARIA",
+       0
+      ],
+      [
+       "UNIDADE INTERMEDIARIA NEONATAL",
+       0
+      ],
+      [
+       "UNIDADE ISOLAMENTO",
+       36
+      ],
+      [
+       "TRANSPLANTE",
+       6
+      ],
+      [
+       "PEDIATRIA CIRURGICA",
+       29
+      ],
+      [
+       "AIDS",
+       4
+      ],
+      [
+       "FIBROSE CISTICA",
+       0
+      ],
+      [
+       "INTERCORRENCIA POS-TRANSPLANTE",
+       0
+      ],
+      [
+       "GERIATRIA",
+       2
+      ],
+      [
+       "SAUDE MENTAL",
+       1
+      ],
+      [
+       "UTI ADULTO - TIPO I",
+       0
+      ],
+      [
+       "UTI ADULTO - TIPO II",
+       67
+      ],
+      [
+       "UTI ADULTO - TIPO III",
+       0
+      ],
+      [
+       "UTI PEDIATRICA - TIPO I",
+       0
+      ],
+      [
+       "UTI PEDIATRICA - TIPO II",
+       11
+      ],
+      [
+       "UTI PEDIATRICA - TIPO III",
+       0
+      ],
+      [
+       "UTI NEONATAL - TIPO I",
+       5
+      ],
+      [
+       "UTI NEONATAL - TIPO II",
+       23
+      ],
+      [
+       "UTI NEONATAL - TIPO III",
+       0
+      ],
+      [
+       "UTI DE QUEIMADOS",
+       0
+      ],
+      [
+       "ACOLHIMENTO NOTURNO",
+       10
+      ],
+      [
+       "UTI CORONARIANA TIPO II - UCO TIPO II",
+       0
+      ],
+      [
+       "UTI CORONARIANA TIPO III - UCO TIPO III",
+       0
+      ],
+      [
+       "SAUDE MENTAL",
+       18
+      ],
+      [
+       "QUEIMADO ADULTO",
+       0
+      ],
+      [
+       "QUEIMADO PEDIATRICO",
+       0
+      ],
+      [
+       "QUEIMADO ADULTO",
+       0
+      ],
+      [
+       "QUEIMADO PEDIATRICO",
+       0
+      ],
+      [
+       "UNIDADE DE CUIDADOS INTERMED NEONATAL CONVENCIONAL",
+       26
+      ],
+      [
+       "UNIDADE DE CUIDADOS INTERMED NEONATAL CANGURU",
+       16
+      ],
+      [
+       "UNIDADE DE CUIDADOS INTERMEDIARIOS PEDIATRICO",
+       10
+      ],
+      [
+       "UNIDADE DE CUIDADOS INTERMED  ADULTO",
+       15
+      ],
+      [
+       "Não classificados",
+       30
+      ]
+     ],
+     "total": [
+      1816
+     ]
+    },
+    {
+     "id": "L2",
+     "linha": "Leito Hosp/Lt Complem",
+     "incrementos": [
+      "Freqüência",
+      "Quantidade Leitos SUS"
+     ],
+     "naoClassificados": "incluir",
+     "rows": [
+      [
+       "Leitos Hospitalares",
+       1577,
+       1433
+      ],
+      [
+       "Leitos Complementares",
+       239,
+       199
+      ]
+     ],
+     "total": [
+      1816,
+      1632
+     ]
+    },
+    {
+     "id": "L3",
+     "linha": "Retenção Tributo Estabel.",
+     "incrementos": [
+      "Freqüência"
+     ],
+     "naoClassificados": "incluir",
+     "rows": [
+      [
+       "Estabelecimento PUBLICO",
+       0
+      ],
+      [
+       "Estabelecimento FILANTROPICO",
+       0
+      ],
+      [
+       "Estabelecimento SEM FINS LUCRATIVOS",
+       0
+      ],
+      [
+       "Estabelecimento PRIVADO LUCRATIVA SIMPLES",
+       0
+      ],
+      [
+       "Estabelecimento PRIVADO LUCRATIVA",
+       0
+      ],
+      [
+       "Estabelecimento SINDICAL",
+       0
+      ],
+      [
+       "Estabelecimento PESSOA FISICA",
+       0
+      ],
+      [
+       "Retenção estab. não  informada",
+       1816
+      ]
+     ],
+     "total": [
+      1816
      ]
     }
    ]

@@ -231,3 +231,26 @@ test('CNV literal salva de volta mantém a ordem dos códigos na linha', async (
   const cnv = parseCnv(['1 2 L', row(1, 'Tres', '07-48,7 -48, 7-48,AB')].join('\n'));
   assert.match(serializeCnv(cnv), /07-48,7 -48, 7-48,AB/);
 });
+
+// RE-004, testes H5–H8 no TabWin 4.15 (pesos: 050, 100, 300, 700, 999, A01, K01, branco).
+test('CNV curta: espaços e hífen ("   -zzz") são uma faixa que começa no branco e pega o resto', () => {
+  const codes = ['050', '100', '300', '700', '999', 'A01', 'K01', null];
+  const caught = (token) => {
+    const cnv = parseCnv(['2 3', row(1, 'Hifen', token), row(2, 'Exato 100', '100')].join('\n'));
+    return codes.filter((code) => classifyCnv(cnv, code)?.sequence === 1);
+  };
+  // "   -500" = "000-500" = 165 no TabWin: branco, A01, 300, 050.
+  assert.deepEqual(caught('   -500'), ['050', '300', 'A01', null]);
+  assert.deepEqual(caught('000-500'), ['050', '300', 'A01', null]);
+  // "   -zzz" = "000-zzz" = 253: tudo menos o 100, até o K01 (índice 1001).
+  assert.deepEqual(caught('   -zzz'), ['050', '300', '700', '999', 'A01', 'K01', null]);
+});
+
+test('NATJUR.CNV do CNES: "    -zzzz" no formato N pega o código que nenhuma outra linha cobre', () => {
+  const nrow = (sequence, label, codes, parent = '') => `${parent.padStart(4)} ${String(sequence).padStart(4)}  ${label.padEnd(100)} ${codes}`;
+  const cnv = parseCnv(['N 3 4', nrow(90, '--- Não especificado ou ignorado', '    -zzzz'), nrow(1, '1. Administração Pública', '1000-1999,'), nrow(2, '101-5 Órgão Público', '1015', '1')].join('\n'));
+  assert.equal(cnv.mode, 'short');
+  assert.equal(classifyCnv(cnv, '8885')?.sequence, 90);
+  assert.equal(classifyCnv(cnv, '1015')?.sequence, 2);
+  assert.equal(classifyCnv(cnv, '1999')?.sequence, 1);
+});

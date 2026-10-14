@@ -120,9 +120,20 @@ export function nomeBaseDoRecurso(path: string): string {
   return path.replace(/\\/g, '/').split('/').pop()?.toLowerCase() ?? path.toLowerCase();
 }
 
+/**
+ * Linha-título de seção, que o TabWin lista mas não é variável: sem campo, ou
+ * com TITULO/COMENTARIO no lugar dele ("X* DADOS GERAIS *, TITULO,
+ * LINHA_COMENTARIO_…" e "X* EQUIPES_AC *,    , TITULO , …" nos DEFs do CNES).
+ */
+function ehTitulo(option: DefOption): boolean {
+  const recurso = option.kind === 'conversion' ? option.conversionFile : option.kind === 'dbf-lookup' ? option.lookupFile : option.resourceFile;
+  return !option.field || /^(TITULO|COMENTARIO)$/i.test(option.field) || /^LINHA_COMENTARIO/i.test(recurso);
+}
+
 function eixoDoDef(option: DefOption, papel: string, recursos: ResolvedorDeRecursos, campos?: ReadonlySet<string>): PainelEixo {
   const id = `def:${option.sourceLine}:${papel}`;
   const base = { id, label: option.label, field: option.field };
+  if (ehTitulo(option)) return { ...base, disponivel: false, motivo: 'título de seção do DEF, não é uma variável' };
   const faltaCampo = campos && !campos.has(option.field.toUpperCase());
   if (option.kind === 'conversion') {
     const conversionId = recursos.conversao(option.conversionFile);

@@ -1,4 +1,4 @@
-# RE-004 — Texto no lugar da posição, CNV no formato N e a ordem do Discriminar
+# RE-004 — Texto no lugar da posição, CNV no formato N, ordem do Discriminar e CNES
 
 Data: 2026-10-14. Programa de referência: TabWin 4.15 (`TabWin415.exe`) no
 Wine 10, a mesma montagem do [RE-002](./RE_002_PAINEL_TABULA.md). Dados:
@@ -86,6 +86,72 @@ soltos na ordem do arquivo; vários arquivos um depois do outro). O acumulador
 guarda, para cada código do Discriminar, a menor posição em que apareceu, e
 ordena as linhas por ela. A contagem não muda; só a ordem.
 
+## CNES conferido no TabWin
+
+Com o `TAB_CNES.zip` oficial e o Acre de jan/2025 (`STAC2501.dbc`, 1.467
+estabelecimentos; `LTAC2501.dbc`, 276 registros de leitos).
+
+**Três dos 15 DEFs do CNES eram recusados inteiros pelo TabSis.** O TabWin os
+abre ([painel](./telas/23-cnes-estabelecimento-no-painel.png)) e lista as
+linhas-título como opções:
+
+- `X* EQUIPES_AC *,    , TITULO , TITULO_REFERENTES_A_EQUIPES_DO_UF`
+  (Equipes.def): opção sem campo;
+- `I* ATENDIMIMENTO PRESTADO *, ATEND_PR,` (Estabelecimento.def,
+  DadosComplementares.def): incremento com vírgula sobrando.
+
+**No TabSis:** as duas formas abrem; a linha-título aparece em cinza no painel
+("título de seção do DEF, não é uma variável"), como as de 3 campos
+(`X* DADOS GERAIS *, TITULO, LINHA_COMENTARIO_…`).
+
+Doze tabelas salvas pelo TabWin, com Incluir (`verify:sim-sinasc … CNES=`):
+
+| Caso | Variável | O que exercita |
+| --- | --- | --- |
+| C0 | Natureza Jurídica (`NATJUR.CNV`, formato N) | subtotais N; `    -zzzz` (abaixo) |
+| C1 | Esfera Jurídica | subtotais |
+| C2 | Tipo de Estabelecimento | CNV comum |
+| C3 | Retenção Tributos Estabel. | campo vazio em todos |
+| C4 | Ambulatorial Atenção Básica | código lido de GESPRG1E+GESPRG1M |
+| C5 | Serviço Social | SERAP02P+SERAP02T |
+| C6 | INTERNAÇÃO | AP01CV01…AP01CV04 (4 campos) |
+| C7 | INT. Seguro Próprio/Terceiro | AP01CV03+AP01CV04 |
+| L0–L3 | Leitos: Tipo/Especialidade, Especialidade, Hosp/Complementar, Retenção | `G QT_EXIST` + incremento Quantidade Leitos SUS |
+
+Onze bateram de saída. O C0 diferia num estabelecimento (`NAT_JUR` 8885, que
+nenhuma linha cobre): o TabWin o põe em "--- Não especificado ou ignorado",
+cuja linha tem o código `    -zzzz`.
+
+### Teste H — hífen no começo do código da CNV curta
+
+[`ferramentas/re004-cnv-hifen.py`](./ferramentas/re004-cnv-hifen.py): CNV `2 3`
+com a linha 1 testada e a linha 2 = `100`; registros 050, 100, 300, 700, 999,
+A01, K01 e branco com pesos 1…128.
+
+| Código da linha 1 | TabWin | Quem caiu |
+| --- | ---: | --- |
+| `-zzz` | 0 | — |
+| `-500` | 128 | só o branco |
+| `500-` | 128 | só o branco |
+| `---` | 128 | só o branco |
+| `   -500` (espaços antes) | 165 | branco, A01, 300, 050 |
+| `000-500` (controle) | 165 | o mesmo |
+| `   -zzz` (espaços antes) | 253 | tudo menos o 100 — até o K01 |
+| `000-zzz` | 253 | o mesmo |
+
+**Espaços antes do hífen são o início da faixa: o branco.** `    -zzzz` pega
+tudo o que as outras linhas não pegam — é a linha "pega o resto" de 57 linhas
+das CNVs oficiais (NATJUR, TP_ESTAB, BR_UFS, FONTEREM…). E a faixa passa do 999
+quando a ponta tem letra (`zzz` = 2600; K01 = 1001).
+
+O hífen colado no começo, sem espaços (`-500`, `---`), só pega o branco, e
+`-zzz` não pega nem ele. Isso não está entendido e **não foi implementado**; é
+raro em CNV oficial com algo depois do hífen (1 caso, `OSMOSE_R.CNV`), e nas
+linhas-título (`----`) só faria diferença para registro em branco.
+
+**No TabSis:** na CNV curta, espaços seguidos de hífen viram faixa do branco
+até a ponta. Com isso o CNES fica 12/12.
+
 ## Conferência
 
 `npm run verify:re003 -- <pasta>`: 9/9 (os 7 do RE-003 + SubTp FAEC e Proc
@@ -93,9 +159,15 @@ obs, com Discriminar). A sequência medida está em
 `fixtures/oracle/re004-ordem-dbc/expected.json` e é o teste
 `tests/read-order.test.mjs`.
 
+`verify:sim-sinasc` com `CNES=<pasta>`: 39/39 (SIM, SINASC, SIA, SINAN e os 12
+do CNES).
+
 ## O que não foi medido
 
 - Registro maior que 4.096 bytes num DBC (fica na ordem do arquivo).
 - Terceiro campo com texto e recurso que não é `.CNV` nem `.DBF`.
 - A linha-título `X** DADOS DO PACIENTE **,,,` do `Atencao_Domiciliar.def`
   (SIA), que o TabSis mostra em cinza.
+- Hífen colado no começo do código, sem espaços (teste H1–H4).
+- Espaços + hífen em CNV literal (só a curta foi medida).
+- O que o TabWin faz ao escolher um incremento-título (`I* LEITO HOSPITALAR *`).

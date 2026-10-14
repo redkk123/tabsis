@@ -109,7 +109,15 @@ function parseOption(
   const [label = '', field = '', third = '', fourth = '', ...trailingFields] = fields;
   const retainedTrailingFields = trailingFields.length ? { trailingFields } : {};
   if (strict && !label) throw new DefParseError(`${directive} directive has no display label`, sourceLine);
-  if (strict && !field) throw new DefParseError(`${directive} directive has no DBF field`, sourceLine);
+  // Linha-título sem campo ("X* EQUIPES_AC *,    , TITULO , TITULO_…" no
+  // Equipes.def do CNES): o TabWin abre o DEF e lista a linha como opção
+  // (RE-004). Fica guardada, sem campo — o painel a mostra em cinza.
+  if (!field) {
+    return {
+      kind: 'external-lookup', directive, label, field: '', roles: rolesForDirective(directive),
+      lookupLabelField: third, resourceFile: fourth, sourceLine, ...retainedTrailingFields,
+    };
+  }
   if (strict && !third) throw new DefParseError(`${directive} directive has an empty third field`, sourceLine);
   if (strict && !fourth) throw new DefParseError(`${directive} directive has no conversion/lookup file`, sourceLine);
 
@@ -182,7 +190,11 @@ function parseOption(
 }
 
 function parseIncrement(rest: string, sourceLine: number, strict: boolean): DefIncrement {
+  // Vírgula sobrando no fim ("I* ATENDIMENTO PRESTADO *, ATEND_PR," no
+  // Estabelecimento.def do CNES): o TabWin abre o DEF e lista o incremento
+  // (RE-004). Campos vazios no fim não contam.
   const fields = splitCommaFields(rest);
+  while (fields.length > 2 && !fields[fields.length - 1]) fields.pop();
   if (strict && fields.length !== 2) {
     throw new DefParseError(`I directive expects label,field; got ${fields.length} fields`, sourceLine);
   }

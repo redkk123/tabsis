@@ -91,8 +91,12 @@ Do Help do TabWin v2 (versão impressa, Vigilância em Saúde de MG):
       CNV da posição 1. De quebra: CNV no formato N respeita o `L`, branco
       entre vírgulas é código, e a ordem do Discriminar segue a leitura do
       TabWin, que num DBC vai em pedaços de 4.096 bytes
-      ([RE-004](../reverse-engineering/RE_004_LOOKUP_E_ORDEM.md)).
+      ([RE-004](../reverse-engineering/RE_004_LOOKUP_ORDEM_CNES.md)).
       `verify:re003` 9/9.
+- [x] **CNES conferido no TabWin** (STAC2501 e LTAC2501, 12 tabelas): 3 dos
+      15 DEFs oficiais eram recusados (linhas-título) e agora abrem; espaços +
+      hífen na CNV curta (`    -zzzz`) são faixa a partir do branco.
+      `verify:sim-sinasc` 39/39.
 - [x] **SIA e SINAN conferidos** (`verify:sim-sinasc` 26/27 + 1 diferença
       documentada): DEF do SIA com linha de 3 campos não derruba mais o
       arquivo; campo de data classifica; CNV literal com a última ocorrência e
