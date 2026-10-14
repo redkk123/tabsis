@@ -55,10 +55,32 @@ test('parses grouped-frequency G and retains legacy R', () => {
   assert.equal(def.reportFile, 'saida.rel');
 });
 
-test('does not guess X directive semantics', () => {
-  const def = parseDef(`; x\nA*.DBF\nXAlguma coisa,CAMPO,1,X.CNV\nLRegião,UF,1,UF.CNV`);
-  assert.equal(def.unknownLines[0]?.directive, 'X');
-  assert.match(def.warnings.join('\n'), /X directive detected/);
+test('X is line, column and selection at once, as the real TabWin 4.15 lists it', () => {
+  // Oracle 2026-10-13 (docs/reverse-engineering/RE_002): TESTE.DEF with
+  // "XSexo X,SEXO,1,SEXO.CNV" showed "Sexo X" in Linhas, Colunas and
+  // Seleções disponíveis, after the L/C/S options declared before it.
+  const def = parseDef(`; x\nA*.DBF\nLRaça parcial,RACA_COR,1,RACA1.CNV\nLSexo,SEXO,1,SEXO.CNV\nCCaráter,CAR_INT,1,CARINT.CNV\nSRaça parcial,RACA_COR,1,RACA1.CNV\nXSexo X,SEXO,1,SEXO.CNV`);
+  assert.equal(def.unknownLines.length, 0);
+  assert.doesNotMatch(def.warnings.join('\n'), /X directive/);
+  assert.deepEqual(optionsForRole(def, 'row').map((x) => x.label), ['Raça parcial', 'Sexo', 'Sexo X']);
+  assert.deepEqual(optionsForRole(def, 'column').map((x) => x.label), ['Caráter', 'Sexo X']);
+  assert.deepEqual(optionsForRole(def, 'selection').map((x) => x.label), ['Raça parcial', 'Sexo X']);
+  const x = def.options.at(-1);
+  assert.equal(x?.directive, 'X');
+  assert.equal(x?.kind, 'conversion');
+  assert.equal(x?.conversionFile, 'SEXO.CNV');
+});
+
+test('the ? directive names the help file instead of becoming an unknown line', () => {
+  const def = parseDef(';Movimento de AIH\nADADOS\\RD*.DBC\n?\\TAB\\RD.HLP\nLSexo,SEXO,1,SEXO.CNV');
+  assert.equal(def.helpFile, '\\TAB\\RD.HLP');
+  assert.equal(def.unknownLines.length, 0);
+});
+
+test('other first-position letters stay as audited unknown lines', () => {
+  const def = parseDef('; z\nA*.DBF\nZAlguma coisa,CAMPO,1,Z.CNV\nLRegião,UF,1,UF.CNV');
+  assert.equal(def.unknownLines[0]?.directive, 'Z');
+  assert.equal(def.options.length, 1);
 });
 
 test('retains contemporary textual-field CNV lookups without pretending they are DBF lookups', () => {

@@ -6,7 +6,7 @@
  * of silently normalizing legacy semantics away.
  */
 
-export type DefDirective = 'A' | 'R' | 'S' | 'L' | 'C' | 'Q' | 'D' | 'T' | 'I' | 'G';
+export type DefDirective = 'A' | 'R' | 'S' | 'L' | 'C' | 'Q' | 'D' | 'T' | 'X' | 'I' | 'G' | '?';
 export type DefRole = 'selection' | 'row' | 'column' | 'quad';
 
 export interface DefDataSource {
@@ -17,7 +17,14 @@ export interface DefDataSource {
 }
 
 interface DefOptionBase {
-  directive: 'S' | 'L' | 'C' | 'Q' | 'D' | 'T';
+  /**
+   * `X` is the contemporary shorthand for "line, column and selection at once".
+   * Established on 2026-10-13 against the real TabWin 4.15 running under Wine:
+   * an `X` option of `RD2008.DEF` ("Município internação") and of a purpose-built
+   * DEF appeared in the Linhas, Colunas and Seleções disponíveis lists together,
+   * in source order with the other directives. See docs/reverse-engineering/RE_002.
+   */
+  directive: 'S' | 'L' | 'C' | 'Q' | 'D' | 'T' | 'X';
   label: string;
   field: string;
   roles: DefRole[];
@@ -81,6 +88,12 @@ export interface DefDefinition {
   groupedCountField?: string;
   /** R directive, retained for old TABDOS compatibility even though Web does not use it. */
   reportFile?: string;
+  /**
+   * `?` directive: the help file the TabWin panel opens from its "Ajuda" button
+   * (`?\TAB\RD.HLP` in RD2008.DEF). Kept so the panel can name it; WinHelp
+   * itself is not reproduced.
+   */
+  helpFile?: string;
   comments: string[];
   unknownLines: DefUnknownLine[];
   warnings: string[];

@@ -98,21 +98,24 @@ Planned implementation:
 3. verify fallback rule when the source-key-named field does not exist in related DBF (historical docs say first field is used);
 4. golden-test ordering, missing keys, duplicate keys and selection behavior.
 
-## 7. `X` directive — unresolved
+## 7. `X` directive — resolved 2026-10-13
 
-The `defcnv.htm` supplied with TabWin 4.15 explicitly refers to DEF record types `S, L, C, D, T ou X` when discussing the starting position used for CNV comparison.
+`X` puts one option in **Linhas, Colunas and Seleções disponíveis at the same
+time**. Established against the real TabWin 4.15 running under Wine (see
+`docs/reverse-engineering/RE_002_PAINEL_TABULA.md`):
 
-The supplied 4.15 documentation does **not** define the meaning of `X`, and the older manual's directive list does not include it.
+- `RD2008.DEF` declares `XMunicípio internação,MUNIC_MOV,1,CNV\br_municip.cnv`;
+  TabWin lists "Município internação" in all three lists.
+- A purpose-built `TESTE.DEF` with `XSexo X,SEXO,1,SEXO.CNV` after `L`, `C` and
+  `S` lines showed "Sexo X" last in each of the three lists — source order is
+  kept across directives.
 
-R01 policy:
+Before this fix the parser kept `X` lines as unknown and the 47 `X` options of
+`RD2008.DEF` (município, capital, CIR, macro/microrregião…) were missing from
+the web panel.
 
-- detect `X`;
-- preserve the complete source line;
-- emit a warning;
-- do not activate it as a row/column/filter role;
-- resolve from a real modern DEF corpus or stronger documentation.
-
-This is a good example of the project's rule: **unknown semantics are a visible gap, not an invitation to guess.**
+The `?` directive (`?\TAB\RD.HLP`) names the help file the panel's "Ajuda"
+button opens. It is parsed into `helpFile`.
 
 ## 8. Unknown first-position characters
 
@@ -135,7 +138,7 @@ CNV source-order precedence is a separate issue and is already represented by th
 - D/T role expansion is tested;
 - related DBF lookups parse;
 - G and R parse;
-- X is detected without guessed semantics.
+- X expands to row + column + selection (oracle 2026-10-13).
 
 ### Executor-level evidence
 
@@ -152,4 +155,4 @@ CNV source-order precedence is a separate issue and is already represented by th
 - execute G001 against a real DBC;
 - compare exact labels/order/cells with TabWin 4.15;
 - test related-DBF lookup if G001/next fixtures require it;
-- determine `X` semantics from real corpus/documentation.
+- ~~determine `X` semantics~~ — done, row + column + selection.
