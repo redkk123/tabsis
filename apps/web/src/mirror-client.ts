@@ -16,6 +16,7 @@
 
 import {
   lookupInMirror,
+  lookupLightInMirror,
   parseMirrorManifest,
   type MirrorManifestV1,
 } from '../../../packages/acquisition/src/mirror-manifest.ts';
@@ -51,6 +52,11 @@ export interface MirrorFetchResult {
   bytes: Uint8Array;
   /** Para a auditoria registrar de onde o arquivo veio de fato. */
   url: string;
+  /** Nome do arquivo entregue: o original (`DNBR2024.dbc`) ou a versão leve (`DNBR2024.parquet`). */
+  name: string;
+  formato: 'dbc' | 'parquet';
+  /** Só na versão leve: o SHA-256 do DBC que ela diz ter convertido. */
+  sourceSha256?: string;
 }
 
 /**
@@ -70,13 +76,40 @@ export async function fetchFromMirror(
     onResume?: (fromBytes: number, totalBytes: number, reason: string) => void;
     /** Onde as partes ficam. O padrão é o OPFS; o teste injeta o seu. */
     partials?: PartialStore;
+    /**
+     * Prefere a versão leve (Parquet) quando o espelho a tiver: metade do
+     * tamanho, e a tabulação lê só as colunas que usa.
+     */
+    preferirLeve?: boolean;
   } = {},
 ): Promise<MirrorFetchResult | null> {
   const manifesto = await carregarManifesto();
   if (!manifesto) return null;
 
-  const alvo = lookupInMirror(manifesto, fileName);
-  if (!alvo) return null;
+  const leve = options.preferirLeve ? lookupLightInMirror(manifesto, fileName) : null;
+  if (leve) {
+    // Versão leve que falha (ausente, hash errado, origem trocada) não pode
+    // custar o espelho: tenta o DBC do mesmo espelho antes de ir ao DATASUS.
+    const resultado = await baixarDoEspelho(leve, { name: leve.name, formato: 'parquet', sourceSha256: leve.sourceSha256 }, computeSha256, options);
+    if (resultado) return resultado;
+  }
+  const original = lookupInMirror(manifesto, fileName);
+  if (!original) return null;
+  return baixarDoEspelho(original, { name: fileName, formato: 'dbc' }, computeSha256, options);
+}
+
+async function baixarDoEspelho(
+  alvo: { url: string; sha256: string; bytes: number },
+  identidade: Pick<MirrorFetchResult, 'name' | 'formato' | 'sourceSha256'>,
+  computeSha256: (bytes: Uint8Array) => Promise<string>,
+  options: {
+    fetchImpl?: typeof fetch;
+    signal?: AbortSignal;
+    onProgress?: (received: number, total: number) => void;
+    onResume?: (fromBytes: number, totalBytes: number, reason: string) => void;
+    partials?: PartialStore;
+  },
+): Promise<MirrorFetchResult | null> {
 
   const buscar = options.fetchImpl ?? fetch;
   const partes = options.partials ?? OPFS_PARTIAL_STORE;
@@ -144,7 +177,14 @@ export async function fetchFromMirror(
       return null;
     }
     await partes.delete(alvo.sha256);
-    return { bytes, url: alvo.url };
+    if (identidade.formato === 'parquet') {
+      // O Parquet diz, por dentro, de qual DBC veio. Tem de ser o DBC que o
+      // manifesto declara; se não for, é outro dado — volta ao caminho do DBC.
+      const { asyncBufferFromBytes, openParquetDataset } = await import('../../../packages/acquisition/src/parquet-source.ts');
+      const conjunto = await openParquetDataset(asyncBufferFromBytes(bytes));
+      if (conjunto.provenance.sha256 !== identidade.sourceSha256) return null;
+    }
+    return { bytes, url: alvo.url, ...identidade };
   } catch {
     // O que já chegou fica no disco de propósito: é justamente a queda no meio
     // que a retomada existe para socorrer.

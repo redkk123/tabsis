@@ -29,6 +29,20 @@ export interface MirrorEntry {
   fetchedAt: string;
   /** Endereço oficial de origem, para a procedência não depender do bucket. */
   source: string;
+  /**
+   * Versão leve do mesmo arquivo, em Parquet (scripts/dbc-para-parquet.mjs).
+   * Tem hash próprio, também declarado aqui no git; e o Parquet carrega dentro
+   * dele o SHA-256 do DBC de origem, que o aplicativo confere contra `sha256`.
+   */
+  parquet?: MirrorParquetVariant;
+}
+
+export interface MirrorParquetVariant {
+  path: string;
+  sha256: string;
+  bytes: number;
+  rows: number;
+  converter: string;
 }
 
 export interface MirrorManifestV1 {
@@ -83,6 +97,19 @@ export function parseMirrorManifest(conteudo: string): MirrorManifestV1 {
     // não oficial. Uma entrada assim é pior que entrada nenhuma.
     if (!name || !path || !sha256 || !source) return [];
     if (!/^[0-9a-f]{64}$/.test(sha256)) return [];
+    const leve = registro?.parquet as Partial<MirrorParquetVariant> | undefined;
+    const levePath = texto(leve?.path);
+    const leveSha = texto(leve?.sha256);
+    // Variante sem hash válido some em silêncio: o DBC continua servindo.
+    const parquet = levePath && leveSha && /^[0-9a-f]{64}$/.test(leveSha)
+      ? {
+        path: levePath,
+        sha256: leveSha,
+        bytes: Number(leve?.bytes) || 0,
+        rows: Number(leve?.rows) || 0,
+        converter: texto(leve?.converter) ?? '',
+      }
+      : undefined;
     return [{
       name,
       path,
@@ -90,6 +117,7 @@ export function parseMirrorManifest(conteudo: string): MirrorManifestV1 {
       bytes: Number(registro?.bytes) || 0,
       fetchedAt: texto(registro?.fetchedAt) ?? '',
       source,
+      ...(parquet ? { parquet } : {}),
     }];
   });
 
@@ -106,6 +134,42 @@ export interface MirrorLookup {
   url: string;
   sha256: string;
   bytes: number;
+}
+
+export interface MirrorLightLookup extends MirrorLookup {
+  /** Nome a dar ao arquivo baixado: o nome original, com extensão .parquet. */
+  name: string;
+  /** SHA-256 do DBC de origem, que o Parquet tem de declarar dentro dele. */
+  sourceSha256: string;
+}
+
+function caminhoSeguro(caminho: string): boolean {
+  return !caminho.includes('..') && !/^[a-z]+:/i.test(caminho);
+}
+
+/**
+ * A versão leve (Parquet) de um arquivo do espelho, quando houver.
+ *
+ * Mesmas regras de {@link lookupInMirror} — manifesto velho, arquivo ausente
+ * ou caminho suspeito devolvem `null` — e o chamador cai no DBC.
+ */
+export function lookupLightInMirror(
+  manifest: MirrorManifestV1,
+  fileName: string,
+  now = Date.now(),
+  maxAgeMs = MIRROR_MAX_AGE_MS,
+): MirrorLightLookup | null {
+  if (!lookupInMirror(manifest, fileName, now, maxAgeMs)) return null;
+  const entrada = manifest.entries.find((item) => item.name.toLowerCase() === fileName.trim().toLowerCase());
+  const leve = entrada?.parquet;
+  if (!entrada || !leve || !caminhoSeguro(leve.path)) return null;
+  return {
+    url: `${manifest.baseUrl}/${leve.path.replace(/^\//, '')}`,
+    sha256: leve.sha256,
+    bytes: leve.bytes,
+    name: entrada.name.replace(/\.(dbc|dbf)$/i, '') + '.parquet',
+    sourceSha256: entrada.sha256,
+  };
 }
 
 /**

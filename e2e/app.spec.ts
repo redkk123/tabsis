@@ -1483,7 +1483,11 @@ test('o arquivo guardado pode ser baixado sem precisar abrir a análise', async 
   const archive = [...zipSync({ 'GUARDADO01.dbc': strToU8('conteudo-de-teste') })];
 
   await page.evaluate(async (bytes) => {
-    const open = indexedDB.open('tabwin-web', 1);
+    // Sem versão: abre o banco como estiver. Se o aplicativo ainda não o
+    // criou, nasce na versão 1 (a de quem já usava antes) e a atualização do
+    // aplicativo migra o pacote para a store de metadados — que é justamente
+    // o que este teste passa a exercitar também.
+    const open = indexedDB.open('tabwin-web');
     const database: IDBDatabase = await new Promise((resolve, reject) => {
       open.onsuccess = () => resolve(open.result);
       open.onerror = () => reject(open.error);
@@ -1497,16 +1501,23 @@ test('o arquivo guardado pode ser baixado sem precisar abrir a análise', async 
         }
       };
     });
-    const transaction = database.transaction('official-archives', 'readwrite');
-    transaction.objectStore('official-archives').put({
+    const entry = {
       key: 'official-v1:teste',
       savedAt: Date.now(),
       bytes: new Uint8Array(bytes).buffer,
       sha256: 'a'.repeat(64),
       role: 'data',
       sources: [{ name: 'GUARDADO01.dbc', address: 'ftp://ftp.datasus.gov.br/x', source: 'SINAN', modality: 'Dados' }],
-    });
+    };
+    const stores = ['official-archives', ...(database.objectStoreNames.contains('archive-meta') ? ['archive-meta'] : [])];
+    const transaction = database.transaction(stores, 'readwrite');
+    transaction.objectStore('official-archives').put(entry);
+    if (stores.includes('archive-meta')) {
+      const { bytes: conteudo, ...resumo } = entry;
+      transaction.objectStore('archive-meta').put({ ...resumo, size: conteudo.byteLength });
+    }
     await new Promise((resolve) => { transaction.oncomplete = () => resolve(null); });
+    database.close();
   }, archive);
 
   await page.locator('#catalog-button').click();
@@ -1888,10 +1899,14 @@ test('a lista de combinações aparece antes das respostas, e cada linha se reso
   await expect(linhas).toHaveCount(0);
 });
 
-test('o cache guarda os seis mais recentes e descarta os antigos sem carregá-los', async ({ page }) => {
+test('o cache guarda os mais recentes e descarta os antigos sem carregá-los', async ({ page }) => {
   // A eviction nunca teve teste, e o código que ela substitui usava `getAll()`
   // — trazia os BYTES de todo pacote em cache só para ordenar por data, logo
   // depois de o navegador já ter na memória o arquivo recém-baixado.
+  //
+  // Desde o TabSis o limite principal é em BYTES (cota do navegador, ver
+  // packages/acquisition/src/cache-policy.ts); pacotes minúsculos como estes
+  // só esbarram no teto de quantidade, que é doze.
   const { zipSync, strToU8 } = await import('fflate');
   await page.route('**/wp-content/ftp.php', (route) => route.fulfill({
     status: 200, contentType: 'application/json',
@@ -1900,12 +1915,11 @@ test('o cache guarda os seis mais recentes e descarta os antigos sem carregá-lo
   await page.goto('/');
 
   const pacote = [...zipSync({ 'X.dbc': strToU8('conteudo') })];
-  // Oito pacotes com datas crescentes; o limite do aplicativo é seis.
   const resultado = await page.evaluate(async (bytes) => {
     const mod = await import('/src/archive-cache.ts');
-    for (let i = 1; i <= 8; i++) {
-      await mod.writeCachedArchive(`official-v1:pacote-${i}`, new Uint8Array(bytes), {
-        sha256: String(i).repeat(64).slice(0, 64),
+    for (let i = 1; i <= 14; i++) {
+      await mod.writeCachedArchive(`official-v1:pacote-${String(i).padStart(2, '0')}`, new Uint8Array(bytes), {
+        sha256: String(i % 10).repeat(64),
         role: 'data',
         sources: [{ name: `P${i}.dbc`, address: 'ftp://x', source: 'SINAN', modality: 'Dados' }],
       });
@@ -1916,12 +1930,9 @@ test('o cache guarda os seis mais recentes e descarta os antigos sem carregá-lo
     return guardados.map((s) => s.key);
   }, pacote);
 
-  expect(resultado).toHaveLength(6);
-  // Os dois mais antigos saíram; os seis mais novos ficaram, do novo para o velho.
-  expect(resultado).toEqual([
-    'official-v1:pacote-8', 'official-v1:pacote-7', 'official-v1:pacote-6',
-    'official-v1:pacote-5', 'official-v1:pacote-4', 'official-v1:pacote-3',
-  ]);
+  expect(resultado).toHaveLength(12);
+  // Os dois mais antigos saíram; os doze mais novos ficaram, do novo para o velho.
+  expect(resultado).toEqual(Array.from({ length: 12 }, (_, i) => `official-v1:pacote-${String(14 - i).padStart(2, '0')}`));
 });
 
 test('a consulta SQL responde sobre os dados abertos, sem tocar no motor de tabulação', async ({ page }) => {

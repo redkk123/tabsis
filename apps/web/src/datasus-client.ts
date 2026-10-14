@@ -66,7 +66,7 @@ export interface ExtractedArchive {
   skipped: SkippedArchiveEntry[];
 }
 
-const SUPPORTED_EXTENSIONS = new Set(['DBC', 'DBF', 'DEF', 'CNV', 'MAP']);
+const SUPPORTED_EXTENSIONS = new Set(['DBC', 'DBF', 'DEF', 'CNV', 'MAP', 'PARQUET']);
 const MAX_ARCHIVE_BYTES = ARCHIVE_LIMITS.maxArchiveBytes;
 const DATASUS_PROXY_BASE = (import.meta.env.VITE_DATASUS_PROXY_BASE as string | undefined)?.replace(/\/$/, '') ?? '';
 const TRANSIENT_HTTP = new Set([429, 502, 503, 504]);

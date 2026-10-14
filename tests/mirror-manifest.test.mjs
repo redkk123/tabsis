@@ -105,3 +105,33 @@ test('a descrição conta quantos arquivos e quando sincronizou', () => {
   assert.equal(describeMirror(parseMirrorManifest(manifesto()), AGORA),
     'Espelho com 1 arquivo(s), sincronizado há 1 dia.');
 });
+
+test('a versão leve em Parquet é oferecida com o nome original e o hash do DBC', async () => {
+  const { lookupLightInMirror } = await import('../dist/packages/acquisition/src/mirror-manifest.js');
+  const PARQUET = 'b'.repeat(64);
+  const lido = parseMirrorManifest(manifesto({
+    entries: [{
+      name: 'DNBR2024.dbc', path: 'sinasc/DNBR2024.dbc', sha256: HASH, bytes: 110_613_958,
+      fetchedAt: new Date(AGORA - DIA).toISOString(), source: 'ftp://x/DNBR2024.dbc',
+      parquet: { path: 'sinasc/DNBR2024.parquet', sha256: PARQUET, bytes: 55_000_000, rows: 2_400_000, converter: 'tabsis-dbc-para-parquet/1' },
+    }],
+  }));
+  const leve = lookupLightInMirror(lido, 'dnbr2024.dbc', AGORA);
+  assert.equal(leve.name, 'DNBR2024.parquet');
+  assert.equal(leve.url, 'https://espelho.tabweb.me/sinasc/DNBR2024.parquet');
+  assert.equal(leve.sha256, PARQUET);
+  assert.equal(leve.sourceSha256, HASH);
+  // Sem variante, nada de versão leve — o DBC continua servindo.
+  assert.equal(lookupLightInMirror(parseMirrorManifest(manifesto()), 'DNBR2024.dbc', AGORA), null);
+});
+
+test('variante Parquet sem hash válido é ignorada', () => {
+  const lido = parseMirrorManifest(manifesto({
+    entries: [{
+      name: 'DNBR2024.dbc', path: 'sinasc/DNBR2024.dbc', sha256: HASH, bytes: 1,
+      fetchedAt: new Date(AGORA - DIA).toISOString(), source: 'ftp://x/DNBR2024.dbc',
+      parquet: { path: 'sinasc/DNBR2024.parquet', sha256: 'curto' },
+    }],
+  }));
+  assert.equal(lido.entries[0].parquet, undefined);
+});

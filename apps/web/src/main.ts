@@ -124,6 +124,7 @@ import { nextToPrepare } from '../../../packages/acquisition/src/prepare-ahead.t
 import { parseQuestion, type QuestionMatch } from '../../../packages/acquisition/src/question-parser.ts';
 import { describeRecognition, recognizeArchive } from '../../../packages/acquisition/src/known-archive.ts';
 import { fetchFromMirror } from './mirror-client.ts';
+import { describeCacheUsage } from '../../../packages/acquisition/src/cache-policy.ts';
 import { fetchTabnetPreview, tabnetPreviewAvailable } from './tabnet-client.ts';
 import {
   buildPicker,
@@ -194,6 +195,7 @@ import {
   deleteCachedArchive,
   listCachedArchives,
   readCachedArchive,
+  describeCacheBudget,
   writeCachedArchive,
   type CachedArchiveRole,
   type CachedArchiveSummary,
@@ -2633,8 +2635,9 @@ function resetAnalysisState(): void {
 async function decodeDbf(bytes: Uint8Array, file: File, isDbc: boolean, source: LoadedSource): Promise<void> {
   // A fase que o R chama de `read.dbc`: descompressão do DBC mais leitura do
   // DBF. É a única do caminho que compara diretamente com outra ferramenta.
+  const formato = extensionOf(file.name);
   const header = await temposDoDownload.measure(
-    isDbc ? `leitura do DBC` : `leitura do DBF`,
+    formato === 'PARQUET' ? 'leitura do Parquet' : isDbc ? `leitura do DBC` : `leitura do DBF`,
     () => openDatasetFile(bytes, file, isDbc),
   );
 
@@ -2646,7 +2649,9 @@ async function decodeDbf(bytes: Uint8Array, file: File, isDbc: boolean, source: 
   dbfHeader = header;
   currentDatasetFile = file;
   currentCompatibilityProfile = 'tabwin-4.15';
-  sourceDbfButton.disabled = false;
+  // "Extrair DBF original" devolve o DBF de dentro do DBC; um Parquet não
+  // carrega esses bytes (só o cabeçalho), então o botão não se aplica.
+  sourceDbfButton.disabled = formato === 'PARQUET';
   resetAnalysisState();
   // Em segundo plano: a leitura pelo campo geográfico custa uma passada, e
   // segurar a abertura do arquivo por causa de um painel lateral trocaria uma
@@ -2673,10 +2678,7 @@ async function openDatasetFile(bytes: Uint8Array, file: File, isDbc: boolean): P
   setBusy(isDbc ? `Abrindo ${file.name}…` : `Lendo ${file.name}…`);
   decodeCancelButton.hidden = false;
   try {
-    return await openDataset(
-      [{ kind: 'binary', name: file.name, bytes: transferableBytes(bytes), isDbc }],
-      `Leitura de ${file.name}`,
-    );
+    return await openDataset([workerSourceFor(file.name, bytes)], `Leitura de ${file.name}`);
   } finally {
     decodeCancelButton.hidden = true;
     activeDecode = null;
@@ -2702,10 +2704,7 @@ async function appendCompatibleDbf(
     }
     // The Worker holds every source and checks the schema against the open
     // dataset, so nothing is concatenated on this thread.
-    dbfHeader = await appendDataset(
-      { kind: 'binary', name: file.name, bytes: transferableBytes(bytes), isDbc },
-      `Combinação de ${file.name}`,
-    );
+    dbfHeader = await appendDataset(workerSourceFor(file.name, bytes), `Combinação de ${file.name}`);
   } finally {
     decodeCancelButton.hidden = true;
     activeDecode = null;
@@ -2724,7 +2723,15 @@ async function appendCompatibleDbf(
 
 type DatasetWorkerSource =
   | { kind: 'binary'; name: string; bytes: ArrayBuffer; isDbc: boolean }
+  | { kind: 'parquet'; name: string; bytes: ArrayBuffer }
   | { kind: 'records'; name: string; records: DbfRecord[] };
+
+/** DBC, DBF ou o Parquet leve do TabSis, decidido pela extensão do nome original. */
+function workerSourceFor(name: string, bytes: Uint8Array): DatasetWorkerSource {
+  const extension = extensionOf(name);
+  if (extension === 'PARQUET') return { kind: 'parquet', name, bytes: transferableBytes(bytes) };
+  return { kind: 'binary', name, bytes: transferableBytes(bytes), isDbc: extension === 'DBC' };
+}
 
 /**
  * The opened dataset lives in the Worker; this thread keeps only its shape.
@@ -2868,32 +2875,18 @@ async function rebuildSourcesFromOriginalFiles(): Promise<{ sources: DatasetWork
     // appended binary source after a Worker cancellation/failure.
     const appended = await Promise.all(activeDatasetFiles.slice(1).map(async (candidate) => {
       const extension = extensionOf(candidate.name);
-      if (extension !== 'DBC' && extension !== 'DBF') {
+      if (extension !== 'DBC' && extension !== 'DBF' && extension !== 'PARQUET') {
         throw new Error(`${candidate.name}: fonte combinada não pode ser restaurada`);
       }
-      const candidateBytes = new Uint8Array(await candidate.arrayBuffer());
-      return {
-        kind: 'binary' as const,
-        name: candidate.name,
-        bytes: transferableBytes(candidateBytes),
-        isDbc: extension === 'DBC',
-      };
+      return workerSourceFor(candidate.name, new Uint8Array(await candidate.arrayBuffer()));
     }));
     return {
       sources: [{ kind: 'records', name: file.name, records: parsed.records as DbfRecord[] }, ...appended],
       fields: parsed.fields,
     };
   }
-  const sources = await Promise.all(activeDatasetFiles.map(async (file) => {
-    const extension = extensionOf(file.name);
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    return {
-      kind: 'binary' as const,
-      name: file.name,
-      bytes: transferableBytes(bytes),
-      isDbc: extension === 'DBC',
-    };
-  }));
+  const sources = await Promise.all(activeDatasetFiles.map(async (file) =>
+    workerSourceFor(file.name, new Uint8Array(await file.arrayBuffer()))));
   return { sources, fields: undefined };
 }
 
@@ -3048,7 +3041,7 @@ async function decodeDelimitedFile(bytes: Uint8Array, file: File, source: Loaded
 
 async function loadFile(file: File): Promise<void> {
   const extension = extensionOf(file.name);
-  if (!['DBC', 'DBF', 'CSV', 'TSV', 'DEF', 'CNV', 'MAP'].includes(extension)) {
+  if (!['DBC', 'DBF', 'PARQUET', 'CSV', 'TSV', 'DEF', 'CNV', 'MAP'].includes(extension)) {
     throw new Error(`${file.name}: formato ainda não suportado`);
   }
   if (file.size > MAX_LOCAL_INPUT_BYTES) {
@@ -3080,7 +3073,7 @@ async function loadFile(file: File): Promise<void> {
       return;
     }
   }
-  if (extension === 'DBC' || extension === 'DBF') {
+  if (extension === 'DBC' || extension === 'DBF' || extension === 'PARQUET') {
     if (combineCompatibleFiles.checked && dbfHeader && datasetRecordCount) {
       await appendCompatibleDbf(bytes, file, extension === 'DBC', source);
       return;
@@ -3839,7 +3832,7 @@ async function loadFiles(files: File[]): Promise<void> {
     // Metadata first lets a DEF/CNV influence the automatic first analysis even
     // when the user selected all files in one gesture.
     const ordered = [...files].sort((a, b) => {
-      const rank = (file: File) => ({ DEF: 0, CNV: 1, MAP: 2, DBC: 3, DBF: 3, CSV: 3, TSV: 3 } as Record<string, number>)[extensionOf(file.name)] ?? 9;
+      const rank = (file: File) => ({ DEF: 0, CNV: 1, MAP: 2, DBC: 3, DBF: 3, PARQUET: 3, CSV: 3, TSV: 3 } as Record<string, number>)[extensionOf(file.name)] ?? 9;
       return rank(a) - rank(b);
     });
     for (const file of ordered) await loadFile(file);
@@ -7207,6 +7200,9 @@ async function downloadCatalogEntries(
   if (!archive && files.length === 1 && files[0]) {
     const doEspelho = await fetchFromMirror(files[0].name, sha256, {
       ...(signal ? { signal } : {}),
+      // A versão leve (Parquet) vem primeiro quando o espelho a tiver: metade
+      // do tamanho, e a tabulação lê só as colunas que usa.
+      preferirLeve: true,
       onProgress: (recebidos, total) => {
         onActivity?.();
         const pedaco = total
@@ -7228,9 +7224,23 @@ async function downloadCatalogEntries(
       // O espelho entrega o `.dbc` direto, não o `.zip` do portal. O resto do
       // fluxo espera um pacote, então ele é embalado aqui — sem recompressão,
       // porque o DBC já é comprimido por dentro.
-      archive = zipSync({ [files[0].name]: [doEspelho.bytes, { level: 0 }] });
+      archive = zipSync({ [doEspelho.name]: [doEspelho.bytes, { level: 0 }] });
       temposDoDownload.add('espelho', 0);
-      setCatalogStatus(`${files[0].name} veio do espelho, com hash conferido.`);
+      setCatalogStatus(doEspelho.formato === 'parquet'
+        ? `${files[0].name} veio do espelho na versão leve (${doEspelho.name}, ${formatBytes(doEspelho.bytes.byteLength)}), com os dois hashes conferidos.`
+        : `${files[0].name} veio do espelho, com hash conferido.`);
+      // Guarda como guardaria o pacote do DATASUS: abrir de novo amanhã não
+      // precisa baixar outra vez, e a política de espaço vale igual.
+      const pacote = archive;
+      const pacoteSha256 = await sha256(pacote);
+      const fontes = files.map(({ name, address, source, modality, catalogQuery }) => ({
+        name, address, source, modality, ...(catalogQuery ? { catalogQuery: { ...catalogQuery } } : {}),
+      }));
+      try {
+        summary = await writeCachedArchive(cacheKey, pacote, { sha256: pacoteSha256, role, sources: fontes });
+      } catch {
+        summary = { key: cacheKey, savedAt: Date.now(), size: pacote.byteLength, sha256: pacoteSha256, role, sources: fontes };
+      }
     }
   }
 
@@ -7632,7 +7642,7 @@ async function openOfficialFile(
     // leitor de fluxo, que mede só a rede e sabe cancelá-la.
     watchdog.dispose();
     const wanted = downloaded.files.find((entry) => displayBaseName(entry.name).toLowerCase() === remote.name.toLowerCase())
-      ?? downloaded.files.find((entry) => ['DBC', 'DBF'].includes(extensionOf(entry.name)));
+      ?? downloaded.files.find((entry) => ['DBC', 'DBF', 'PARQUET'].includes(extensionOf(entry.name)));
     if (!wanted) throw new Error('O pacote oficial não contém um DBC ou DBF reconhecido');
     await loadFile(archiveFile(wanted));
     const source = loadedSources.find((item) => item.name.toLowerCase() === displayBaseName(wanted.name).toLowerCase());
@@ -7800,7 +7810,7 @@ async function packageOfficialFileBatch(
       );
       prepararProximo(files, index, preparandoPacote);
       const downloaded = await downloadCatalogEntries([remote], controller.signal, 24 * 60 * 60 * 1000, 'data');
-      const wanted = downloaded.files.filter((entry) => ['DBC', 'DBF'].includes(extensionOf(entry.name)));
+      const wanted = downloaded.files.filter((entry) => ['DBC', 'DBF', 'PARQUET'].includes(extensionOf(entry.name)));
       if (!wanted.length) throw new Error(`${remote.name} não trouxe DBC ou DBF`);
       for (const entry of wanted) {
         const name = displayBaseName(entry.name);
@@ -7920,7 +7930,7 @@ async function openRecentArchive(summary: CachedArchiveSummary): Promise<void> {
     const extracted = extractSupportedArchiveFiles(cached.bytes);
     const expectedNames = new Set(summary.sources.map((source) => source.name.toLowerCase()));
     const wanted = extracted.find((entry) => expectedNames.has(displayBaseName(entry.name).toLowerCase()))
-      ?? extracted.find((entry) => ['DBC', 'DBF'].includes(extensionOf(entry.name)));
+      ?? extracted.find((entry) => ['DBC', 'DBF', 'PARQUET'].includes(extensionOf(entry.name)));
     if (!wanted) throw new Error('O pacote salvo não contém um DBC ou DBF reconhecido');
     // Propagate decode/schema failures. The UI-oriented multi-file wrapper
     // intentionally catches errors and would otherwise report a false success.
@@ -7971,7 +7981,7 @@ function saveExtractedFilesToDisk(
   extracted: readonly ExtractedArchiveFile[],
   original: { bytes: Uint8Array; filename: string } | null,
 ): string {
-  const data = extracted.filter((entry) => ['DBC', 'DBF'].includes(extensionOf(entry.name)));
+  const data = extracted.filter((entry) => ['DBC', 'DBF', 'PARQUET'].includes(extensionOf(entry.name)));
   const wanted = data.length ? data : extracted;
 
   if (wanted.length === 1) {
@@ -8161,7 +8171,7 @@ async function saveAllCachedArchives(summaries: readonly CachedArchiveSummary[])
       const cached = await readCachedArchive(summary.key, Number.POSITIVE_INFINITY);
       if (!cached) throw new Error('não está mais no cache');
       for (const entry of extractSupportedArchiveFiles(cached.bytes)) {
-        if (!['DBC', 'DBF'].includes(extensionOf(entry.name))) continue;
+        if (!['DBC', 'DBF', 'PARQUET'].includes(extensionOf(entry.name))) continue;
         const name = displayBaseName(entry.name);
         // Nomes repetidos não podem se sobrescrever em silêncio.
         bundle[bundle[name] ? `${summary.key.slice(-6)}-${name}` : name] = [entry.bytes, { level: 0 }];
@@ -8296,9 +8306,13 @@ async function renderRecentArchives(): Promise<void> {
     catalogRecentList.replaceChildren();
     const totalBytes = archives.reduce((sum, archive) => sum + archive.size, 0);
     const dataCount = archives.filter((archive) => archive.role === 'data').length;
+    // O teto vem da cota que o navegador informa: guardar além dele faz o
+    // navegador apagar o site inteiro, e é isso que a pessoa precisa saber.
+    const { budgetBytes } = await describeCacheBudget();
+    if (generation !== recentArchivesGeneration) return;
     catalogRecentSummary.textContent = archives.length
-      ? `${integerFormat.format(dataCount)} arquivo(s) de dados · ${formatBytes(totalBytes)} em ${integerFormat.format(archives.length)} pacote(s)`
-      : 'Nenhum download oficial salvo neste aparelho.';
+      ? `${integerFormat.format(dataCount)} arquivo(s) de dados · ${describeCacheUsage(totalBytes, budgetBytes)} reservados neste navegador · os mais antigos saem quando o espaço acaba`
+      : `Nenhum download oficial salvo neste aparelho (espaço reservado: ${describeCacheUsage(0, budgetBytes).split(' de ')[1]}).`;
     catalogCacheClear.disabled = archives.length === 0;
 
     // Com vários pacotes guardados, salvar um a um é trabalho manual sem
