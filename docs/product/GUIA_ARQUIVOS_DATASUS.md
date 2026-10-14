@@ -105,6 +105,12 @@ Regras que pegam gente experiente:
   Norte" soma as UFs dela; o Total não conta duas vezes.
 - **`L` no cabeçalho** (`5 2 L`): código tratado como texto (siglas de UF).
   Códigos com mais de 4 posições já são tratados assim.
+- **Código curto (até 4 posições, sem `L`) vira número.** Na 1ª posição,
+  letra vale a posição no alfabeto (`A` = 1 … `Z` = 26); nas outras, o que
+  não for dígito vale 0. Então `A01` e `101` são o mesmo código, e **campo em
+  branco é `000`** (cai em "Ignorado" se a CNV tiver `00`). O Help antigo diz
+  "A a J valem 0 a 9"; o programa real faz assim — medido em
+  [RE-003](../reverse-engineering/RE_003_CNV_CODIGO_CURTO.md).
 - **`F` / `Faixas`** (`6 14 Faixas`): os códigos são limites superiores de
   faixas de valor (`99.99`, `499.99`…), para variáveis contínuas.
 - **Não classificados:** código que nenhuma linha da CNV cobre. No painel:

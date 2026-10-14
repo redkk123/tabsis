@@ -75,6 +75,13 @@ Do manual do curso TabWin (SESAP-RN/COSEMS-RN, fev/2011), que o Red mandou:
 - [x] Suprimir/agregar linhas por critério (igual/maior/menor/diferente) com
       a linha "Outras"; negativos em vermelho.
 - [ ] Largura de coluna (o navegador ajusta sozinho) e salvar em PRN/SPR/SQL.
+
+Do Help do TabWin v2 (versão impressa, Vigilância em Saúde de MG):
+
+- [x] **Código curto da CNV como o TabWin real**: letra vira número, branco é
+      000 — medido com quatro testes no TabWin 4.15
+      ([RE-003](../reverse-engineering/RE_003_CNV_CODIGO_CURTO.md)); goldens e
+      painel sem diferença.
 - [ ] Comprimir DBF → DBC (o TabWin comprime; o TabSis só expande).
 
 Próximos passos sugeridos para a tabulação:

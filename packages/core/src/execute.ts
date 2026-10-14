@@ -144,7 +144,7 @@ export function resolveDimensionValue(
     return { key: value, label: value };
   }
 
-  const match = classifyCnv(definition, raw);
+  const match = classifyCnv(definition, raw, { textual: typeof record[dimension.field] !== 'number' });
   if (!match) {
     return unclassifiedValue(dimension, String(raw ?? '').trim(), definition.mode === 'literal');
   }
@@ -174,7 +174,7 @@ function acceptsFilter(
   } else if (!definition) {
     matches = filter.acceptedCategories.includes(String(raw ?? ''));
   } else {
-    const match = classifyCnv(definition, raw);
+    const match = classifyCnv(definition, raw, { textual: typeof record[filter.field] !== 'number' });
     matches = match
       ? filter.acceptedCategories.includes(String(match.sequence))
       : filter.includeUnclassified === true;

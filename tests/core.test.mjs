@@ -237,7 +237,9 @@ test('numeric range filters honor inclusive and exclusive boundaries', () => {
 });
 
 test('unclassified CNV values can be selected or discriminated as an explicit axis', () => {
-  const records = [{ MES: '01' }, { MES: '77' }, { MES: 'AA' }];
+  // "ZZ", não "AA": no TabWin a letra da 1ª posição vira número (Z = 26) e a
+  // da 2ª vira 0, então "AA" é o código 10 e cai em 00-99; "ZZ" é 260 (RE-003).
+  const records = [{ MES: '01' }, { MES: '77' }, { MES: 'ZZ' }];
   const selected = compileQueryPlan({
     compatibilityProfile: 'tabwin-4.15', rows: { field: 'MES' }, measure: { kind: 'count' },
     filters: [{ field: 'MES', conversionId: 'mes', acceptedCategories: [], includeUnclassified: true }],
