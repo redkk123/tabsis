@@ -658,13 +658,17 @@
                   <option value="multiply">Multiplicar colunas</option><option value="divide">Dividir colunas</option>
                   <option value="minimum">Mínimo entre colunas</option><option value="maximum">Máximo entre colunas</option>
                   <option value="percentage">Percentual A ÷ B</option><option value="factor">Multiplicar por fator</option>
-                  <option value="percent-of-total">% do total da coluna (%percentagem)</option><option value="normalize">Normalizar — escore z</option>
+                  <option value="indicator">Calcular indicador (A ÷ B × escala)</option><option value="percent-of-total">% do total da coluna (%percentagem)</option><option value="normalize">Normalizar — escore z</option>
                   <option value="cumulative">Acumulado</option><option value="absolute">Valor absoluto</option>
                   <option value="integer">Converter para inteiro</option><option value="sequence">Sequência</option>
                   <option value="constant">Nova coluna constante</option><option value="expression">Nova coluna por expressão</option>
                 </select></label>
                 <label id="table-operation-left-label">Coluna A<select id="table-operation-left"></select></label>
                 <label id="table-operation-right-label">Coluna B<select id="table-operation-right"></select></label>
+                <label id="table-operation-scale-label" hidden>Escala<select id="table-operation-scale">
+                  <option value="0">por 1</option><option value="1">por 10</option><option value="2">por 100</option><option value="3">por 1.000</option>
+                  <option value="4">por 10.000</option><option value="5" selected>por 100.000</option><option value="6">por 1.000.000</option>
+                </select></label>
                 <label id="table-operation-number-label" hidden>Fator/valor<input id="table-operation-number" type="number" step="any" value="1"></label>
                 <label id="table-operation-expression-label" hidden>Expressão<input id="table-operation-expression" type="text" spellcheck="false" list="table-operation-function-list" placeholder="=TAXA([Óbitos]; [População]; 100000)"></label>
                 <label id="table-operation-zero-label" hidden>Divisão por zero<select id="table-operation-zero"><option value="error">Interromper</option><option value="zero">Usar zero</option></select></label>

@@ -122,6 +122,11 @@ interface TabulateRequest {
   requestId: number;
   plan: QueryPlan;
   conversions?: ConversionRegistry;
+  /**
+   * Só estes arquivos (pelo nome), como a lista "Arquivos" do painel do
+   * TabWin. Ausente = todos os abertos.
+   */
+  sourceNames?: string[];
 }
 
 interface NumericProfileRequest {
@@ -178,6 +183,8 @@ interface SelectedDbfRequest {
   requestId: number;
   plan: QueryPlan;
   conversions?: ConversionRegistry;
+  /** Os mesmos arquivos que a tabela usou (lista "Arquivos" do painel). */
+  sourceNames?: string[];
 }
 
 interface MicrodatasusCsvRequest {
@@ -407,12 +414,14 @@ function streamAll(
   requestId: number,
   fields: readonly string[] | undefined,
   consume: (batch: DbfRecordBatch, sourceIndex: number) => void,
+  only?: ReadonlySet<string>,
 ): number {
   const declared = header?.recordCount ?? 0;
   let readSoFar = 0;
   let reported = 0;
 
   for (const [sourceIndex, source] of sources.entries()) {
+    if (only && !only.has(source.name)) continue;
     const forward = (batch: DbfRecordBatch): void => {
       consume(batch, sourceIndex);
       const total = readSoFar + batch.recordsRead;
@@ -564,6 +573,19 @@ function handle(request: DatasetRequest): void {
     }
     case 'tabulate': {
       const conversions = request.conversions ?? {};
+      const subset = request.sourceNames && request.sourceNames.length < sources.length
+        ? new Set(request.sourceNames) : undefined;
+      if (subset) {
+        // Um recorte dos arquivos é outro conjunto de dados: os caches do
+        // conjunto inteiro não valem para ele, e ele não entra neles.
+        if (![...subset].some((name) => sources.some((source) => source.name === name))) {
+          throw new Error('Nenhum dos arquivos escolhidos está aberto');
+        }
+        const accumulator = createTabulationAccumulator(request.plan, conversions);
+        streamAll(request.requestId, fieldsUsedByPlan(request.plan), (batch) => accumulator.push(batch.records), subset);
+        post({ type: 'tabulation', requestId: request.requestId, result: accumulator.finish(), cached: false });
+        return;
+      }
       const cached = resultCache.get({ plan: request.plan, conversions });
       if (cached) {
         post({ type: 'tabulation', requestId: request.requestId, result: cached, cached: true });
@@ -680,7 +702,8 @@ function handle(request: DatasetRequest): void {
       if (!header) throw new Error('Nenhum conjunto de dados aberto');
       const collector = createSelectedRecordCollector(request.plan, request.conversions ?? {});
       // No projection here: the exported DBF must carry every declared field.
-      streamAll(request.requestId, undefined, (batch) => collector.push(batch.records));
+      const only = request.sourceNames?.length ? new Set(request.sourceNames) : undefined;
+      streamAll(request.requestId, undefined, (batch) => collector.push(batch.records), only);
       const bytes = writeDbf(collector.finish(), header.fields, header.dateOfLastUpdate ? { dateOfLastUpdate: header.dateOfLastUpdate } : {});
       const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
       post({ type: 'selected-dbf-ready', requestId: request.requestId, bytes: buffer }, [buffer]);

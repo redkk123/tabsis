@@ -88,6 +88,12 @@ export function applyTableOperation(
   if (operation.kind === 'percent-of-total' && columnTotal === 0) {
     throw new Error('percent of total needs a column whose total is not zero');
   }
+  const numeratorIndex = operation.kind === 'indicator' ? columnIndex(source, operation.numeratorColumnKey) : -1;
+  const denominatorIndex = operation.kind === 'indicator' ? columnIndex(source, operation.denominatorColumnKey) : -1;
+  const indicatorScale = operation.kind === 'indicator' ? 10 ** operation.scalePower : 1;
+  if (operation.kind === 'indicator' && (!Number.isInteger(operation.scalePower) || operation.scalePower < 0 || operation.scalePower > 6)) {
+    throw new Error('indicator scale must be 10^0 to 10^6');
+  }
   let zMean = 0;
   let zDeviation = 0;
   if (operation.kind === 'normalize') {
@@ -119,6 +125,9 @@ export function applyTableOperation(
     } else if (operation.kind === 'cumulative') {
       running += cells[sourceIndex] ?? 0;
       value = running;
+    } else if (operation.kind === 'indicator') {
+      const denominator = cells[denominatorIndex] ?? 0;
+      value = denominator === 0 ? 0 : ((cells[numeratorIndex] ?? 0) * indicatorScale) / denominator;
     } else if (operation.kind === 'percent-of-total') {
       value = ((cells[sourceIndex] ?? 0) / columnTotal) * 100;
     } else if (operation.kind === 'normalize') {
@@ -145,16 +154,30 @@ export function applyTableOperation(
   const result: TabulationResult = {
     ...source,
     rows: source.rows.map((row) => ({ ...row })),
-    columns: [...source.columns.map((column) => ({ ...column })), {
-      key: operation.output.key,
-      label: operation.output.label,
-      source: 'derived',
-      totalPolicy: operation.output.totalPolicy,
-    }],
+    columns: [...source.columns.map((column) => ({ ...column })), operation.kind === 'indicator'
+      ? {
+        key: operation.output.key,
+        label: operation.output.label,
+        source: 'derived' as const,
+        totalPolicy: 'precalculated' as const,
+        precalculatedTotal: indicatorTotal(source, operation, indicatorScale),
+      }
+      : {
+        key: operation.output.key,
+        label: operation.output.label,
+        source: 'derived' as const,
+        totalPolicy: operation.output.totalPolicy,
+      }],
     cells: source.cells.map((cells, index) => [...cells, values[index] ?? 0]),
     warnings: [...source.warnings],
   };
   return withAudit(source, result, operation);
+}
+
+function indicatorTotal(source: TabulationResult, operation: Extract<TableOperation, { kind: 'indicator' }>, scale: number): number {
+  const denominator = calculateColumnTotal(source, operation.denominatorColumnKey, 'sum') ?? 0;
+  if (denominator === 0) return 0;
+  return ((calculateColumnTotal(source, operation.numeratorColumnKey, 'sum') ?? 0) * scale) / denominator;
 }
 
 function withAudit(source: TabulationResult, result: TabulationResult, operation: TableOperation) {

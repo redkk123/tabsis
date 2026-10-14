@@ -62,10 +62,12 @@ export interface PainelDeps {
   valoresDistintos(campo: string): Promise<{ values: string[]; truncated: boolean }>;
   /** As primeiras linhas do arquivo, só com os campos pedidos ("Ver arquivo .DBF"). */
   primeirosRegistros?(campos: string[], limite: number): Promise<Array<Record<string, unknown>>>;
+  /** "Salvar registros": grava em DBF os registros que entraram na última tabela. */
+  salvarRegistros?(): Promise<void>;
   /** "Testar CRC": confere cada DBC aberto contra o CRC-32 gravado nele. */
   testarCrc?(): Promise<Array<{ name: string; report: { ok: boolean; stored: string; computed: string } | null }>>;
   perfil(): CompatibilityProfile;
-  executar(spec: TabulationSpec, info: { titulo?: string; subtitulo: string; linha: string }): Promise<TabulationResult | null>;
+  executar(spec: TabulationSpec, info: { titulo?: string; subtitulo: string; linha: string; arquivos: string[] }): Promise<TabulationResult | null>;
   aviso(mensagem: string, erro?: boolean): void;
 }
 
@@ -166,6 +168,14 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
   const suprimirLinhas = el('input', { type: 'checkbox', id: 'painel-suprimir-linhas' });
   const suprimirColunas = el('input', { type: 'checkbox', id: 'painel-suprimir-colunas' });
   const testarCrc = el('input', { type: 'checkbox', id: 'painel-testar-crc' });
+  const salvarRegistros = el('input', { type: 'checkbox', id: 'painel-salvar-registros' });
+  /**
+   * Arquivos desmarcados na lista "Arquivos" (o TabWin tabula só os marcados).
+   * Guarda os desmarcados, não os marcados, para que um arquivo novo entre
+   * marcado, como no TabWin.
+   */
+  const arquivosDesmarcados = new Set<string>();
+  const arquivosMarcados = (): PainelArquivo[] => deps.arquivos().filter((arquivo) => !arquivosDesmarcados.has(arquivo.name));
   /** Arquivos cujo CRC já foi conferido nesta sessão (nome + tamanho), e o resultado. */
   const crcConferido = new Map<string, boolean>();
   const naoClassIgnorar = el('input', { type: 'radio', name: 'painel-nao-classificados', value: 'ignorar', id: 'painel-nc-ignorar' });
@@ -216,6 +226,7 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
   const opcoes = el('div', { className: 'painel-opcoes' },
     el('label', { className: 'check-label' }, suprimirLinhas, el('span', {}, 'Suprimir linhas zeradas')),
     el('label', { className: 'check-label' }, suprimirColunas, el('span', {}, 'Suprimir colunas zeradas')),
+    el('label', { className: 'check-label', title: 'Depois de tabular, grava num DBF os registros que passaram pelas Seleções, como a caixa do TabWin' }, salvarRegistros, el('span', {}, 'Salvar registros')),
     el('label', { className: 'check-label', title: 'Antes de tabular, confere se cada DBC descomprime exatamente no DBF original (CRC-32 gravado no arquivo), como a caixa do TabWin' }, testarCrc, el('span', {}, 'Testar CRC')),
     el('fieldset', { className: 'painel-nao-classificados', title: 'Como tratar os registros cujos códigos não estão previstos na tabela de conversão (CNV)' },
       el('legend', {}, 'Não classificados'),
@@ -305,8 +316,21 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
       ...(arquivos.length
         ? arquivos.map((arquivo) => {
           const crc = crcConferido.get(`${arquivo.name}:${arquivo.size}`);
-          return el('li', { title: `${arquivo.name} · ${formatarBytes(arquivo.size)}`, className: crc === false ? 'painel-crc-falhou' : '' },
-            el('b', {}, arquivo.name), el('small', {}, formatarBytes(arquivo.size)),
+          const marcado = !arquivosDesmarcados.has(arquivo.name);
+          // Com um arquivo só não há o que escolher; com vários, cada um vira
+          // uma caixa, como a lista de seleção múltipla do TabWin.
+          const caixa = arquivos.length > 1
+            ? [el('input', {
+              type: 'checkbox', checked: marcado, title: 'Entra na tabulação',
+              onchange: (evento: Event) => {
+                if ((evento.target as HTMLInputElement).checked) arquivosDesmarcados.delete(arquivo.name);
+                else arquivosDesmarcados.add(arquivo.name);
+                renderArquivos();
+              },
+            })]
+            : [];
+          return el('li', { title: `${arquivo.name} · ${formatarBytes(arquivo.size)}`, className: [crc === false ? 'painel-crc-falhou' : '', marcado ? '' : 'painel-arquivo-fora'].join(' ').trim() },
+            el('label', { className: 'painel-arquivo' }, ...caixa, el('b', {}, arquivo.name)), el('small', {}, formatarBytes(arquivo.size)),
             ...(crc === undefined ? [] : [el('small', { className: crc ? 'painel-crc-ok' : 'painel-crc-erro' }, crc ? 'CRC ok' : 'CRC não confere')]));
         })
         : [el('li', { className: 'painel-vazio' }, 'Nenhum arquivo de dados aberto')]),
@@ -565,6 +589,7 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
     erro.hidden = true;
     let spec: TabulationSpec;
     try {
+      if (!arquivosMarcados().length) throw new PainelErro('Selecione ao menos um arquivo.');
       spec = specDoPainel(catalogo, estado, deps.perfil());
     } catch (motivo) {
       const mensagem = motivo instanceof Error ? motivo.message : String(motivo);
@@ -577,7 +602,7 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
     executarBotao.disabled = true;
     try {
       if (testarCrc.checked && deps.testarCrc) {
-        const pendentes = deps.arquivos().some((arquivo) => !crcConferido.has(`${arquivo.name}:${arquivo.size}`));
+        const pendentes = arquivosMarcados().some((arquivo) => !crcConferido.has(`${arquivo.name}:${arquivo.size}`));
         if (pendentes) {
           resumo.textContent = 'Testando o CRC dos arquivos…';
           const tamanhos = new Map(deps.arquivos().map((arquivo) => [arquivo.name, arquivo.size]));
@@ -587,7 +612,7 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
           renderArquivos();
           renderResumo();
         }
-        const ruins = deps.arquivos().filter((arquivo) => crcConferido.get(`${arquivo.name}:${arquivo.size}`) === false);
+        const ruins = arquivosMarcados().filter((arquivo) => crcConferido.get(`${arquivo.name}:${arquivo.size}`) === false);
         if (ruins.length) {
           erro.textContent = `${ruins.map((arquivo) => arquivo.name).join(', ')}: CRC não confere — o arquivo está corrompido ou incompleto. Baixe de novo antes de tabular.`;
           erro.hidden = false;
@@ -596,17 +621,21 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
       }
       const subtitulo = subtituloDoPainel(catalogo, estado, deps.perfil());
       const linha = catalogo.linhas.find((eixo) => eixo.id === estado!.linha)?.label ?? '';
-      const resultado = await deps.executar(spec, { ...(catalogo.titulo ? { titulo: catalogo.titulo } : {}), subtitulo, linha });
+      const resultado = await deps.executar(spec, {
+        ...(catalogo.titulo ? { titulo: catalogo.titulo } : {}), subtitulo, linha,
+        arquivos: arquivosMarcados().map((arquivo) => arquivo.name),
+      });
       if (!resultado) return false;
       const defNome = deps.defAtivo();
       ultimoLog = serializeTabwinLog(logDoPainel(catalogo, estado, {
         ...(defNome ? { def: defNome } : {}),
         ...(catalogo.padraoArquivos ? { padrao: catalogo.padraoArquivos } : {}),
-        arquivos: deps.arquivos().map((arquivo) => arquivo.name),
+        arquivos: arquivosMarcados().map((arquivo) => arquivo.name),
         registros: resultado.recordsSeen,
         tempo: formatTabwinElapsed(performance.now() - inicio),
       }, rotuloDaCategoria, deps.perfil()));
       logTexto.value = ultimoLog.replace(/\r\n/g, '\n');
+      if (salvarRegistros.checked && deps.salvarRegistros) await deps.salvarRegistros();
       return true;
     } finally {
       executarBotao.disabled = false;
@@ -642,6 +671,16 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
     }
     if (!catalogo) return;
     const { estado: restaurado, avisos } = estadoDoLog(catalogo, log, categoriasDe);
+    // [Arquivos] do log: marca os que estão abertos; avisa dos que não estão.
+    if (log.files.length) {
+      const abertos = deps.arquivos().map((arquivo) => arquivo.name);
+      const pedidos = new Set(log.files.map((nome) => nome.toLowerCase()));
+      arquivosDesmarcados.clear();
+      for (const nome of abertos) if (!pedidos.has(nome.toLowerCase())) arquivosDesmarcados.add(nome);
+      const faltando = log.files.filter((nome) => !abertos.some((aberto) => aberto.toLowerCase() === nome.toLowerCase()));
+      if (faltando.length) avisos.push(`Arquivo(s) do log não abertos: ${faltando.join(', ')}.`);
+      if (abertos.every((nome) => arquivosDesmarcados.has(nome))) arquivosDesmarcados.clear();
+    }
     estado = restaurado;
     tocado = true;
     selecaoEmFoco = estado.selecoes[0]?.eixo ?? null;

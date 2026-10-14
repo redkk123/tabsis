@@ -38,7 +38,7 @@ Status vocabulary:
 | Selections / filters | **Web / Kernel** | Multiple simultaneous raw or DEF/CNV-backed inclusion/exclusion filters, explicit numeric intervals and selection-all/clear controls. Exact 4.15 dialog defaults remain golden-pending. |
 | Suppress zero rows | **Web** | Applied after materializing CNV categories. |
 | Row subtotals | **Kernel** | CNV subtotal propagation tested. |
-| Tabulate list of files | **Cataloged** | Multi-period ingestion/merge semantics pending oracle cases. |
+| Tabulate list of files | **Web** | Panel "Arquivos" list: choose which open files enter the tabulation (log and saved records follow). |
 | Value ranges | **Web / Kernel** | Numeric-range CNV plus explicit open/closed filter bounds in the browser. |
 | Top `n` categories | **Cataloged** | Must define tie/order semantics from the oracle. |
 | Unclassified data | **Web / oracle-checked** | Ignorar/Incluir/Discriminar as TabWin: Incluir = one `Não classificados` row/column; Discriminar = one row per unmatched code on literal CNV/DBF lookups, first-appearance order, ignored on short CNV (RE-002, `verify:painel`). |
@@ -63,7 +63,7 @@ explicit, replayable result transforms and must never mutate the source
 
 | Operation | Status |
 | --- | --- |
-| Indicator calculation | **Web / partial** — explicit numerator/denominator percentage is available; legacy indicator dialog defaults still need an oracle. |
+| Indicator calculation | **Web** — TabWin `Calcular indicador`: numerator × 10ⁿ ÷ denominator (scale 1…1,000,000), zero on zero denominator, precalculated total = ratio of totals (decompiled, RE-002). |
 | Add two or more columns | **Web / modern policy** — pairwise addition can be chained and is persisted in recipes. |
 | Subtract, multiply or divide two columns | **Web / modern policy** — division-by-zero behavior is explicit (`error` or `zero`). |
 | Minimum and maximum | **Web / modern policy** |

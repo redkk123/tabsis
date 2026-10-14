@@ -49,6 +49,8 @@ import {
   parseDelimited,
   parseDef,
   datasusFieldLabel,
+  detectDbfTextEncoding,
+  transcodeDbfCp850ToWindows1252,
   parseTabwinMap,
   type CnvDefinition,
   type DefDefinition,
@@ -601,6 +603,8 @@ const tableOperationRight = element<HTMLSelectElement>('#table-operation-right')
 const tableOperationLeftLabel = element<HTMLElement>('#table-operation-left-label');
 const tableOperationRightLabel = element<HTMLElement>('#table-operation-right-label');
 const tableOperationNumberLabel = element<HTMLElement>('#table-operation-number-label');
+const tableOperationScaleLabel = element<HTMLElement>('#table-operation-scale-label');
+const tableOperationScale = element<HTMLSelectElement>('#table-operation-scale');
 const tableOperationNumber = element<HTMLInputElement>('#table-operation-number');
 const tableOperationExpressionLabel = element<HTMLElement>('#table-operation-expression-label');
 const tableOperationExpression = element<HTMLInputElement>('#table-operation-expression');
@@ -774,6 +778,8 @@ let painel: Painel | null = null;
 let abaConsulta: AbaConsulta | null = null;
 /** Filtros que vieram das Seleções do painel, para trocá-los sem apagar os outros. */
 let filtrosDoPainel = new Set<FilterSpec>();
+/** Arquivos marcados no painel ("Arquivos" do TabWin); `null` = todos os abertos. */
+let arquivosDoPainel: string[] | null = null;
 let crossFieldRuleSequence = 0;
 let lastCombinationProfile: FieldCombinationProfile | null = null;
 /** Kept so "restaurar sinais descartados" can re-render without re-running the scan. */
@@ -2559,6 +2565,7 @@ function updateDatasetStats(): void {
  * de nascer zerada em dois dos três caminhos.
  */
 function resetAnalysisState(): void {
+  arquivosDoPainel = null;
   configuredFilters = [];
   configuredCrossFieldRules = [];
   extraMeasures = [];
@@ -3001,7 +3008,7 @@ async function loadFile(file: File): Promise<void> {
   if (file.size > MAX_LOCAL_INPUT_BYTES) {
     throw new Error(`${file.name}: excede o limite local de ${formatBytes(MAX_LOCAL_INPUT_BYTES)}`);
   }
-  const bytes = new Uint8Array(await file.arrayBuffer());
+  let bytes = new Uint8Array(await file.arrayBuffer());
   const source: LoadedSource = {
     name: file.name,
     extension,
@@ -3014,6 +3021,13 @@ async function loadFile(file: File): Promise<void> {
   // dúvida de "é o mesmo dado?" — e a resposta é por hash, não por nome.
   void reconhecerArquivoConhecido(source.sha256, file.name);
 
+  if (extension === 'DBF' && detectDbfTextEncoding(bytes) === 'cp850') {
+    // Acentuação do DOS (CP850), como parte dos DBFs auxiliares do DATASUS
+    // ainda sai. O hash já foi tirado dos bytes originais; daqui em diante o
+    // arquivo é lido como Windows-1252, com os acentos certos.
+    bytes = transcodeDbfCp850ToWindows1252(bytes);
+    showToast(`${file.name}: acentuação do DOS (CP850) convertida`);
+  }
   if (extension === 'DBF') {
     const lookupOption = activeDef?.options.find((option) =>
       option.kind === 'dbf-lookup' && baseName(option.lookupFile) === baseName(file.name));
@@ -3402,7 +3416,7 @@ async function downloadSelectedDbf(): Promise<void> {
     // The Worker selects with the same resolvePlanRecord boundary the table
     // used, so the exported subset cannot disagree with the accepted count.
     const reply = await askDataset<{ bytes: ArrayBuffer }>(
-      { type: 'selected-dbf', plan: currentPlan, conversions },
+      { type: 'selected-dbf', plan: currentPlan, conversions, ...(arquivosDoPainel ? { sourceNames: arquivosDoPainel } : {}) },
       { label: 'Exportação de registros selecionados', progress: datasetProgress('Selecionando') },
     );
     const bytes = new Uint8Array(reply.bytes);
@@ -3551,7 +3565,7 @@ async function runAnalysis(measureOverride?: MeasureSpec, planOverride?: QueryPl
     const plan = planOverride ?? buildPlan(measureOverride);
     const conversions = conversionsForPlan(plan);
     const { result, cached } = await askDataset<{ result: TabulationResult; cached: boolean }>(
-      { type: 'tabulate', plan, conversions },
+      { type: 'tabulate', plan, conversions, ...(arquivosDoPainel ? { sourceNames: arquivosDoPainel } : {}) },
       { label: 'Tabulação', progress: datasetProgress('Tabulando') },
     );
     currentPlan = plan;
@@ -3649,7 +3663,7 @@ function operationLabel(operation: TableOperation): string {
     add: 'soma', subtract: 'subtração', multiply: 'produto', divide: 'divisão',
     minimum: 'mínimo', maximum: 'máximo', percentage: 'percentual', factor: 'fator',
     cumulative: 'acumulado', absolute: 'absoluto', integer: 'inteiro', sequence: 'sequência', constant: 'constante',
-    'percent-of-total': 'percentual do total', normalize: 'normalizar (escore z)',
+    'percent-of-total': 'percentual do total', normalize: 'normalizar (escore z)', indicator: 'indicador',
     expression: 'expressão',
   };
   if (operation.kind === 'rename-column') return `${operation.label} · renomear coluna`;
@@ -3679,7 +3693,8 @@ function updateTableOperationControls(): void {
   else if (tableOperationRight.options.length > 1) tableOperationRight.selectedIndex = 1;
 
   const kind = tableOperationKind.value;
-  const binary = ['add', 'subtract', 'multiply', 'divide', 'minimum', 'maximum', 'percentage'].includes(kind);
+  const binary = ['add', 'subtract', 'multiply', 'divide', 'minimum', 'maximum', 'percentage', 'indicator'].includes(kind);
+  tableOperationScaleLabel.hidden = kind !== 'indicator';
   const sourceFree = kind === 'sequence' || kind === 'constant' || kind === 'expression';
   tableOperationLeftLabel.hidden = sourceFree;
   tableOperationRightLabel.hidden = !binary;
@@ -3746,6 +3761,7 @@ function suggestedOperationLabel(kind: string): string {
     cumulative: `Acumulado: ${left}`, absolute: `Absoluto: ${left}`, integer: `Inteiro: ${left}`,
     // Os mesmos cabeçalhos que o TabWin dá: "%" e "Z" antes do nome da coluna.
     'percent-of-total': `%${left}`, normalize: `Z${left}`,
+    indicator: `${left} ÷ ${right} ${tableOperationScale.selectedOptions[0]?.textContent ?? ''}`.trim(),
     sequence: 'Sequência', constant: 'Nova coluna', expression: 'Coluna calculada',
   };
   return labels[kind] ?? 'Nova coluna';
@@ -3772,6 +3788,11 @@ function applySelectedTableOperation(): void {
     };
   } else if (kind === 'factor') {
     operation = { kind, sourceColumnKey: tableOperationLeft.value, factor: numeric, output };
+  } else if (kind === 'indicator') {
+    operation = {
+      kind, numeratorColumnKey: tableOperationLeft.value, denominatorColumnKey: tableOperationRight.value,
+      scalePower: Number(tableOperationScale.value), output,
+    };
   } else if (kind === 'cumulative' || kind === 'absolute' || kind === 'percent-of-total' || kind === 'normalize') {
     operation = { kind, sourceColumnKey: tableOperationLeft.value, output };
   } else if (kind === 'integer') {
@@ -4112,7 +4133,7 @@ function renderTable(result: TabulationResult): void {
   for (const column of result.columns) {
     const cell = document.createElement('td');
     const policy = column.totalPolicy ?? 'sum';
-    const total = policy === 'precalculated' ? undefined : calculateColumnTotal(result, column.key, policy);
+    const total = policy === 'precalculated' ? column.precalculatedTotal : calculateColumnTotal(result, column.key, policy);
     cell.textContent = total === undefined ? '—' : tableNumber(total);
     totalRow.append(cell);
   }
@@ -9642,8 +9663,9 @@ async function primeiraTabulacao(): Promise<void> {
   await runAnalysis();
 }
 
-async function executarDoPainel(spec: TabulationSpec, info: { titulo?: string; subtitulo: string; linha: string }): Promise<TabulationResult | null> {
+async function executarDoPainel(spec: TabulationSpec, info: { titulo?: string; subtitulo: string; linha: string; arquivos: string[] }): Promise<TabulationResult | null> {
   if (!dbfHeader) return null;
+  arquivosDoPainel = info.arquivos.length < activeDatasetSources.length ? [...info.arquivos] : null;
   const extras = configuredFilters.filter((filter) => !filtrosDoPainel.has(filter));
   sincronizarControlesComPainel(spec);
   // Filtros de fora do painel (o recorte "Onde", limpeza assistida) continuam
@@ -9651,7 +9673,8 @@ async function executarDoPainel(spec: TabulationSpec, info: { titulo?: string; s
   const plan = compileQueryPlan({ ...spec, filters: [...spec.filters, ...extras] });
   const ok = await runAnalysis(undefined, plan);
   if (!ok || !currentResult) return null;
-  resultKicker.textContent = info.titulo ? `${datasetName} · ${info.titulo}` : datasetName;
+  const nomes = arquivosDoPainel ? arquivosDoPainel.join(' + ') : datasetName;
+  resultKicker.textContent = info.titulo ? `${nomes} · ${info.titulo}` : nomes;
   resultTitle.textContent = info.subtitulo;
   // O canto da tabela leva o nome da Linha como o DEF escreve, igual ao TabWin.
   currentRowLabel = info.linha;
@@ -9698,6 +9721,7 @@ painel = criarPainel(element<HTMLElement>('#painel'), {
     { type: 'records', fields: campos, maxRecords: limite },
     { label: 'Leitura de registros' },
   )).records,
+  salvarRegistros: () => downloadSelectedDbf(),
   testarCrc: async () => (await askDataset<{ reports: Array<{ name: string; report: { ok: boolean; stored: string; computed: string } | null }> }>(
     { type: 'crc' },
     { label: 'Teste de CRC' },

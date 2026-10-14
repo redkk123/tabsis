@@ -884,3 +884,6 @@ dialog p { color: #676d74; font-size: 13px; line-height: 1.6; }
 .painel-registros-tabela th small { display: block; color: var(--faint); font-weight: 400; }
 .painel-registros-tabela th em { display: block; color: var(--brand-ink); font-style: normal; font-weight: 600; }
 .painel-registros-tabela td { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.painel-arquivo { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.painel-arquivo input { accent-color: var(--brand); }
+.painel-arquivos li.painel-arquivo-fora { opacity: .55; background: transparent; border-style: dashed; }

@@ -376,7 +376,7 @@ export function validateTableOperation(value: unknown): asserts value is TableOp
   if (!value || typeof value !== 'object') throw new Error('invalid table operation in TabSis recipe');
   const operation = value as Partial<TableOperation> & Record<string, unknown> & { output?: Record<string, unknown> };
   const stringField = (key: string): boolean => typeof operation[key] === 'string' && String(operation[key]).length > 0;
-  const allowedKinds = new Set(['binary', 'factor', 'cumulative', 'percent-of-total', 'normalize', 'absolute', 'integer', 'sequence', 'constant', 'expression',
+  const allowedKinds = new Set(['binary', 'factor', 'cumulative', 'percent-of-total', 'normalize', 'indicator', 'absolute', 'integer', 'sequence', 'constant', 'expression',
     'rename-column', 'move-column', 'delete-column', 'transpose', 'include-table', 'suppress-rows', 'aggregate-rows']);
   if (!operation.kind || !allowedKinds.has(operation.kind)) {
     throw new Error('invalid table operation in TabSis recipe');
@@ -449,6 +449,12 @@ export function validateTableOperation(value: unknown): asserts value is TableOp
       || !stringField('leftColumnKey') || !stringField('rightColumnKey')
       || !new Set(['error', 'zero']).has(String(operation.divisionByZero))) {
       throw new Error('invalid binary table operation in TabSis recipe');
+    }
+  } else if (operation.kind === 'indicator') {
+    const power = operation.scalePower;
+    if (!stringField('numeratorColumnKey') || !stringField('denominatorColumnKey')
+      || typeof power !== 'number' || !Number.isInteger(power) || power < 0 || power > 6) {
+      throw new Error('invalid indicator operation in TabSis recipe');
     }
   } else if (operation.kind === 'factor') {
     if (!stringField('sourceColumnKey') || !finiteField('factor')) throw new Error('invalid factor operation in TabSis recipe');

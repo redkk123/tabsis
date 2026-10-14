@@ -161,6 +161,8 @@ export interface ResultAxisItem {
   excludeFromTotal?: boolean;
   /** Explicit display policy for a post-tabulation derived column. */
   totalPolicy?: TotalPolicy;
+  /** The total shown when `totalPolicy` is `precalculated` (TabWin "Pré Calculado"). */
+  precalculatedTotal?: number;
 }
 
 export interface TabulationResult {
@@ -209,6 +211,20 @@ export type TableOperation =
        */
       kind: 'percent-of-total';
       sourceColumnKey: string;
+      output: DerivedColumnSpec;
+    }
+  | {
+      /**
+       * TabWin "Operações → Calcular indicador" (decompiled Indicador1Click):
+       * numerator × 10^scalePower ÷ denominator per row, zero where the
+       * denominator is zero; the column total is NOT a sum but the same ratio
+       * over the column totals (total numerator × scale ÷ total denominator).
+       */
+      kind: 'indicator';
+      numeratorColumnKey: string;
+      denominatorColumnKey: string;
+      /** 0..6: "por 1", "por 10", … "por 1.000.000", as the TabWin dialog offers. */
+      scalePower: number;
       output: DerivedColumnSpec;
     }
   | {

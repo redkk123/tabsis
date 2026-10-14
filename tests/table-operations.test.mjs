@@ -181,3 +181,22 @@ test('%percentagem e Normalizar fazem o que o TabWin faz (decompilado)', async (
   assert.deepEqual(z.cells.map((row) => row[1]), [-1, 0, 1]);
   assert.throws(() => applyTableOperation({ ...base, cells: [[2], [2], [2]] }, { kind: 'normalize', sourceColumnKey: 'C', output: { key: 'Z', label: 'Z', totalPolicy: 'none' } }), /not all equal/);
 });
+
+test('Calcular indicador: A × escala ÷ B por linha, zero com B zero, e o total é a razão dos totais', async () => {
+  const { applyTableOperation } = await import('../dist/packages/analysis/src/table-operations.js');
+  const base = {
+    rows: [{ key: '1', label: 'Acre', source: 'conversion' }, { key: '2', label: 'Amapá', source: 'conversion' }, { key: '3', label: 'Pará', source: 'conversion' }],
+    columns: [{ key: 'OB', label: 'Óbitos', source: 'raw' }, { key: 'POP', label: 'População', source: 'raw' }],
+    cells: [[10, 900_000], [3, 0], [50, 8_000_000]],
+    warnings: [], recordsSeen: 63, recordsAccepted: 63,
+  };
+  const r = applyTableOperation(base, {
+    kind: 'indicator', numeratorColumnKey: 'OB', denominatorColumnKey: 'POP', scalePower: 5,
+    output: { key: 'TX', label: 'Taxa por 100.000', totalPolicy: 'sum' },
+  }).result;
+  assert.deepEqual(r.cells.map((row) => Number(row[2].toFixed(4))), [1.1111, 0, 0.625]);
+  const coluna = r.columns.at(-1);
+  assert.equal(coluna.totalPolicy, 'precalculated');
+  // 63 × 100.000 ÷ 8.900.000, e não a soma das taxas.
+  assert.equal(Number(coluna.precalculatedTotal.toFixed(6)), Number((63 * 1e5 / 8_900_000).toFixed(6)));
+});
