@@ -166,6 +166,21 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
   const colunasBusca = el('input', { type: 'search', className: 'painel-busca', placeholder: 'Procurar…', ariaLabel: 'Procurar nas colunas' });
   const colunasLista = el('select', { id: 'painel-colunas', size: 9, ariaLabel: 'Colunas' });
   const incrementosLista = el('div', { id: 'painel-incrementos', className: 'painel-checklist', role: 'group', ariaLabel: 'Incremento' });
+  // Embaixo de Linhas e Colunas: o que a escolha vai virar ("5 linhas: < 7d ·
+  // 07-27 · …"). Um nome do DEF como "Fx.Etar.Infant.1" não diz nada a quem
+  // nunca o viu; as categorias dizem.
+  const previaLinhas = el('p', { className: 'painel-previa', id: 'painel-previa-linhas', ariaLive: 'polite' });
+  const previaColunas = el('p', { className: 'painel-previa', id: 'painel-previa-colunas', ariaLive: 'polite' });
+  /**
+   * Opções que não dá para usar com estes arquivos (campo que não existe, CNV
+   * que não foi aberta) ficam fora das listas até a pessoa pedir: misturadas,
+   * em cinza e com o motivo cortado, só confundiam.
+   */
+  let mostrarIndisponiveis = false;
+  const botaoIndisponiveis = (): HTMLButtonElement => el('button', { type: 'button', className: 'text-button painel-indisponiveis' });
+  const indisponiveisLinhas = botaoIndisponiveis();
+  const indisponiveisColunas = botaoIndisponiveis();
+  const indisponiveisSelecoes = botaoIndisponiveis();
 
   const disponiveisLista = el('select', { id: 'painel-selecoes-disponiveis', size: 6, ariaLabel: 'Seleções disponíveis' });
   const ativasLista = el('select', { id: 'painel-selecoes-ativas', size: 6, ariaLabel: 'Seleções ativas' });
@@ -215,15 +230,15 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
   );
 
   const linhas = bloco('1', 'Linhas', 'O que vira cada linha da tabela: município, sexo, faixa etária…', 'linhas');
-  linhas.corpo.append(linhasBusca, linhasLista);
+  linhas.corpo.append(linhasBusca, linhasLista, previaLinhas, indisponiveisLinhas);
   const colunas = bloco('2', 'Colunas', 'Opcional. Abre cada linha em colunas (ex.: por sexo). "Não ativa" = uma coluna só.', 'colunas');
-  colunas.corpo.append(colunasBusca, colunasLista);
+  colunas.corpo.append(colunasBusca, colunasLista, previaColunas, indisponiveisColunas);
   const incremento = bloco('3', 'Incremento', 'O número de cada célula: Frequência conta os registros; os outros somam um valor.', 'incremento');
   incremento.corpo.append(incrementosLista);
   const selecoes = bloco('4', 'Seleções', 'Filtros (opcional). Escolha uma variável, clique em Incluir e marque as categorias que entram — ex.: só um município. Duplo clique também inclui ou exclui.', 'selecoes');
   selecoes.corpo.append(
     el('div', { className: 'painel-selecoes-grade' },
-      el('label', { className: 'painel-sublista' }, el('span', {}, 'Disponíveis'), disponiveisLista),
+      el('div', { className: 'painel-sublista' }, el('label', { htmlFor: 'painel-selecoes-disponiveis' }, 'Disponíveis'), disponiveisLista, indisponiveisSelecoes),
       el('div', { className: 'painel-selecoes-botoes' }, incluirBotao, excluirBotao),
       el('label', { className: 'painel-sublista' }, el('span', {}, 'Ativas'), ativasLista),
     ),
@@ -300,18 +315,83 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
     return eixo.disponivel ? eixo.label : `${eixo.label} — ${eixo.motivo ?? 'indisponível'}`;
   }
 
-  function preencherLista(lista: HTMLSelectElement, eixos: readonly PainelEixo[], escolhido: string | null, filtro: string, naoAtiva = false): void {
+  /** O botão que mostra ou esconde as indisponíveis de uma lista. */
+  function rotularIndisponiveis(botao: HTMLButtonElement, quantas: number): void {
+    botao.hidden = quantas === 0;
+    botao.textContent = mostrarIndisponiveis
+      ? 'Esconder as que não dá para usar'
+      : `+ ${quantas} que não dá para usar com estes arquivos`;
+    botao.title = 'Variáveis do DEF cujo campo não existe nestes arquivos, ou cuja tabela de conversão (CNV) não foi aberta';
+  }
+
+  function preencherLista(lista: HTMLSelectElement, eixos: readonly PainelEixo[], escolhido: string | null, filtro: string, naoAtiva = false, botao?: HTMLButtonElement): void {
     const termo = semAcento(filtro.trim());
     lista.replaceChildren();
     if (naoAtiva) lista.add(new Option('Não ativa', '', false, escolhido === null));
+    const fora: PainelEixo[] = [];
     for (const eixo of eixos) {
       const visivel = !termo || semAcento(`${eixo.label} ${eixo.field}`).includes(termo) || eixo.id === escolhido;
       if (!visivel) continue;
-      const option = new Option(rotuloOpcao(eixo), eixo.id, false, eixo.id === escolhido);
-      option.disabled = !eixo.disponivel;
-      option.title = [eixo.field, eixo.resourceFile, eixo.motivo].filter(Boolean).join(' · ');
+      if (!eixo.disponivel) { fora.push(eixo); continue; }
+      const option = new Option(eixo.label, eixo.id, false, eixo.id === escolhido);
+      // Passar o mouse diz o que a opção é: as categorias que ela gera
+      // ("Oport invetig (120d)" → "Até 120 dias (invest oportuna) · 121 a 150 dias…").
+      option.title = dicaDaOpcao(eixo);
       lista.add(option);
     }
+    // As indisponíveis, quando pedidas, vão juntas no fim, num grupo com nome.
+    if (mostrarIndisponiveis && fora.length) {
+      const grupo = document.createElement('optgroup');
+      grupo.label = 'Não dá para usar com estes arquivos';
+      for (const eixo of fora) {
+        const option = new Option(rotuloOpcao(eixo), eixo.id);
+        option.disabled = true;
+        option.title = eixo.motivo ?? '';
+        grupo.append(option);
+      }
+      lista.append(grupo);
+    }
+    if (botao) rotularIndisponiveis(botao, fora.length);
+  }
+
+  /** Amostra de categorias por tabela (CNV ou DBF já lido), feita uma vez só. */
+  const amostras = new WeakMap<object, string>();
+
+  function dicaDaOpcao(eixo: PainelEixo): string {
+    const recurso = eixo.conversionId ? deps.conversoes().get(eixo.conversionId)
+      : eixo.lookupId ? deps.lookups().get(eixo.lookupId) : undefined;
+    let amostra = recurso ? amostras.get(recurso) : undefined;
+    if (amostra === undefined) {
+      amostra = amostraDe(eixo);
+      if (recurso) amostras.set(recurso, amostra);
+    }
+    const origem = [eixo.field && `campo ${eixo.field}`, eixo.resourceFile && `tabela ${eixo.resourceFile.replace(/\\/g, '/').split('/').pop()}`].filter(Boolean).join(', ');
+    return `${eixo.label}: ${amostra}${origem ? `\n${origem}` : ''}`;
+  }
+
+  function amostraDe(eixo: PainelEixo): string {
+    const categorias = categoriasDe(eixo);
+    return categorias?.length
+      ? `${categorias.slice(0, 5).map((categoria) => categoria.label.trim()).join(' · ')}${categorias.length > 5 ? ` … (${categorias.length.toLocaleString('pt-BR')} ao todo)` : ''}`
+      : 'um item para cada valor do campo';
+  }
+
+  /** "5 linhas: < 7d · 07-27 · 28d-<1 · Ign <1 · Ign", e de onde vêm. */
+  function renderPrevia(destino: HTMLElement, eixo: PainelEixo | undefined, papel: 'linhas' | 'colunas'): void {
+    destino.replaceChildren();
+    if (!eixo) {
+      destino.append(papel === 'colunas' ? 'Sem colunas: uma coluna só, com o total de cada linha.' : '');
+      return;
+    }
+    const categorias = categoriasDe(eixo);
+    const origem = [eixo.field && `campo ${eixo.field}`, eixo.resourceFile && `tabela ${eixo.resourceFile.replace(/\\/g, '/').split('/').pop()}`].filter(Boolean).join(', ');
+    if (categorias?.length) {
+      const amostra = categorias.slice(0, 6).map((categoria) => categoria.label.trim()).join(' · ');
+      destino.append(el('b', {}, `${categorias.length.toLocaleString('pt-BR')} ${papel}: `), amostra, categorias.length > 6 ? ' …' : '');
+    } else {
+      destino.append(el('b', {}, `Uma ${papel === 'linhas' ? 'linha' : 'coluna'} para cada valor`), ' que aparecer no arquivo');
+    }
+    if (origem) destino.append(el('small', {}, origem));
   }
 
   function renderDef(): void {
@@ -392,14 +472,7 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
   function renderSelecoes(): void {
     if (!catalogo || !estado) return;
     const ativas = new Set(estado.selecoes.map((selecao) => selecao.eixo));
-    disponiveisLista.replaceChildren();
-    for (const eixo of catalogo.selecoes) {
-      if (ativas.has(eixo.id)) continue;
-      const option = new Option(rotuloOpcao(eixo), eixo.id);
-      option.disabled = !eixo.disponivel;
-      option.title = [eixo.field, eixo.resourceFile, eixo.motivo].filter(Boolean).join(' · ');
-      disponiveisLista.add(option);
-    }
+    preencherLista(disponiveisLista, catalogo.selecoes.filter((eixo) => !ativas.has(eixo.id)), null, '', false, indisponiveisSelecoes);
     ativasLista.replaceChildren();
     for (const selecao of estado.selecoes) {
       const eixo = catalogo.selecoes.find((item) => item.id === selecao.eixo);
@@ -495,8 +568,9 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
       renderResumo();
       return;
     }
-    preencherLista(linhasLista, catalogo.linhas, estado.linha, linhasBusca.value);
-    preencherLista(colunasLista, catalogo.colunas, estado.coluna, colunasBusca.value, true);
+    preencherLista(linhasLista, catalogo.linhas, estado.linha, linhasBusca.value, false, indisponiveisLinhas);
+    preencherLista(colunasLista, catalogo.colunas, estado.coluna, colunasBusca.value, true, indisponiveisColunas);
+    renderPrevias();
     renderIncrementos();
     renderSelecoes();
     suprimirLinhas.checked = estado.suprimirLinhasZeradas;
@@ -505,6 +579,12 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
     naoClassIncluir.checked = estado.naoClassificados === 'incluir';
     naoClassDiscriminar.checked = estado.naoClassificados === 'discriminar';
     renderResumo();
+  }
+
+  function renderPrevias(): void {
+    if (!catalogo || !estado) return;
+    renderPrevia(previaLinhas, catalogo.linhas.find((eixo) => eixo.id === estado!.linha), 'linhas');
+    renderPrevia(previaColunas, catalogo.colunas.find((eixo) => eixo.id === estado!.coluna), 'colunas');
   }
 
   function existe(lista: readonly PainelEixo[], id: string | null): boolean {
@@ -544,16 +624,24 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
     if ((evento.target as HTMLElement).closest('.painel-selecoes-botoes, .painel-categorias-acoes')) tocado = true;
   });
   defSelect.addEventListener('change', () => { tocado = false; deps.escolherDef(defSelect.value); });
-  linhasBusca.addEventListener('input', () => catalogo && estado && preencherLista(linhasLista, catalogo.linhas, estado.linha, linhasBusca.value));
-  colunasBusca.addEventListener('input', () => catalogo && estado && preencherLista(colunasLista, catalogo.colunas, estado.coluna, colunasBusca.value, true));
+  linhasBusca.addEventListener('input', () => catalogo && estado && preencherLista(linhasLista, catalogo.linhas, estado.linha, linhasBusca.value, false, indisponiveisLinhas));
+  colunasBusca.addEventListener('input', () => catalogo && estado && preencherLista(colunasLista, catalogo.colunas, estado.coluna, colunasBusca.value, true, indisponiveisColunas));
+  for (const botao of [indisponiveisLinhas, indisponiveisColunas, indisponiveisSelecoes]) {
+    botao.addEventListener('click', () => {
+      mostrarIndisponiveis = !mostrarIndisponiveis;
+      renderTudo();
+    });
+  }
   linhasLista.addEventListener('change', () => {
     if (!estado || !linhasLista.value) return;
     estado.linha = linhasLista.value;
+    renderPrevias();
     renderResumo();
   });
   colunasLista.addEventListener('change', () => {
     if (!estado) return;
     estado.coluna = colunasLista.value || null;
+    renderPrevias();
     renderResumo();
   });
 

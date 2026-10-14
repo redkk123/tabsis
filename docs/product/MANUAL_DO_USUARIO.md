@@ -193,7 +193,7 @@ Instalação, endereços que ele pode acessar e modelo de ameaça estão em
 O **Painel de tabulação**, no topo da área principal, é o mesmo painel do
 TabWin, em quatro blocos numerados:
 
-![Painel de tabulação com o DEF de óbitos do SIM: Linhas em Fx.Etar.Infant.1, Colunas em Sexo, Incremento Frequência, Seleções vazias e as opções com uma frase cada](./manual/15-painel.png "O painel com o `Obito_1996_CID10.def` oficial e o DOINF23. Ao lado do arquivo, o que ele é; embaixo de cada opção, o que ela faz; e, antes de executar, a frase dizendo o que vai ser tabulado.")
+![Painel de tabulação com o DEF de óbitos do SIM: Linhas em Fx.Etar.Infant.1 (5 linhas: < 7d, 07-27, 28d-<1, Ign <1, Ign), Colunas em Sexo (M, F, I), Incremento Frequência e as opções com uma frase cada](./manual/15-painel.png "O painel com o `Obito_1996_CID10.def` oficial e o DOINF23. Embaixo de Linhas e Colunas, as categorias que a escolha vai virar; embaixo de cada opção, o que ela faz; e, antes de executar, a frase dizendo o que vai ser tabulado.")
 
 | Bloco | O que faz | Padrão (igual ao TabWin) |
 | --- | --- | --- |
@@ -204,8 +204,17 @@ TabWin, em quatro blocos numerados:
 
 As listas vêm do **DEF**, com os nomes exatamente como ele escreve e na ordem
 do arquivo. Escolha o DEF no seletor do alto do painel (cada um aparece com a
-sua descrição). Sem DEF, as listas mostram os campos do arquivo. Uma opção cuja
-CNV não foi carregada aparece em cinza, dizendo qual arquivo falta.
+sua descrição). Sem DEF, as listas mostram os campos do arquivo.
+
+Embaixo de **Linhas** e de **Colunas**, o painel mostra o que a escolha vai
+virar — *5 linhas: < 7d · 07-27 · 28d-<1 · Ign <1 · Ign*, do campo `IDADE`,
+tabela `FXINFAN1.CNV`. Um nome do DEF como *Fx.Etar.Infant.1* não diz nada a
+quem nunca o viu; as categorias dizem.
+
+As opções que não dá para usar com os arquivos abertos (o campo não existe
+neles, ou a CNV não foi aberta) ficam fora das listas. O link **+ N que não dá
+para usar com estes arquivos**, embaixo de cada lista, mostra quais são e por
+quê.
 
 Embaixo dos blocos, uma frase diz o que vai ser tabulado — *Frequência por
 Sexo segundo Fx.Etar.Infant.1* — antes de você clicar em **Executar**.

@@ -170,7 +170,15 @@ if (!auxiliares.length) {
     .some((option) => option.textContent === 'Fx.Etar.Infant.1' && !option.disabled), null, { timeout: 180_000 });
   await pagina.waitForFunction(() => [...document.querySelectorAll('#painel-colunas option')]
     .some((option) => option.textContent === 'Sexo' && !option.disabled), null, { timeout: 180_000 });
-  await pagina.waitForTimeout(1500);
+  // E até a barra lateral parar de mudar: as últimas CNVs ainda podem estar
+  // chegando, e a contagem de indisponíveis mudaria de uma captura para outra.
+  let anterior = '';
+  for (let tentativa = 0; tentativa < 60; tentativa++) {
+    await pagina.waitForTimeout(1000);
+    const agora = await pagina.locator('#file-list').innerText();
+    if (agora === anterior) break;
+    anterior = agora;
+  }
 
   await capturar('15-painel', 'Painel de tabulação com o DEF do SIM', async () => {
     await pagina.locator('#painel-linhas').selectOption({ label: 'Fx.Etar.Infant.1' });

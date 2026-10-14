@@ -803,6 +803,13 @@ dialog p { color: #676d74; font-size: 13px; line-height: 1.6; }
 .painel-bloco h3 { margin: 0; color: var(--tom); font: 700 15px/1.2 var(--sans); text-transform: uppercase; letter-spacing: .06em; }
 .painel-bloco-cabecalho p { margin: 3px 0 0; color: var(--muted); font-size: 12px; line-height: 1.35; }
 .painel-bloco-corpo { display: flex; flex-direction: column; gap: 6px; padding: 0 10px 10px; flex: 1 1 auto; min-height: 0; }
+/* O que a escolha vai virar, embaixo da lista. */
+.painel-previa { margin: 2px 2px 0; color: var(--ink); font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; }
+.painel-previa b { color: var(--tom); font-weight: 700; }
+.painel-previa small { display: block; color: var(--faint); font-size: 11px; }
+.painel-previa:empty { display: none; }
+.painel-indisponiveis { align-self: flex-start; padding: 0; font-size: 11px; color: var(--muted); text-align: left; }
+.painel-bloco select optgroup { color: var(--faint); font-style: normal; font-size: 11px; }
 .painel-busca { width: 100%; min-height: 32px; padding: 5px 8px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--surface); font-size: 13px; }
 .painel-bloco select { width: 100%; flex: 1 1 auto; min-height: 190px; padding: 3px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--surface); color: var(--ink); font-size: 13px; }
 .painel-bloco select option { padding: 4px 6px; border-radius: 3px; }
@@ -815,7 +822,7 @@ dialog p { color: #676d74; font-size: 13px; line-height: 1.6; }
 .painel-checklist input { margin-top: 2px; accent-color: var(--tom); }
 .painel-selecoes-grade { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 8px; align-items: stretch; }
 .painel-sublista { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.painel-sublista > span { color: var(--muted); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.painel-sublista > label, .painel-sublista > span { color: var(--muted); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
 .painel-bloco--selecoes select { min-height: 128px; }
 .painel-selecoes-botoes { display: flex; flex-direction: column; justify-content: center; gap: 6px; }
 .painel-selecoes-botoes button { min-height: 34px; padding: 5px 9px; font-size: 12px; white-space: nowrap; }
