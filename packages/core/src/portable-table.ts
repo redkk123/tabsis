@@ -1,4 +1,5 @@
-import type { QueryPlan, ResultAxisItem, SourceFingerprint, TableOperation, TabulationResult } from './model.js';
+import type { QueryPlan, ResultAxisItem, SourceFingerprint, TableOperation, TabulationResult, TechnicalNote } from './model.js';
+import { validateTechnicalNotes } from './model.js';
 import { compileQueryPlan } from './plan.js';
 import { stableJson, validateTableOperation } from './recipe.js';
 
@@ -19,6 +20,7 @@ export interface PortableTableV1 {
     keyVisible: boolean;
     subtitle?: string;
     footer?: string;
+    notes?: TechnicalNote[];
   };
 }
 
@@ -104,6 +106,9 @@ export function parsePortableTable(json: string): PortableTableV1 {
       || (presentation.subtitle !== undefined && (typeof presentation.subtitle !== 'string' || presentation.subtitle.length > 240))
       || (presentation.footer !== undefined && (typeof presentation.footer !== 'string' || presentation.footer.length > 240))) {
       throw new Error('invalid presentation in TabSis table');
+    }
+    if (presentation.notes !== undefined) {
+      validateTechnicalNotes(presentation.notes, 'TabSis table');
     }
   }
   return value as PortableTableV1;

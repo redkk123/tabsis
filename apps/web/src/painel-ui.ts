@@ -125,6 +125,8 @@ export interface Painel {
   restaurar(texto: string): void;
   /** Executa o estado atual (o padrão do TabWin, se ninguém mexeu). Diz se houve tabela. */
   executarAgora(): Promise<boolean>;
+  /** O log do TabWin da última tabela feita pelo painel ('' sem nenhuma). */
+  logAtual(): string;
 }
 
 export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
@@ -774,5 +776,5 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
   }
 
   atualizar();
-  return { atualizar, restaurar, executarAgora };
+  return { atualizar, restaurar, executarAgora, logAtual: () => ultimoLog };
 }
