@@ -10104,6 +10104,10 @@ painel = criarPainel(element<HTMLElement>('#painel'), {
     { type: 'distinct', field: campo, limit: 2000 },
     { label: 'Leitura de valores' },
   ),
+  testarCrc: async () => (await askDataset<{ reports: Array<{ name: string; report: { ok: boolean; stored: string; computed: string } | null }> }>(
+    { type: 'crc' },
+    { label: 'Teste de CRC' },
+  )).reports,
   perfil: () => currentCompatibilityProfile,
   executar: executarDoPainel,
   aviso: showToast,

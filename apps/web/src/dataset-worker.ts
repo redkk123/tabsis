@@ -32,6 +32,7 @@ import {
   type ParquetDataset,
 } from '../../../packages/acquisition/src/parquet-source.ts';
 import type { AsyncBuffer } from 'hyparquet';
+import { verifyDbcCrc, type DbcCrcReport } from '../../../packages/acquisition/src/dbc-crc.ts';
 import {
   createTabulationAccumulator,
   matchesFilters,
@@ -230,8 +231,13 @@ interface TransformApplyRequest {
   conversions?: ConversionRegistry;
 }
 
+interface CrcRequest {
+  type: 'crc';
+  requestId: number;
+}
+
 type DatasetRequest =
-  | OpenRequest | AppendRequest | TabulateRequest
+  | OpenRequest | AppendRequest | TabulateRequest | CrcRequest
   | NumericProfileRequest | CombinationProfileRequest | DistinctRequest | SelectedDbfRequest
   | RecordsRequest
   | FlowRequest | MicrodatasusCsvRequest | AuditScanRequest | TransformApplyRequest;
@@ -329,7 +335,8 @@ function fieldsForRequest(request: DatasetRequest): readonly string[] | undefine
     case 'records': return request.fields;
     case 'flows': return [request.originField, request.destinationField, ...(request.weightField ? [request.weightField] : [])];
     case 'open':
-    case 'append': return [];
+    case 'append':
+    case 'crc': return [];
     default: return undefined;
   }
 }
@@ -595,6 +602,16 @@ function handle(request: DatasetRequest): void {
 
       resultCache.set({ plan: request.plan, conversions }, result);
       post({ type: 'tabulation', requestId: request.requestId, result, cached: false });
+      return;
+    }
+    case 'crc': {
+      // "Testar CRC" do TabWin: só DBC tem CRC gravado; DBF, CSV e Parquet
+      // aparecem como não aplicável.
+      const reports: Array<{ name: string; report: DbcCrcReport | null }> = sources.map((source) => ({
+        name: source.name,
+        report: source.kind === 'binary' && source.isDbc ? verifyDbcCrc(new Uint8Array(source.bytes)) : null,
+      }));
+      post({ type: 'crc-ready', requestId: request.requestId, reports });
       return;
     }
     case 'profile-numeric': {

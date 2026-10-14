@@ -60,6 +60,8 @@ export interface PainelDeps {
   campoInicial?(): string | undefined;
   arquivos(): PainelArquivo[];
   valoresDistintos(campo: string): Promise<{ values: string[]; truncated: boolean }>;
+  /** "Testar CRC": confere cada DBC aberto contra o CRC-32 gravado nele. */
+  testarCrc?(): Promise<Array<{ name: string; report: { ok: boolean; stored: string; computed: string } | null }>>;
   perfil(): CompatibilityProfile;
   executar(spec: TabulationSpec, info: { titulo?: string; subtitulo: string; linha: string }): Promise<TabulationResult | null>;
   aviso(mensagem: string, erro?: boolean): void;
@@ -150,6 +152,9 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
 
   const suprimirLinhas = el('input', { type: 'checkbox', id: 'painel-suprimir-linhas' });
   const suprimirColunas = el('input', { type: 'checkbox', id: 'painel-suprimir-colunas' });
+  const testarCrc = el('input', { type: 'checkbox', id: 'painel-testar-crc' });
+  /** Arquivos cujo CRC já foi conferido nesta sessão (nome + tamanho), e o resultado. */
+  const crcConferido = new Map<string, boolean>();
   const naoClassIgnorar = el('input', { type: 'radio', name: 'painel-nao-classificados', value: 'ignorar', id: 'painel-nc-ignorar' });
   const naoClassIncluir = el('input', { type: 'radio', name: 'painel-nao-classificados', value: 'incluir', id: 'painel-nc-incluir' });
   const naoClassDiscriminar = el('input', { type: 'radio', name: 'painel-nao-classificados', value: 'discriminar', id: 'painel-nc-discriminar' });
@@ -198,6 +203,7 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
   const opcoes = el('div', { className: 'painel-opcoes' },
     el('label', { className: 'check-label' }, suprimirLinhas, el('span', {}, 'Suprimir linhas zeradas')),
     el('label', { className: 'check-label' }, suprimirColunas, el('span', {}, 'Suprimir colunas zeradas')),
+    el('label', { className: 'check-label', title: 'Antes de tabular, confere se cada DBC descomprime exatamente no DBF original (CRC-32 gravado no arquivo), como a caixa do TabWin' }, testarCrc, el('span', {}, 'Testar CRC')),
     el('fieldset', { className: 'painel-nao-classificados', title: 'Como tratar os registros cujos códigos não estão previstos na tabela de conversão (CNV)' },
       el('legend', {}, 'Não classificados'),
       el('label', { className: 'check-label' }, naoClassIgnorar, el('span', {}, 'Ignorar')),
@@ -283,8 +289,12 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
     const arquivos = deps.arquivos();
     arquivosLista.replaceChildren(
       ...(arquivos.length
-        ? arquivos.map((arquivo) => el('li', { title: `${arquivo.name} · ${formatarBytes(arquivo.size)}` },
-          el('b', {}, arquivo.name), el('small', {}, formatarBytes(arquivo.size))))
+        ? arquivos.map((arquivo) => {
+          const crc = crcConferido.get(`${arquivo.name}:${arquivo.size}`);
+          return el('li', { title: `${arquivo.name} · ${formatarBytes(arquivo.size)}`, className: crc === false ? 'painel-crc-falhou' : '' },
+            el('b', {}, arquivo.name), el('small', {}, formatarBytes(arquivo.size)),
+            ...(crc === undefined ? [] : [el('small', { className: crc ? 'painel-crc-ok' : 'painel-crc-erro' }, crc ? 'CRC ok' : 'CRC não confere')]));
+        })
         : [el('li', { className: 'painel-vazio' }, 'Nenhum arquivo de dados aberto')]),
     );
     padraoNota.textContent = catalogo?.padraoArquivos ? `O DEF espera arquivos como ${catalogo.padraoArquivos}` : '';
@@ -551,6 +561,24 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
     const inicio = performance.now();
     executarBotao.disabled = true;
     try {
+      if (testarCrc.checked && deps.testarCrc) {
+        const pendentes = deps.arquivos().some((arquivo) => !crcConferido.has(`${arquivo.name}:${arquivo.size}`));
+        if (pendentes) {
+          resumo.textContent = 'Testando o CRC dos arquivos…';
+          const tamanhos = new Map(deps.arquivos().map((arquivo) => [arquivo.name, arquivo.size]));
+          for (const { name, report } of await deps.testarCrc()) {
+            if (report) crcConferido.set(`${name}:${tamanhos.get(name) ?? 0}`, report.ok);
+          }
+          renderArquivos();
+          renderResumo();
+        }
+        const ruins = deps.arquivos().filter((arquivo) => crcConferido.get(`${arquivo.name}:${arquivo.size}`) === false);
+        if (ruins.length) {
+          erro.textContent = `${ruins.map((arquivo) => arquivo.name).join(', ')}: CRC não confere — o arquivo está corrompido ou incompleto. Baixe de novo antes de tabular.`;
+          erro.hidden = false;
+          return false;
+        }
+      }
       const subtitulo = subtituloDoPainel(catalogo, estado, deps.perfil());
       const linha = catalogo.linhas.find((eixo) => eixo.id === estado!.linha)?.label ?? '';
       const resultado = await deps.executar(spec, { ...(catalogo.titulo ? { titulo: catalogo.titulo } : {}), subtitulo, linha });
