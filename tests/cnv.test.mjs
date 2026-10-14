@@ -27,10 +27,12 @@ test('short-code overlap follows documented later-row precedence', () => {
   assert.deepEqual(classifyCnv(cnv, '88'), { sequence: 3, label: 'Ignorado' });
 });
 
-test('literal mode preserves first-match behavior as an explicit compatibility rule', () => {
+// Antes: "primeira ocorrência vale", tirado do Help. Medido no TabWin 4.15
+// (RE-003, LITDUP e LONGDUP): no literal também vale a última.
+test('literal mode: the last line wins, as TabWin 4.15 does (not the Help)', () => {
   const cnv = parseCnv(['2 2 L', row(1, 'Primeiro', 'AA'), row(2, 'Segundo', 'AA')].join('\n'));
-  assert.equal(cnv.precedence, 'first-match-wins');
-  assert.deepEqual(classifyCnv(cnv, 'AA'), { sequence: 1, label: 'Primeiro' });
+  assert.equal(cnv.precedence, 'last-match-wins');
+  assert.deepEqual(classifyCnv(cnv, 'AA'), { sequence: 2, label: 'Segundo' });
 });
 
 test('numeric range mode uses inclusive upper bounds', () => {
@@ -126,4 +128,59 @@ test('"----" das linhas-título não é código: não pega o CID M000 (RE-003, S
   const cnv = parseCnv(['2 4', row(1, '19. Pré-natal e parto', '----'), row(2, '19.1 ITU na gravidez', 'O23 -O239', '1')].join('\n'));
   assert.equal(classifyCnv(cnv, 'M000'), undefined);
   assert.equal(classifyCnv(cnv, 'O230')?.sequence, 2);
+});
+
+// RE-003, SIM e SINASC oficiais contra o TabWin 4.15 (verify-sim-sinasc 16/16).
+test('código "em branco" (espaços antes da vírgula) vale como código, e ganha do 00-99', () => {
+  const meses = parseCnv(['3 2', row(3, 'Ign', '00-99'), row(1, 'Jan', '01'), row(2, 'branco', '  ,')].join('\n'));
+  assert.equal(classifyCnv(meses, null)?.label, 'branco');
+  assert.equal(classifyCnv(meses, '01')?.label, 'Jan');
+  assert.equal(classifyCnv(meses, '77')?.label, 'Ign');
+  // Linha-título com espaço sobrando no fim, sem vírgula, não vira código.
+  const titulo = parseCnv(['2 2', row(1, 'Grupo', '    '), row(2, 'Jan', '01')].join('\n'), { strict: false });
+  assert.equal(classifyCnv(titulo, null), undefined);
+});
+
+test('rótulo mantém o recuo do começo (hierarquia do CID10_BR), só apara o fim', () => {
+  const cnv = parseCnv(['2 4', row(1, '001-031 Infecciosas', 'A000-B999'), row(2, '  001 Intestinais', 'A000-A099', '1')].join('\n'));
+  assert.equal(cnv.categories[1].label, '  001 Intestinais');
+});
+
+test('subtotal que não é número: a categoria fica sem subtotal, com aviso, e o arquivo abre', () => {
+  const text = ['N 2   4 L', '     0001  E00 Iodo', 'E249,0002  E24 Cushing                                                                                          E24'].join('\n');
+  const cnv = parseCnv(text, { strict: false });
+  assert.equal(cnv.categories.find((c) => c.sequence === 2).subtotalTarget, undefined);
+  assert.match(cnv.warnings.join('\n'), /não é número/);
+});
+
+// RE-003, testes T5–T7 no TabWin 4.15: N(2) com 0..20 (número alinhado à direita: " 7", "10").
+test('CNV literal: faixa e código comparados com os espaços, como o TabWin (T6)', () => {
+  const numero = (v) => String(v).padStart(2);
+  const pega = (codes) => {
+    const cnv = parseCnv(['1 2 L', row(1, 'Faixa', codes)].join('\n'));
+    return Array.from({ length: 21 }, (_, v) => v).filter((v) => classifyCnv(cnv, numero(v)));
+  };
+  const de = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
+  assert.deepEqual(pega(' 7-48'), de(7, 20));
+  assert.deepEqual(pega('07-48'), de(10, 20));
+  assert.deepEqual(pega('7 -48'), []);
+  assert.deepEqual(pega(' 1- 5'), de(1, 5));
+  assert.deepEqual(pega('01-05'), []);
+  assert.deepEqual(pega('1 -5 '), de(10, 20));
+  assert.deepEqual(pega(' 7- 9'), de(7, 9));
+  assert.deepEqual(pega(' 7-15'), de(7, 15));
+});
+
+test('CNV literal: lista que começa com vírgula tem o código em branco; l minúsculo é L (T5)', () => {
+  const cnv = parseCnv(['2 2 l', row(1, 'não preenchido', ',00-99'), row(2, 'nenhuma dose', '00, 0,0 ,')].join('\n'));
+  assert.equal(cnv.mode, 'literal');
+  assert.equal(classifyCnv(cnv, null)?.label, 'não preenchido');
+  assert.equal(classifyCnv(cnv, ' 0')?.label, 'nenhuma dose');
+  // Pai com os códigos dos filhos (CODOCO.CNV do SIA): os filhos ficam com eles.
+  const codoco = parseCnv(['3 2 L', row(1, 'Pai', 'AA,BB'), row(2, 'Filho A', 'AA', '1'), row(3, 'Filho B', 'BB', '1')].join('\n'));
+  assert.equal(classifyCnv(codoco, 'AA')?.label, 'Filho A');
+  // Código longo repetido: também vale a última linha (LONGDUP).
+  const longo = parseCnv(['2 6', row(1, 'Primeira', '120040,120050'), row(2, 'Segunda', '120040')].join('\n'));
+  assert.equal(classifyCnv(longo, '120040')?.label, 'Segunda');
+  assert.equal(classifyCnv(longo, '120050')?.label, 'Primeira');
 });

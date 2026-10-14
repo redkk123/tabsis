@@ -198,3 +198,92 @@ Diferença que fica, de propósito: o `HUF_MEC.DBF` está em CP850, e o TabWin
 mostra "Säo Paulo" onde o arquivo diz "São Paulo" (a conversão de acentos dele
 erra o `ã`). O TabSis mostra "São". A comparação usa o código CNES do começo
 do rótulo.
+
+## SIM e SINASC com os DEF e CNV oficiais (2026-10-14)
+
+Pacotes auxiliares oficiais `OBITOS_CID10_TAB.zip` e `NASC_NOV_TAB.zip` e
+dados do Acre (`DOAC2024.dbc`, 4.267 óbitos; `DNAC2022.dbc`, 14.483 nascidos
+vivos), todos de `ftp.datasus.gov.br/dissemin/publicos`. Uma varredura de todas
+as variáveis dos DEFs oficiais (`scripts/varrer-def.mjs`) apontou onde a leitura antiga e a atual
+divergiam; essas variáveis foram tabuladas no TabWin e salvas como `.TAB`
+(`fixtures/oracle/re003-sim-sinasc`, `npm run verify:sim-sinasc -- <pasta SIM>
+<pasta SINASC>`). Começou em 10/16 e terminou em **16/16**, depois de quatro
+correções:
+
+| Achado | No TabWin | Correção no TabSis |
+| --- | --- | --- |
+| **Código "em branco"**: `MESES.CNV` do SIM tem a linha `branco` com código `  ,`; `HORAOBITO.CNV` tem `Ign` com `    ,`; `diasINVEST1.cnv`, `Sem informação` com `   ,` | o branco vai para essa linha (3.451 em "branco" no Mês de investigação) | o leitor aparava os espaços e jogava o código fora; agora espaços antes da vírgula são o código "em branco" (vale 000, e ganha do `00-99` por vir depois) |
+| **Recuo dos rótulos** (`CID10_BR.CNV`: `  001 Doencas…`, `    004.1 …`) | mostra o recuo, que é a hierarquia | o rótulo só é aparado no fim; a tabela mostra o recuo |
+| **Linha-subtotal com códigos próprios** (`001-031` = `A000-B999` pega a sepse `A41`, que nenhum filho cobre) | conta no Total (4.267) | contava na linha mas não no Total (3.976); agora a linha guarda `directTotal`, somado no Total |
+| **Subtotal com texto** (`E249,` no `CID10_04_ST.CNV` e outros `_ST`) | abre o arquivo | recusava o arquivo inteiro; agora a categoria fica sem subtotal, com aviso |
+
+Confirmado também no SINASC:
+- **País de residência**: `CODPAISRES` (3) com `PAIS.CNV` literal de 8 — o
+  TabWin atravessa os campos e não acha nenhum país (BRASIL = 0, "Não
+  classificados" = 14.483), igual ao TabSis desde a leitura atravessada;
+- **Ano de recebimento** em branco → "2000" (o `00` do `ANO.CNV`);
+- **Anomalia** `Q02X` → "Outras anomalias" (o `X` da 4ª posição vale 0).
+
+E sobre o DEF:
+- **`x` minúsculo** (linha 410 do `Obito_1996_CID10.def`): o TabWin lista em
+  Linhas, Colunas e Seleções, como `X`; o TabSis já fazia igual.
+- **`MUNICDF.CNV`** começa com um `s` solto no cabeçalho: o TabWin recusa
+  ("'s' is not a valid integer value", tela 18), como o TabSis. O arquivo
+  oficial está quebrado.
+
+## SIA e SINAN (2026-10-14)
+
+`TAB_SIA.zip` + `PAAC2501.dbc` (produção ambulatorial do Acre, jan/2025, com
+`G` = quantidade aprovada) e `TAB_SINANNET.zip` + `HANSBR23.dbc`
+(hanseníase, Brasil, 2023), do FTP do DATASUS. Mesma varredura, mesmo
+verificador (`npm run verify:sim-sinasc -- SIM=… SINASC=… SIA=… SINAN=…`):
+**26 de 27 iguais ao TabWin**, mais uma diferença conhecida e documentada.
+
+**O DEF oficial do SIA não abria no TabSis.** A linha
+`L + NOME FANTASIA , TITULO , LINHA_COMENTARIO_…` tem 3 campos; o TabSis
+recusava o arquivo inteiro. O TabWin lista a opção e só reclama se alguém a
+usar, lendo o 3º campo como a tabela ("Tabela de conversão não encontrada",
+tela 19). Agora é igual: a opção aparece em cinza no painel, dizendo qual
+tabela falta.
+
+**Campo de data (DBF tipo D) não classificava nada.** "Ano da Alta" e "Mês da
+Alta" (`DTALTA_N`, data) comparavam o texto `2024-02-20T00:00…` com a CNV. Com
+a leitura de largura fixa a data vira `AAAAMMDD`, como o TabWin lê: iguais.
+
+**CNV literal: vale a última ocorrência, não a primeira.** O `CODOCO.CNV` do
+SIA (literal) repete no pai os códigos dos filhos (`1K,1R,1S` no pai, `1K` no
+filho). Com "a primeira vale" (do Help), tudo ia para o pai e os filhos
+ficavam com 0; o TabWin dá aos filhos. Testes T5/T6
+([`ferramentas/re003-cnv-literal.py`](./ferramentas/re003-cnv-literal.py)):
+
+| CNV | Resultado no TabWin |
+| --- | --- |
+| `LITDUP` (`3 2 L`): `AA` na 1ª e na 2ª linha | `AA` na 2ª |
+| `LITSUB`: pai `AA,BB`, filhos `AA` e `BB` | filhos com os registros, pai com a soma |
+| `LONGDUP` (`2 6`, sem L): `120040` na 1ª e na 2ª | na 2ª |
+| `l` minúsculo no cabeçalho | igual ao `L` |
+
+**Faixas no CNV literal são comparação de texto, com os espaços.** O número
+N(2) vem alinhado à direita (`" 7"`, `"10"`), e o TabWin não apara o código da
+CNV (T6):
+
+| Faixa | Pega (de 0 a 20) |
+| --- | --- |
+| `" 7-48"` | 7 a 20 |
+| `"07-48"` | 10 a 20 |
+| `"7 -48"` | nada |
+| `" 1- 5"` | 1 a 5 |
+| `"01-05"` | nada |
+| `"1 -5 "` | 10 a 20 |
+| `" 7- 9"`, `" 7-15"` | 7 a 9, 7 a 15 |
+
+E lista que começa com vírgula (`,00-99`) tem o código em branco também no
+literal.
+
+**A diferença que fica.** `nudosePB.cnv` (SINAN) é literal e tem, na mesma
+linha, três faixas que se sobrepõem (`07-48,7 -48, 7-48`). Sobrepostas, o
+resultado do TabWin depende da ordem (T7: `07-48` antes de `" 7-48"` deixa 8 a
+20 sem classificação; na ordem inversa, tudo classifica) — efeito da estrutura
+de busca dele, não uma regra documentável. O Help diz que CNV literal não
+aceita faixas. Reproduzir exigiria decompilar a rotina; está marcado no
+verificador como diferença conhecida (H1).

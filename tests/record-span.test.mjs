@@ -63,3 +63,27 @@ test('Incluir: a linha "Não classificados" só aparece se houver algum (TabWin 
   assert.deepEqual(comUm.rows.map((r) => r.label), ['Masculino', 'Feminino', 'Não classificados']);
   assert.equal(comUm.cells.at(-1)[0], 1);
 });
+
+test('o que cai direto numa linha-subtotal entra no Total (CID10_BR: A41 só no grupo A000-B999)', async () => {
+  const { calculateColumnTotal } = await import('../dist/packages/analysis/src/table-operations.js');
+  const cid = parseCnv(['3 4', row(1, '001-031 Infecciosas', 'A000-B999'), row(2, '  001 Intestinais', 'A000-A099'), row(3, '  005 Tuberculose', 'A150-A169')]
+    .map((line, i) => (i >= 2 ? `  1${line.slice(3)}` : line)).join('\n'));
+  const spec = { compatibilityProfile: 'tabwin-4.15', rows: { field: 'CAUSABAS', conversionId: 'CID' }, measure: { kind: 'count' }, filters: [] };
+  const result = executeInMemory([{ CAUSABAS: 'A09' }, { CAUSABAS: 'A150' }, { CAUSABAS: 'A419' }], compileQueryPlan(spec), { CID: cid });
+  const counts = Object.fromEntries(result.rows.map((r, i) => [r.label.trim(), result.cells[i][0]]));
+  assert.deepEqual(counts, { '001-031 Infecciosas': 3, '001 Intestinais': 1, '005 Tuberculose': 1 });
+  assert.equal(calculateColumnTotal(result, result.columns[0].key, 'sum'), 3);
+});
+
+test('campo de data (DBF tipo D) é lido como AAAAMMDD, como o TabWin (DTALTA_N do SINAN)', () => {
+  const meses = parseCnv(['3 2', row(3, 'Ign', '00-99'), row(1, 'Fevereiro', '02'), row(2, 'Branco', '  ,')].join('\n'));
+  const anos = parseCnv(['2 4', row(1, '2024', '2024'), row(2, 'IGN', '    ,')].join('\n'));
+  const lay = [{ field: 'DTALTA_N', type: 'D', length: 8, decimals: 0 }];
+  const recs = [{ DTALTA_N: new Date(Date.UTC(2024, 1, 20)) }, { DTALTA_N: null }];
+  const mes = withRecordLayout({ compatibilityProfile: 'tabwin-4.15', rows: { field: 'DTALTA_N', conversionId: 'M', startPosition: 5 }, measure: { kind: 'count' }, filters: [] }, lay, { M: meses });
+  const r1 = executeInMemory(recs, compileQueryPlan(mes), { M: meses });
+  assert.deepEqual(Object.fromEntries(r1.rows.map((r, i) => [r.label, r1.cells[i][0]])), { Ign: 0, Fevereiro: 1, Branco: 1 });
+  const ano = withRecordLayout({ compatibilityProfile: 'tabwin-4.15', rows: { field: 'DTALTA_N', conversionId: 'A', startPosition: 1 }, measure: { kind: 'count' }, filters: [] }, lay, { A: anos });
+  const r2 = executeInMemory(recs, compileQueryPlan(ano), { A: anos });
+  assert.deepEqual(Object.fromEntries(r2.rows.map((r, i) => [r.label, r2.cells[i][0]])), { 2024: 1, IGN: 1 });
+});

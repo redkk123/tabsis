@@ -80,6 +80,25 @@ function parseOption(
   strict: boolean,
 ): DefOption {
   const fields = splitCommaFields(rest);
+  // Três campos ("L + NOME FANTASIA, TITULO, LINHA_COMENTARIO_…" no
+  // Producao_Ambulatorial.DEF oficial do SIA): o TabWin lista a opção e lê o
+  // terceiro campo como a tabela de conversão — só reclama se alguém a usar
+  // ("Tabela de conversão não encontrada"; RE-003, tela 19). Aqui também: vira
+  // uma opção cuja CNV não existe, que o painel mostra em cinza, em vez de
+  // recusar o DEF inteiro.
+  if (fields.length === 3 && fields[0] && fields[1] && fields[2] && !/^\d+$/.test(fields[2])) {
+    return {
+      kind: 'conversion',
+      directive,
+      label: fields[0],
+      field: fields[1],
+      roles: rolesForDirective(directive),
+      startPosition: 1,
+      conversionFile: fields[2],
+      sourceLine,
+      threeFields: true,
+    } as DefOption;
+  }
   if (strict && fields.length < 4) {
     throw new DefParseError(
       `${directive} directive expects at least 4 comma-separated fields after the directive; got ${fields.length}`,
@@ -203,6 +222,10 @@ export function parseDef(text: string, options: ParseDefOptions = {}): DefDefini
     if (OPTION_DIRECTIVES.has(directive)) {
       const option = parseOption(directive as DefOption['directive'], rest, sourceLine, strict);
       defOptions.push(option);
+      if ('threeFields' in option) {
+        delete (option as { threeFields?: boolean }).threeFields;
+        warnings.push(`${directive} directive at line ${sourceLine} has 3 fields; like TabWin, the third is read as the conversion table (${(option as { conversionFile: string }).conversionFile})`);
+      }
       if (option.trailingFields?.length) {
         warnings.push(
           `${directive} directive at line ${sourceLine} contains ${option.trailingFields.length} retained trailing field(s) with unresolved semantics`,

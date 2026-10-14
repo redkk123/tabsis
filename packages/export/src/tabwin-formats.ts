@@ -46,9 +46,10 @@ export function columnDecimals(result: TabulationResult, columnIndex: number): n
 }
 
 function defaultTotals(result: TabulationResult): number[] {
-  return result.columns.map((_, column) => result.cells
-    .filter((_, row) => !result.rows[row]?.excludeFromTotal)
-    .reduce((sum, cells) => sum + (cells[column] ?? 0), 0));
+  return result.columns.map((_, column) => result.cells.reduce((sum, cells, row) => {
+    const axis = result.rows[row];
+    return sum + (axis?.excludeFromTotal ? (axis.directTotal?.[column] ?? 0) : (cells[column] ?? 0));
+  }, 0));
 }
 
 function quote(text: string): string {

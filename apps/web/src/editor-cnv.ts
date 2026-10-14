@@ -114,6 +114,8 @@ function parseCodesText(
   }
   const exactCodes: string[] = [];
   const ranges: CnvCodeRange[] = [];
+  // Código "em branco" (espaços antes da vírgula), como o leitor de CNV entende.
+  if (mode === 'short' && /^ +,/.test(text)) exactCodes.push(' ');
   for (const rawToken of trimmed.split(',')) {
     const token = rawToken.trim();
     if (!token) continue;

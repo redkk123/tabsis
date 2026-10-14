@@ -74,7 +74,7 @@ function parseRuleLine(
   sourceLine: number,
   mode: CnvMode,
   sourceOrder: number,
-): { category: CnvCategory; rule: CnvRuleLine } {
+): { category: CnvCategory; rule: CnvRuleLine; invalidSubtotal?: string } {
   // Legacy columns (1-based): subtotal 1-3, sequence 4-7,
   // description 10-59, codes 61+. The N layout widens sequence, description
   // and codes: sequence 6-9, description 12-111, codes 113+. All 41,897 body
@@ -97,8 +97,22 @@ function parseRuleLine(
   const isNew = mode === 'new-format';
   const subtotalRaw = body.slice(0, isNew ? 4 : 3).trim();
   const sequenceRaw = body.slice(isNew ? 5 : 3, isNew ? 9 : 7).trim();
-  const label = body.slice(isNew ? 11 : 9, isNew ? 111 : 59).trim();
-  const codesRaw = body.slice(isNew ? 112 : 60).trim();
+  // Só o fim é aparado: o recuo do começo é a hierarquia que o TabWin mostra
+  // ("  001 Doencas…", "    004.1 …" no CID10_BR.CNV do SIM; RE-003).
+  const label = body.slice(isNew ? 11 : 9, isNew ? 111 : 59).replace(/\s+$/, "");
+  const codesArea = body.slice(isNew ? 112 : 60);
+  const codesRaw = codesArea.trim();
+  // "Campo em branco" se escreve com espaços antes da vírgula: `  ,` em
+  // MESES.CNV do SIM ("branco"), `    ,` em HORAOBITO.CNV ("Ign"). O TabWin lê
+  // esses espaços como um código; aparados, o branco caía em outra linha
+  // (RE-003, SIM/SINASC). Só conta com vírgula, para não confundir com o
+  // espaço que sobra no fim de uma linha-título.
+  const blankCode = (mode === 'short' || mode === 'literal') && /^ *,/.test(codesArea);
+  // No literal o TabWin compara o código com os espaços como estão
+  // (" 1- 5" pega " 1".." 5"; "01-05" não pega o número 1, que é " 1";
+  // RE-003, testes T5–T7). Só o fim da linha é aparado.
+  const literal = mode === 'literal';
+  const codesList = literal ? codesArea.replace(/\s+$/, '') : codesRaw;
 
   if (!/^\d+$/.test(sequenceRaw)) {
     throw new CnvParseError(
@@ -113,6 +127,7 @@ function parseRuleLine(
 
   let subtotalTarget: number | undefined;
   let excludeFromTotal = false;
+  let invalidSubtotal: string | undefined;
   if (subtotalRaw) {
     if (subtotalRaw === '#') excludeFromTotal = true;
     // "0" is what a truncated N indicator degrades to (e.g. "   01" read as
@@ -121,7 +136,12 @@ function parseRuleLine(
     else if (/^\d+$/.test(subtotalRaw)) {
       const target = Number(subtotalRaw);
       if (target > 0) subtotalTarget = target;
-    } else throw new CnvParseError('invalid subtotal field', sourceLine);
+    } else {
+      // Texto no lugar do número ("E249," no CID10_04_ST.CNV do SIM): o TabWin
+      // abre o arquivo mesmo assim. Fica sem subtotal, com aviso, em vez de
+      // recusar a tabela inteira (RE-003).
+      invalidSubtotal = subtotalRaw;
+    }
   }
 
   const category: CnvCategory = {
@@ -142,13 +162,19 @@ function parseRuleLine(
       throw new CnvParseError(`invalid numeric upper bound: ${codesRaw}`, sourceLine);
     }
     numericUpperInclusive = value;
-  } else if (codesRaw) {
-    for (const rawToken of codesRaw.split(',')) {
-      const token = rawToken.trim();
-      if (!token) continue;
-      const hyphen = token.indexOf('-');
-      if (hyphen > 0 && hyphen < token.length - 1) {
-        ranges.push({ from: token.slice(0, hyphen).trim(), to: token.slice(hyphen + 1).trim() });
+  } else if (codesRaw || blankCode) {
+    if (blankCode) exactCodes.push(' ');
+    for (const rawToken of codesList.split(',')) {
+      const token = literal ? rawToken : rawToken.trim();
+      if (!token.trim()) continue;
+      // Faixa só com hífen depois do primeiro caractere do código: "----" (as
+      // linhas-título) continua não sendo faixa nem código.
+      const begin = token.length - token.trimStart().length;
+      const hyphen = token.indexOf('-', begin);
+      if (hyphen > begin && hyphen < token.length - 1) {
+        ranges.push(literal
+          ? { from: token.slice(0, hyphen), to: token.slice(hyphen + 1) }
+          : { from: token.slice(0, hyphen).trim(), to: token.slice(hyphen + 1).trim() });
       } else {
         exactCodes.push(token);
       }
@@ -164,7 +190,7 @@ function parseRuleLine(
     sourceLine,
   };
 
-  return { category, rule };
+  return { category, rule, ...(invalidSubtotal !== undefined ? { invalidSubtotal } : {}) };
 }
 
 export function parseCnv(text: string, options: ParseCnvOptions = {}): CnvDefinition {
@@ -225,6 +251,9 @@ export function parseCnv(text: string, options: ParseCnvOptions = {}): CnvDefini
     }
 
     const parsed = parseRuleLine(body.padEnd(minimumLength), i + 1, header.mode, sourceOrder++);
+    if (parsed.invalidSubtotal !== undefined) {
+      warnings.push(`linha ${i + 1}: subtotal "${parsed.invalidSubtotal}" não é número; a categoria ${parsed.category.sequence} fica sem subtotal`);
+    }
     const existing = categories.get(parsed.category.sequence);
     if (!existing) {
       categories.set(parsed.category.sequence, parsed.category);
@@ -287,7 +316,11 @@ export function parseCnv(text: string, options: ParseCnvOptions = {}): CnvDefini
     // Documented short-code example says a later row overrides an earlier broad
     // range. The supplied documentation separately notes first-index behavior for
     // long/literal codes. We preserve that distinction explicitly.
-    precedence: header.mode === 'literal' ? 'first-match-wins' : 'last-match-wins',
+    // Também no literal quem vem depois ganha — o Help diz "duplicatas … são
+    // ignoradas a partir da primeira referência", mas o TabWin 4.15 dá o
+    // código à última linha, curto com L ou longo (LITDUP, LONGDUP; e o
+    // CODOCO.CNV do SIA, onde os filhos repetem os códigos do pai; RE-003).
+    precedence: 'last-match-wins',
     categories: categoryList,
     rules,
     comments,

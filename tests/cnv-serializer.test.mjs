@@ -23,8 +23,8 @@ test('literal mode round-trips its explicit L modifier', () => {
   const original = parseCnv(['2 2 L', row(1, 'Primeiro', 'AA'), row(2, 'Segundo', 'AA')].join('\n'));
   const reparsed = parseCnv(serializeCnv(original));
   assert.equal(reparsed.mode, 'literal');
-  assert.equal(reparsed.precedence, 'first-match-wins');
-  assert.deepEqual(classifyCnv(reparsed, 'AA'), { sequence: 1, label: 'Primeiro' });
+  assert.equal(reparsed.precedence, 'last-match-wins');
+  assert.deepEqual(classifyCnv(reparsed, 'AA'), { sequence: 2, label: 'Segundo' });
 });
 
 test('numeric-ranges mode round-trips its F modifier and upper bounds', () => {

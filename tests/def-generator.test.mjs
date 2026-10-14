@@ -40,3 +40,16 @@ test('Gera CNV: um código por categoria, curta até 4 posições, e o arquivo s
   assert.throws(() => generateCnvFromValues(['', '  ']), /não tem valores/);
   assert.throws(() => generateCnvFromValues(['a,b']), /vírgula/);
 });
+
+test('x minúsculo no DEF vale como X (o TabWin lista em Linhas, Colunas e Seleções)', () => {
+  const def = parseDef([';t', 'AX*.DBF', 'xCausa (minusculo), CAUSABAS, 1, CID10_BR.CNV'].join('\r\n'));
+  assert.deepEqual(def.options[0].roles.sort(), ['column', 'row', 'selection']);
+});
+
+test('linha de DEF com 3 campos (SIA): vira opção cuja tabela é o 3º campo, sem derrubar o DEF', () => {
+  const def = parseDef([';t', 'ADADOS\\PA*.DBC', 'LMantida, PA_MN_IND, 1, CNV/MANT_IND.CNV', 'L + NOME FANTASIA   , TITULO     , LINHA_COMENTARIO_REFERENTE_DADOS'].join('\r\n'));
+  assert.equal(def.options.length, 2);
+  assert.equal(def.options[1].label, '+ NOME FANTASIA');
+  assert.equal(def.options[1].conversionFile, 'LINHA_COMENTARIO_REFERENTE_DADOS');
+  assert.match(def.warnings.join('\n'), /3 fields/);
+});

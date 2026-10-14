@@ -117,7 +117,7 @@ function spannedCode(record: DataRecord, span: readonly RecordFieldLayout[], sta
   const raw = span.map((layout) => fixedWidthText(record[layout.field], layout)).join('');
   const start = (startPosition ?? 1) - 1;
   const code = raw.slice(start, start + conversion.codeLength);
-  return conversion.mode === 'literal' ? code.replace(/ +$/, '') : code;
+  return code;
 }
 
 function extractSourceValue(
@@ -519,7 +519,18 @@ function materializeTabulation(state: TabulationState): TabulationResult {
     return columns.map((column) => accumulated?.get(column.key) ?? 0);
   });
 
-  if (plan.spec.rows.conversionId) propagateRowSubtotals(rows, cells);
+  if (plan.spec.rows.conversionId) {
+    // Antes de somar os filhos: o que caiu direto numa linha-subtotal entra no
+    // Total, como no TabWin (directTotal; RE-003, CID10_BR do SIM).
+    const targets = new Set(rows.map((row) => row.subtotalTargetKey).filter(Boolean));
+    rows.forEach((row, index) => {
+      const own = cells[index] ?? [];
+      if (row.excludeFromTotal && targets.has(row.key) && own.some((value) => value !== 0)) {
+        rows[index] = { ...row, directTotal: [...own] };
+      }
+    });
+    propagateRowSubtotals(rows, cells);
+  }
 
   if (plan.spec.suppressZeroRows) {
     const keep = cells.map((row) => row.some((value) => value !== 0));

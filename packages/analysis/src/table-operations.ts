@@ -409,12 +409,19 @@ export function calculateColumnTotal(
 ): number | undefined {
   if (policy === 'none') return undefined;
   const index = columnIndex(result, columnKey);
+  if (policy === 'sum') {
+    // Linhas fora do total (detalhe já somado no subtotal) só entram com o que
+    // caiu direto nelas (directTotal), como o TabWin conta.
+    return result.cells.reduce((sum, row, rowIndex) => {
+      const axis = result.rows[rowIndex];
+      return sum + (axis?.excludeFromTotal ? (axis.directTotal?.[index] ?? 0) : (row[index] ?? 0));
+    }, 0);
+  }
   const values = result.cells
     .filter((_, rowIndex) => !result.rows[rowIndex]?.excludeFromTotal)
     .map((row) => row[index] ?? 0);
   if (!values.length) return 0;
   switch (policy) {
-    case 'sum': return values.reduce((sum, value) => sum + value, 0);
     case 'product': return values.reduce((product, value) => product * value, 1);
     case 'mean': return values.reduce((sum, value) => sum + value, 0) / values.length;
     case 'initial': return values[0];
