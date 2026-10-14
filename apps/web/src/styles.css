@@ -871,3 +871,16 @@ dialog p { color: #676d74; font-size: 13px; line-height: 1.6; }
 .painel-arquivos .painel-crc-ok { color: var(--ok); font-weight: 600; }
 .painel-arquivos .painel-crc-erro { color: var(--danger); font-weight: 700; }
 .painel-arquivos li.painel-crc-falhou { border-color: #e3bcb7; background: #fbf1ef; }
+.painel-registros { width: min(1180px, calc(100% - 24px)); max-height: calc(100vh - 32px); padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; }
+.painel-registros:not([open]) { display: none; }
+.painel-registros-topo { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.painel-registros-topo h2 { margin: 0 0 4px; font-size: 22px; }
+.painel-registros-topo p { margin: 0; max-width: 820px; }
+.painel-registros-rolagem { overflow: auto; border: 1px solid var(--line); border-radius: 5px; }
+.painel-registros-tabela { border-collapse: collapse; font-size: 12px; white-space: nowrap; }
+.painel-registros-tabela th, .painel-registros-tabela td { padding: 4px 8px; border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); text-align: left; }
+.painel-registros-tabela th { position: sticky; top: 0; background: var(--surface-2); vertical-align: top; }
+.painel-registros-tabela th b { display: block; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.painel-registros-tabela th small { display: block; color: var(--faint); font-weight: 400; }
+.painel-registros-tabela th em { display: block; color: var(--brand-ink); font-style: normal; font-weight: 600; }
+.painel-registros-tabela td { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }

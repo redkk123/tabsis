@@ -10096,7 +10096,9 @@ painel = criarPainel(element<HTMLElement>('#painel'), {
   },
   conversoes: () => cnvByName,
   lookups: () => lookupByName,
-  campos: () => (dbfHeader ? dbfHeader.fields.map((field) => ({ name: field.name, type: field.type })) : null),
+  campos: () => (dbfHeader
+    ? dbfHeader.fields.map((field) => ({ name: field.name, type: field.type, length: field.length, decimalCount: field.decimalCount }))
+    : null),
   rotuloDoCampo: (campo) => fieldLabel(campo),
   campoInicial: () => rowField.value || undefined,
   arquivos: () => activeDatasetSources.map((source) => ({ name: source.name, size: source.size })),
@@ -10104,6 +10106,10 @@ painel = criarPainel(element<HTMLElement>('#painel'), {
     { type: 'distinct', field: campo, limit: 2000 },
     { label: 'Leitura de valores' },
   ),
+  primeirosRegistros: async (campos, limite) => (await askDataset<{ records: Array<Record<string, unknown>> }>(
+    { type: 'records', fields: campos, maxRecords: limite },
+    { label: 'Leitura de registros' },
+  )).records,
   testarCrc: async () => (await askDataset<{ reports: Array<{ name: string; report: { ok: boolean; stored: string; computed: string } | null }> }>(
     { type: 'crc' },
     { label: 'Teste de CRC' },

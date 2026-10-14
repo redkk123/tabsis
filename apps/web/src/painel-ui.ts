@@ -54,12 +54,14 @@ export interface PainelDeps {
   conversoes(): ReadonlyMap<string, CnvDefinition>;
   lookups(): ReadonlyMap<string, DimensionLookupDefinition>;
   /** Campos do arquivo aberto; `null` quando não há arquivo. */
-  campos(): Array<{ name: string; type: string }> | null;
+  campos(): Array<{ name: string; type: string; length?: number; decimalCount?: number }> | null;
   rotuloDoCampo(campo: string): string;
   /** Sem DEF, o campo que a abertura escolheu como plausível (UF, município…). */
   campoInicial?(): string | undefined;
   arquivos(): PainelArquivo[];
   valoresDistintos(campo: string): Promise<{ values: string[]; truncated: boolean }>;
+  /** As primeiras linhas do arquivo, só com os campos pedidos ("Ver arquivo .DBF"). */
+  primeirosRegistros?(campos: string[], limite: number): Promise<Array<Record<string, unknown>>>;
   /** "Testar CRC": confere cada DBC aberto contra o CRC-32 gravado nele. */
   testarCrc?(): Promise<Array<{ name: string; report: { ok: boolean; stored: string; computed: string } | null }>>;
   perfil(): CompatibilityProfile;
@@ -76,6 +78,15 @@ function el<K extends keyof HTMLElementTagNameMap>(
   Object.assign(node, props);
   for (const child of children) node.append(child);
   return node;
+}
+
+const NOMES_DE_TIPO: Record<string, string> = { C: 'texto', N: 'número', F: 'número', D: 'data', L: 'sim/não', I: 'inteiro' };
+
+/** "texto (6)", "número (10,2)": o tipo e o tamanho do campo como o DBF declara. */
+function tipoDoCampo(campo: { type: string; length?: number; decimalCount?: number }): string {
+  const nome = NOMES_DE_TIPO[campo.type] ?? campo.type;
+  if (!campo.length) return nome;
+  return campo.decimalCount ? `${nome} (${campo.length},${campo.decimalCount})` : `${nome} (${campo.length})`;
 }
 
 function semAcento(texto: string): string {
@@ -133,6 +144,8 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
   const defNota = el('p', { className: 'painel-def-nota' });
   const arquivosLista = el('ul', { className: 'painel-arquivos', ariaLabel: 'Arquivos da tabulação' });
   const padraoNota = el('p', { className: 'painel-padrao' });
+  const verRegistros = el('button', { type: 'button', className: 'text-button', id: 'painel-ver-registros', title: 'Mostra os campos e as primeiras linhas do arquivo, como "Ver arquivo .DBF" do TabWin' }, 'Ver registros do arquivo');
+  const registrosDialogo = el('dialog', { className: 'painel-registros', id: 'painel-registros' });
 
   const linhasBusca = el('input', { type: 'search', className: 'painel-busca', placeholder: 'Procurar…', ariaLabel: 'Procurar nas linhas' });
   const linhasLista = el('select', { id: 'painel-linhas', size: 9, ariaLabel: 'Linhas' });
@@ -219,13 +232,14 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
         el('h2', {}, 'Monte a tabela'),
       ),
       el('label', { className: 'painel-def-campo' }, el('span', {}, 'Arquivo de definição (DEF)'), defSelect, defNota),
-      el('div', { className: 'painel-arquivos-campo' }, el('span', {}, 'Arquivos'), arquivosLista, padraoNota),
+      el('div', { className: 'painel-arquivos-campo' }, el('span', {}, 'Arquivos'), arquivosLista, padraoNota, verRegistros),
     ),
     el('div', { className: 'painel-grade' }, linhas.raiz, colunas.raiz, incremento.raiz, selecoes.raiz),
     opcoes,
     el('div', { className: 'painel-rodape' }, resumo, executarBotao),
     erro,
     logDetalhes,
+    registrosDialogo,
   );
 
   // ---- Renderização ----------------------------------------------------
@@ -299,6 +313,7 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
     );
     padraoNota.textContent = catalogo?.padraoArquivos ? `O DEF espera arquivos como ${catalogo.padraoArquivos}` : '';
     padraoNota.hidden = !catalogo?.padraoArquivos;
+    verRegistros.hidden = !arquivos.length || !deps.primeirosRegistros;
   }
 
   function renderIncrementos(): void {
@@ -653,6 +668,62 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
     logDetalhes.open = true;
     restaurar(texto);
   });
+
+  /**
+   * "Ver arquivo .DBF": o DBF como ele é — um campo por coluna, com tipo e
+   * tamanho, e as primeiras linhas. É a melhor resposta para "o que tem dentro
+   * deste arquivo?" e mostra a quem está começando que o DEF e a CNV só dão
+   * nome ao que já está ali.
+   */
+  async function abrirRegistros(): Promise<void> {
+    const campos = deps.campos();
+    if (!campos || !deps.primeirosRegistros) return;
+    const LIMITE = 50;
+    const usados = new Map<string, string[]>();
+    for (const eixo of [...(catalogo?.linhas ?? []), ...(catalogo?.colunas ?? []), ...(catalogo?.selecoes ?? [])]) {
+      const nomes = usados.get(eixo.field.toUpperCase()) ?? [];
+      if (!nomes.includes(eixo.label)) nomes.push(eixo.label);
+      usados.set(eixo.field.toUpperCase(), nomes);
+    }
+    registrosDialogo.replaceChildren(
+      el('header', { className: 'painel-registros-topo' },
+        el('div', {}, el('h2', {}, 'Registros do arquivo'),
+          el('p', {}, `${deps.arquivos().map((arquivo) => arquivo.name).join(' + ')} · ${campos.length} campos · primeiras ${LIMITE} linhas. `,
+            'Cada linha é um registro (uma internação, um óbito…); cada coluna, um campo do DBF. O nome em cima é o do arquivo; embaixo, o nome que o DEF dá.')),
+        el('button', { type: 'button', className: 'secondary-button', onclick: () => registrosDialogo.close() }, 'Fechar'),
+      ),
+      el('p', { className: 'painel-vazio' }, 'Lendo…'),
+    );
+    registrosDialogo.showModal();
+    try {
+      const linhas = await deps.primeirosRegistros(campos.map((campo) => campo.name), LIMITE);
+      const tabela = el('table', { className: 'painel-registros-tabela' });
+      const cabeca = el('tr');
+      cabeca.append(el('th', { scope: 'col' }, '#'));
+      for (const campo of campos) {
+        const rotulos = usados.get(campo.name.toUpperCase());
+        cabeca.append(el('th', { scope: 'col', title: rotulos?.join(' · ') ?? '' },
+          el('b', {}, campo.name),
+          el('small', {}, tipoDoCampo(campo)),
+          ...(rotulos ? [el('em', {}, rotulos[0]!)] : [])));
+      }
+      const corpo = el('tbody');
+      linhas.forEach((linha, indice) => {
+        const tr = el('tr');
+        tr.append(el('td', {}, String(indice + 1)));
+        for (const campo of campos) {
+          const valor = linha[campo.name];
+          tr.append(el('td', {}, valor === null || valor === undefined ? '' : valor instanceof Date ? valor.toISOString().slice(0, 10) : String(valor)));
+        }
+        corpo.append(tr);
+      });
+      tabela.append(el('thead', {}, cabeca), corpo);
+      registrosDialogo.lastElementChild?.replaceWith(el('div', { className: 'painel-registros-rolagem' }, tabela));
+    } catch (motivo) {
+      registrosDialogo.lastElementChild?.replaceWith(el('p', { className: 'painel-erro' }, motivo instanceof Error ? motivo.message : String(motivo)));
+    }
+  }
+  verRegistros.addEventListener('click', () => void abrirRegistros());
 
   async function executarAgora(): Promise<boolean> {
     atualizar();
