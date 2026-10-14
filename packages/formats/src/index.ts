@@ -17,3 +17,4 @@ export * from './tab-file.js';
 export * from './tabwin-log.js';
 export * from './dos-encoding.js';
 export * from './def-generator.js';
+export * from './datasus-file-names.js';

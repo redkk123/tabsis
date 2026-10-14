@@ -110,6 +110,11 @@ export interface ResolvedorDeRecursos {
   lookup(arquivo: string): string | undefined;
 }
 
+/** Só o nome do arquivo, sem a pasta do DEF: `DBF\TCNESAC.DBF` → `TCNESAC.DBF`. */
+function nomeDoArquivo(path: string): string {
+  return path.replace(/\\/g, '/').split('/').pop() ?? path;
+}
+
 /** File name only, lower-case: `CNV\br_uf.cnv` and `BR_UF.CNV` are the same table. */
 export function nomeBaseDoRecurso(path: string): string {
   return path.replace(/\\/g, '/').split('/').pop()?.toLowerCase() ?? path.toLowerCase();
@@ -122,8 +127,8 @@ function eixoDoDef(option: DefOption, papel: string, recursos: ResolvedorDeRecur
   if (option.kind === 'conversion') {
     const conversionId = recursos.conversao(option.conversionFile);
     const motivo = faltaCampo
-      ? `o arquivo aberto não tem o campo ${option.field}`
-      : conversionId ? undefined : `falta a tabela ${option.conversionFile}`;
+      ? `não existe neste arquivo (campo ${option.field})`
+      : conversionId ? undefined : `falta a tabela ${nomeDoArquivo(option.conversionFile)}`;
     return {
       ...base,
       startPosition: option.startPosition,
@@ -136,8 +141,8 @@ function eixoDoDef(option: DefOption, papel: string, recursos: ResolvedorDeRecur
   if (option.kind === 'dbf-lookup') {
     const lookupId = recursos.lookup(option.lookupFile);
     const motivo = faltaCampo
-      ? `o arquivo aberto não tem o campo ${option.field}`
-      : lookupId ? undefined : `falta a tabela ${option.lookupFile}`;
+      ? `não existe neste arquivo (campo ${option.field})`
+      : lookupId ? undefined : `falta a tabela ${nomeDoArquivo(option.lookupFile)}`;
     return {
       ...base,
       resourceFile: option.lookupFile,
@@ -150,7 +155,7 @@ function eixoDoDef(option: DefOption, papel: string, recursos: ResolvedorDeRecur
     ...base,
     resourceFile: option.resourceFile,
     disponivel: false,
-    motivo: `usa ${option.resourceFile} de um jeito que o TabSis ainda não executa`,
+    motivo: `ainda não funciona no TabSis (usa ${nomeDoArquivo(option.resourceFile)} de um jeito especial)`,
   };
 }
 

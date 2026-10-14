@@ -19,6 +19,7 @@ import {
   parseTabwinLog,
   serializeTabwinLog,
 } from '../../../packages/formats/src/tabwin-log.ts';
+import { describeDatasusFile } from '../../../packages/formats/src/datasus-file-names.ts';
 import type {
   CompatibilityProfile,
   DimensionLookupDefinition,
@@ -129,6 +130,15 @@ export interface Painel {
   logAtual(): string;
 }
 
+/** "DADOS\\RD*.DBC" → "Feito para arquivos RD… (ex.: RDAC2401.dbc)". */
+function padraoEmPortugues(padrao: string): string {
+  const nome = padrao.replace(/\\/g, '/').split('/').pop() ?? padrao;
+  const prefixo = nome.split('*')[0] ?? '';
+  return prefixo
+    ? `Este DEF é feito para os arquivos que começam com ${prefixo} (${nome})`
+    : `Este DEF é feito para os arquivos ${nome}`;
+}
+
 export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
   let catalogo: PainelCatalogo | null = null;
   let estado: PainelEstado | null = null;
@@ -204,13 +214,13 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
     el('div', { className: 'painel-log-acoes' }, logCopiar, logAbrir, logRestaurar, logArquivo),
   );
 
-  const linhas = bloco('1', 'Linhas', 'Cada categoria vira uma linha da tabela.', 'linhas');
+  const linhas = bloco('1', 'Linhas', 'O que vira cada linha da tabela: município, sexo, faixa etária…', 'linhas');
   linhas.corpo.append(linhasBusca, linhasLista);
-  const colunas = bloco('2', 'Colunas', 'Opcional: abre cada linha em colunas.', 'colunas');
+  const colunas = bloco('2', 'Colunas', 'Opcional. Abre cada linha em colunas (ex.: por sexo). "Não ativa" = uma coluna só.', 'colunas');
   colunas.corpo.append(colunasBusca, colunasLista);
-  const incremento = bloco('3', 'Incremento', 'O que se soma em cada célula.', 'incremento');
+  const incremento = bloco('3', 'Incremento', 'O número de cada célula: Frequência conta os registros; os outros somam um valor.', 'incremento');
   incremento.corpo.append(incrementosLista);
-  const selecoes = bloco('4', 'Seleções', 'Filtros: só entram os registros das categorias marcadas. Duplo clique inclui ou exclui.', 'selecoes');
+  const selecoes = bloco('4', 'Seleções', 'Filtros (opcional). Escolha uma variável, clique em Incluir e marque as categorias que entram — ex.: só um município. Duplo clique também inclui ou exclui.', 'selecoes');
   selecoes.corpo.append(
     el('div', { className: 'painel-selecoes-grade' },
       el('label', { className: 'painel-sublista' }, el('span', {}, 'Disponíveis'), disponiveisLista),
@@ -225,16 +235,24 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
     ),
   );
 
+  // Cada opção diz em poucas palavras o que faz: quem vem do TabWin reconhece
+  // o nome, quem nunca usou entende sem abrir o manual.
+  const opcao = (caixa: HTMLElement, nome: string, oQueFaz: string, titulo?: string): HTMLElement =>
+    el('label', { className: 'check-label painel-opcao', ...(titulo ? { title: titulo } : {}) }, caixa,
+      el('span', {}, nome, el('small', { className: 'painel-opcao-ajuda' }, oQueFaz)));
   const opcoes = el('div', { className: 'painel-opcoes' },
-    el('label', { className: 'check-label' }, suprimirLinhas, el('span', {}, 'Suprimir linhas zeradas')),
-    el('label', { className: 'check-label' }, suprimirColunas, el('span', {}, 'Suprimir colunas zeradas')),
-    el('label', { className: 'check-label', title: 'Depois de tabular, grava num DBF os registros que passaram pelas Seleções, como a caixa do TabWin' }, salvarRegistros, el('span', {}, 'Salvar registros')),
-    el('label', { className: 'check-label', title: 'Antes de tabular, confere se cada DBC descomprime exatamente no DBF original (CRC-32 gravado no arquivo), como a caixa do TabWin' }, testarCrc, el('span', {}, 'Testar CRC')),
-    el('fieldset', { className: 'painel-nao-classificados', title: 'Como tratar os registros cujos códigos não estão previstos na tabela de conversão (CNV)' },
-      el('legend', {}, 'Não classificados'),
-      el('label', { className: 'check-label' }, naoClassIgnorar, el('span', {}, 'Ignorar')),
-      el('label', { className: 'check-label', title: 'Junta os códigos sem correspondência numa linha "Não classificados"' }, naoClassIncluir, el('span', {}, 'Incluir')),
-      el('label', { className: 'check-label', title: 'Uma linha para cada código sem correspondência (só em CNV literal, como no TabWin)' }, naoClassDiscriminar, el('span', {}, 'Discriminar')),
+    opcao(suprimirLinhas, 'Suprimir linhas zeradas', 'esconde as linhas com 0'),
+    opcao(suprimirColunas, 'Suprimir colunas zeradas', 'esconde as colunas com 0'),
+    opcao(salvarRegistros, 'Salvar registros', 'baixa os registros usados na tabela (DBF)',
+      'Depois de tabular, grava num DBF os registros que passaram pelas Seleções, como a caixa do TabWin'),
+    opcao(testarCrc, 'Testar CRC', 'confere se o arquivo DBC não está corrompido',
+      'Antes de tabular, confere se cada DBC descomprime exatamente no DBF original (CRC-32 gravado no arquivo), como a caixa do TabWin'),
+    el('fieldset', { className: 'painel-nao-classificados', title: 'Registros cujo código não está na tabela de conversão (CNV)' },
+      el('legend', {}, 'Não classificados ', el('small', { className: 'painel-opcao-ajuda' }, 'códigos que a tabela de conversão não reconhece')),
+      opcao(naoClassIgnorar, 'Ignorar', 'ficam fora da tabela'),
+      opcao(naoClassIncluir, 'Incluir', 'somados numa linha "Não classificados"'),
+      opcao(naoClassDiscriminar, 'Discriminar', 'uma linha para cada código',
+        'Uma linha para cada código sem correspondência (só em CNV literal, como no TabWin)'),
     ),
   );
 
@@ -244,8 +262,9 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
         el('span', { className: 'eyebrow' }, 'Painel de tabulação'),
         el('h2', {}, 'Monte a tabela'),
       ),
-      el('label', { className: 'painel-def-campo' }, el('span', {}, 'Arquivo de definição (DEF)'), defSelect, defNota),
-      el('div', { className: 'painel-arquivos-campo' }, el('span', {}, 'Arquivos'), arquivosLista, padraoNota, verRegistros),
+      el('label', { className: 'painel-def-campo', title: 'O DEF é o "cardápio" do sistema: diz o que pode ir em Linhas, Colunas, Incremento e Seleções, com os nomes do TabWin' },
+        el('span', {}, 'Definição (DEF) ', el('small', { className: 'painel-opcao-ajuda' }, 'o "cardápio" de variáveis')), defSelect, defNota),
+      el('div', { className: 'painel-arquivos-campo' }, el('span', {}, 'Arquivos de dados'), arquivosLista, padraoNota, verRegistros),
     ),
     el('div', { className: 'painel-grade' }, linhas.raiz, colunas.raiz, incremento.raiz, selecoes.raiz),
     opcoes,
@@ -306,7 +325,7 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
     defSelect.value = defs.has(ativo) ? ativo : '';
     const def = defs.get(ativo);
     defNota.textContent = def
-      ? `${def.options.length} opções, ${def.increments.length} incremento(s)${def.helpFile ? ` · ajuda original: ${def.helpFile}` : ''}`
+      ? `${def.options.length} variáveis para cruzar e ${def.increments.length} ${def.increments.length === 1 ? 'valor' : 'valores'} para somar`
       : defs.size
         ? 'Escolha o DEF para ver as variáveis com os nomes do TabWin.'
         : 'Sem DEF, as listas mostram os campos do arquivo. Abra o .DEF e as .CNV do sistema para ver os nomes do TabWin.';
@@ -331,13 +350,17 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
               },
             })]
             : [];
+          // O nome original primeiro (é por ele que as pessoas se entendem), e
+          // logo abaixo o que ele é, para quem não decorou as siglas.
+          const descricao = describeDatasusFile(arquivo.name)?.summary;
           return el('li', { title: `${arquivo.name} · ${formatarBytes(arquivo.size)}`, className: [crc === false ? 'painel-crc-falhou' : '', marcado ? '' : 'painel-arquivo-fora'].join(' ').trim() },
             el('label', { className: 'painel-arquivo' }, ...caixa, el('b', {}, arquivo.name)), el('small', {}, formatarBytes(arquivo.size)),
+            ...(descricao ? [el('small', { className: 'painel-arquivo-descricao' }, descricao)] : []),
             ...(crc === undefined ? [] : [el('small', { className: crc ? 'painel-crc-ok' : 'painel-crc-erro' }, crc ? 'CRC ok' : 'CRC não confere')]));
         })
         : [el('li', { className: 'painel-vazio' }, 'Nenhum arquivo de dados aberto')]),
     );
-    padraoNota.textContent = catalogo?.padraoArquivos ? `O DEF espera arquivos como ${catalogo.padraoArquivos}` : '';
+    padraoNota.textContent = catalogo?.padraoArquivos ? padraoEmPortugues(catalogo.padraoArquivos) : '';
     padraoNota.hidden = !catalogo?.padraoArquivos;
     verRegistros.hidden = !arquivos.length || !deps.primeirosRegistros;
   }
@@ -355,7 +378,9 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
         estado.incrementos = catalogo!.incrementos.map((item) => item.id).filter((id) => marcados.has(id));
         renderResumo();
       });
-      const detalhe = incremento.measure.kind === 'sum' ? incremento.measure.field ?? '' : (incremento.measure.weightField ? `peso ${incremento.measure.weightField}` : 'conta registros');
+      const detalhe = incremento.measure.kind === 'sum'
+        ? `soma o campo ${incremento.measure.field ?? ''}`
+        : (incremento.measure.weightField ? `conta pelo campo ${incremento.measure.weightField}` : 'conta os registros');
       incrementosLista.append(el('label', { className: 'check-label' }, caixa, el('span', {}, incremento.label, el('small', {}, detalhe))));
     }
   }
