@@ -26,6 +26,14 @@ import {
   type DbfRecordBatch,
 } from '../../../packages/acquisition/src/dbf-record-stream.ts';
 import {
+  asyncBufferFromBytes,
+  openParquetDataset,
+  streamParquetRecords,
+  type ParquetDataset,
+} from '../../../packages/acquisition/src/parquet-source.ts';
+import type { AsyncBuffer } from 'hyparquet';
+import { verifyDbcCrc, type DbcCrcReport } from '../../../packages/acquisition/src/dbc-crc.ts';
+import {
   createTabulationAccumulator,
   matchesFilters,
   type ConversionRegistry,
@@ -88,7 +96,18 @@ interface BinarySource {
   isDbc: boolean;
 }
 
-type DatasetSource = RecordSource | BinarySource;
+/**
+ * O formato leve do TabSis (Parquet convertido de um DBC). Fica guardado como
+ * bytes, e cada coluna só é decodificada quando algum pedido a usa — é o que
+ * torna a primeira tabela de um arquivo grande rápida.
+ */
+interface ParquetSource {
+  kind: 'parquet';
+  name: string;
+  bytes: ArrayBuffer;
+}
+
+type DatasetSource = RecordSource | BinarySource | ParquetSource;
 
 interface OpenRequest {
   type: 'open';
@@ -103,6 +122,11 @@ interface TabulateRequest {
   requestId: number;
   plan: QueryPlan;
   conversions?: ConversionRegistry;
+  /**
+   * Só estes arquivos (pelo nome), como a lista "Arquivos" do painel do
+   * TabWin. Ausente = todos os abertos.
+   */
+  sourceNames?: string[];
 }
 
 interface NumericProfileRequest {
@@ -159,6 +183,8 @@ interface SelectedDbfRequest {
   requestId: number;
   plan: QueryPlan;
   conversions?: ConversionRegistry;
+  /** Os mesmos arquivos que a tabela usou (lista "Arquivos" do painel). */
+  sourceNames?: string[];
 }
 
 interface MicrodatasusCsvRequest {
@@ -212,8 +238,13 @@ interface TransformApplyRequest {
   conversions?: ConversionRegistry;
 }
 
+interface CrcRequest {
+  type: 'crc';
+  requestId: number;
+}
+
 type DatasetRequest =
-  | OpenRequest | AppendRequest | TabulateRequest
+  | OpenRequest | AppendRequest | TabulateRequest | CrcRequest
   | NumericProfileRequest | CombinationProfileRequest | DistinctRequest | SelectedDbfRequest
   | RecordsRequest
   | FlowRequest | MicrodatasusCsvRequest | AuditScanRequest | TransformApplyRequest;
@@ -287,6 +318,91 @@ function reportProgress(requestId: number, recordsRead: number, recordCount: num
   post({ type: 'progress', requestId, recordsRead, recordCount });
 }
 
+interface ParquetState {
+  file: AsyncBuffer;
+  dataset: ParquetDataset;
+  /** Colunas já decodificadas, uma lista de valores por campo, em ordem de registro. */
+  columns: Map<string, DbfRecord[string][]>;
+}
+const parquetStates = new WeakMap<ParquetSource, ParquetState>();
+
+function parquetState(source: ParquetSource): ParquetState {
+  const state = parquetStates.get(source);
+  if (!state) throw new Error(`${source.name}: Parquet não preparado`);
+  return state;
+}
+
+/** Campos que um pedido vai ler; `undefined` quer dizer todos. */
+function fieldsForRequest(request: DatasetRequest): readonly string[] | undefined {
+  switch (request.type) {
+    case 'tabulate': return fieldsUsedByPlan(request.plan);
+    case 'profile-numeric':
+    case 'distinct': return [request.field];
+    case 'profile-combinations':
+    case 'records': return request.fields;
+    case 'flows': return [request.originField, request.destinationField, ...(request.weightField ? [request.weightField] : [])];
+    case 'open':
+    case 'append':
+    case 'crc': return [];
+    default: return undefined;
+  }
+}
+
+/**
+ * Antes de um pedido síncrono, abre os Parquet novos e decodifica as colunas
+ * que o pedido vai precisar. O resto do worker continua igual: para ele, um
+ * Parquet é só mais uma fonte que entrega lotes de registros.
+ */
+async function prepareParquet(request: DatasetRequest): Promise<void> {
+  const candidates: DatasetSource[] = request.type === 'open'
+    ? request.sources
+    : request.type === 'append' ? [...sources, request.source] : sources;
+  const wanted = fieldsForRequest(request);
+  for (const source of candidates) {
+    if (source.kind !== 'parquet') continue;
+    let state = parquetStates.get(source);
+    if (!state) {
+      const file = asyncBufferFromBytes(new Uint8Array(source.bytes));
+      state = { file, dataset: await openParquetDataset(file), columns: new Map() };
+      parquetStates.set(source, state);
+    }
+    const declared = state.dataset.header.fields.map((field) => field.name);
+    const missing = (wanted ?? declared).filter((name) => declared.includes(name) && !state!.columns.has(name));
+    if (!missing.length) continue;
+    const arrays = new Map(missing.map((name) => [name, [] as DbfRecord[string][]]));
+    await streamParquetRecords(state.file, state.dataset, ({ records }) => {
+      for (const record of records) for (const [name, values] of arrays) values.push(record[name] ?? null);
+    }, { fields: missing, batchSize: 100_000 });
+    for (const [name, values] of arrays) state.columns.set(name, values);
+  }
+}
+
+function streamParquetSource(
+  source: ParquetSource,
+  fields: readonly string[] | undefined,
+  forward: (batch: DbfRecordBatch) => void,
+): number {
+  const state = parquetState(source);
+  const names = (fields ?? state.dataset.header.fields.map((field) => field.name)).filter((name) => state.columns.has(name));
+  const total = state.dataset.provenance.recordCount;
+  for (let start = 0; start < total; start += BATCH_RECORDS) {
+    const end = Math.min(total, start + BATCH_RECORDS);
+    const records: DbfRecord[] = [];
+    for (let index = start; index < end; index++) {
+      const record: DbfRecord = {};
+      for (const name of names) record[name] = state.columns.get(name)![index] ?? null;
+      records.push(record);
+    }
+    forward({ records, firstRecordIndex: start, recordsRead: end, recordCount: total });
+  }
+  return total;
+}
+
+function parquetHeader(source: ParquetSource): DbfHeader {
+  const { dataset } = parquetState(source);
+  return { ...dataset.header, recordCount: dataset.provenance.recordCount };
+}
+
 /**
  * Streams every retained source in order through one consumer.
  *
@@ -298,12 +414,14 @@ function streamAll(
   requestId: number,
   fields: readonly string[] | undefined,
   consume: (batch: DbfRecordBatch, sourceIndex: number) => void,
+  only?: ReadonlySet<string>,
 ): number {
   const declared = header?.recordCount ?? 0;
   let readSoFar = 0;
   let reported = 0;
 
   for (const [sourceIndex, source] of sources.entries()) {
+    if (only && !only.has(source.name)) continue;
     const forward = (batch: DbfRecordBatch): void => {
       consume(batch, sourceIndex);
       const total = readSoFar + batch.recordsRead;
@@ -324,6 +442,11 @@ function streamAll(
         });
       }
       readSoFar += source.records.length;
+      continue;
+    }
+
+    if (source.kind === 'parquet') {
+      readSoFar += streamParquetSource(source, fields, forward);
       continue;
     }
 
@@ -358,10 +481,7 @@ function headerForSources(request: OpenRequest): DbfHeader {
         recordCount += source.records.length;
         continue;
       }
-      const bytes = new Uint8Array(source.bytes);
-      const incoming = source.isDbc
-        ? readDbfHeader(bytes.subarray(0, readDbcMetadata(bytes).headerSize))
-        : readDbfHeader(bytes);
+      const incoming = source.kind === 'parquet' ? parquetHeader(source) : binaryHeader(source);
       if (schemaSignature(base) !== schemaSignature(incoming)) {
         throw new Error(`${source.name}: esquema incompatível com a fonte de registros`);
       }
@@ -373,11 +493,8 @@ function headerForSources(request: OpenRequest): DbfHeader {
   let recordCount = 0;
   let first_header: DbfHeader | null = null;
   for (const source of request.sources) {
-    if (source.kind !== 'binary') throw new Error('Fontes de tipos diferentes não podem ser combinadas');
-    const bytes = new Uint8Array(source.bytes);
-    const current = source.isDbc
-      ? readDbfHeader(bytes.subarray(0, readDbcMetadata(bytes).headerSize))
-      : readDbfHeader(bytes);
+    if (source.kind === 'records') throw new Error('Fontes de tipos diferentes não podem ser combinadas');
+    const current = source.kind === 'parquet' ? parquetHeader(source) : binaryHeader(source);
     if (!first_header) first_header = current;
     else if (schemaSignature(first_header) !== schemaSignature(current)) {
       throw new Error(`${source.name}: esquema incompatível com o primeiro arquivo`);
@@ -385,6 +502,13 @@ function headerForSources(request: OpenRequest): DbfHeader {
     recordCount += current.recordCount;
   }
   return { ...first_header!, recordCount };
+}
+
+function binaryHeader(source: BinarySource): DbfHeader {
+  const bytes = new Uint8Array(source.bytes);
+  return source.isDbc
+    ? readDbfHeader(bytes.subarray(0, readDbcMetadata(bytes).headerSize))
+    : readDbfHeader(bytes);
 }
 
 function schemaSignature(value: DbfHeader): string {
@@ -434,11 +558,8 @@ function handle(request: DatasetRequest): void {
     case 'append': {
       if (!header) throw new Error('Nenhum conjunto de dados aberto para combinar');
       const source = request.source;
-      if (source.kind !== 'binary') throw new Error('Só arquivos DBC/DBF podem ser combinados');
-      const bytes = new Uint8Array(source.bytes);
-      const incoming = source.isDbc
-        ? readDbfHeader(bytes.subarray(0, readDbcMetadata(bytes).headerSize))
-        : readDbfHeader(bytes);
+      if (source.kind === 'records') throw new Error('Só arquivos DBC/DBF/Parquet podem ser combinados');
+      const incoming = source.kind === 'parquet' ? parquetHeader(source) : binaryHeader(source);
       if (schemaSignature(header) !== schemaSignature(incoming)) {
         throw new Error(
           `${source.name}: esquema incompatível; arquivos combinados precisam ter os mesmos campos, tipos, tamanhos e decimais`,
@@ -452,6 +573,19 @@ function handle(request: DatasetRequest): void {
     }
     case 'tabulate': {
       const conversions = request.conversions ?? {};
+      const subset = request.sourceNames && request.sourceNames.length < sources.length
+        ? new Set(request.sourceNames) : undefined;
+      if (subset) {
+        // Um recorte dos arquivos é outro conjunto de dados: os caches do
+        // conjunto inteiro não valem para ele, e ele não entra neles.
+        if (![...subset].some((name) => sources.some((source) => source.name === name))) {
+          throw new Error('Nenhum dos arquivos escolhidos está aberto');
+        }
+        const accumulator = createTabulationAccumulator(request.plan, conversions);
+        streamAll(request.requestId, fieldsUsedByPlan(request.plan), (batch) => accumulator.push(batch.records), subset);
+        post({ type: 'tabulation', requestId: request.requestId, result: accumulator.finish(), cached: false });
+        return;
+      }
       const cached = resultCache.get({ plan: request.plan, conversions });
       if (cached) {
         post({ type: 'tabulation', requestId: request.requestId, result: cached, cached: true });
@@ -490,6 +624,16 @@ function handle(request: DatasetRequest): void {
 
       resultCache.set({ plan: request.plan, conversions }, result);
       post({ type: 'tabulation', requestId: request.requestId, result, cached: false });
+      return;
+    }
+    case 'crc': {
+      // "Testar CRC" do TabWin: só DBC tem CRC gravado; DBF, CSV e Parquet
+      // aparecem como não aplicável.
+      const reports: Array<{ name: string; report: DbcCrcReport | null }> = sources.map((source) => ({
+        name: source.name,
+        report: source.kind === 'binary' && source.isDbc ? verifyDbcCrc(new Uint8Array(source.bytes)) : null,
+      }));
+      post({ type: 'crc-ready', requestId: request.requestId, reports });
       return;
     }
     case 'profile-numeric': {
@@ -558,7 +702,8 @@ function handle(request: DatasetRequest): void {
       if (!header) throw new Error('Nenhum conjunto de dados aberto');
       const collector = createSelectedRecordCollector(request.plan, request.conversions ?? {});
       // No projection here: the exported DBF must carry every declared field.
-      streamAll(request.requestId, undefined, (batch) => collector.push(batch.records));
+      const only = request.sourceNames?.length ? new Set(request.sourceNames) : undefined;
+      streamAll(request.requestId, undefined, (batch) => collector.push(batch.records), only);
       const bytes = writeDbf(collector.finish(), header.fields, header.dateOfLastUpdate ? { dateOfLastUpdate: header.dateOfLastUpdate } : {});
       const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
       post({ type: 'selected-dbf-ready', requestId: request.requestId, bytes: buffer }, [buffer]);
@@ -670,14 +815,22 @@ function handle(request: DatasetRequest): void {
   }
 }
 
+// Uma fila: preparar um Parquet é assíncrono, e um pedido não pode começar
+// enquanto o anterior ainda decodifica colunas — os dois mexeriam no mesmo
+// conjunto. Sem Parquet, a preparação não espera nada e o fluxo é o de antes.
+let fila: Promise<void> = Promise.resolve();
 workerScope.addEventListener('message', (event: MessageEvent<DatasetRequest>) => {
-  try {
-    handle(event.data);
-  } catch (error) {
-    post({
-      type: 'error',
-      requestId: event.data.requestId,
-      message: error instanceof Error ? error.message : String(error),
-    });
-  }
+  const request = event.data;
+  fila = fila.then(async () => {
+    try {
+      await prepareParquet(request);
+      handle(request);
+    } catch (error) {
+      post({
+        type: 'error',
+        requestId: request.requestId,
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
 });

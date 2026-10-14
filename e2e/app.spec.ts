@@ -1,5 +1,18 @@
 import { expect, test, type Page } from '@playwright/test';
 
+// Estes testes exercitam os controles campo a campo e as ferramentas da
+// tabela, que no TabSis ficam em grupos recolhíveis ("Tabular por campos",
+// "Quadro", "Operações", "Editar linhas e colunas"). O aplicativo lembra esses
+// grupos abertos por navegador; aqui eles começam abertos, como para quem usa
+// essas ferramentas sempre.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    for (const id of ['group-campos', 'tool-quadro', 'tool-operacoes', 'tool-editar']) {
+      try { localStorage.setItem(`tabsis.aberto.${id}`, '1'); } catch { /* ignora */ }
+    }
+  });
+});
+
 /** Loads the CSV fixture and runs a UF tabulation, the shortest path to a result. */
 async function tabulateFixture(page: Page): Promise<void> {
   await page.goto('/');
@@ -1209,8 +1222,8 @@ test('a raw DATASUS file reads as prose, without hiding the technical field name
 
 test('several DEFs can be loaded at once, and which one is in force is a visible choice', async ({ page }) => {
   await page.goto('/');
-  // The picker only exists once there is something to pick.
-  await expect(page.locator('#def-picker')).toBeHidden();
+  // The tabulation panel (and its DEF picker) only exists once there is something to pick.
+  await expect(page.locator('#painel')).toBeHidden();
   await openSidebarGroup(page, 'metadata');
   await expect(page.locator('#def-inspector-button')).toBeDisabled();
 
@@ -1219,28 +1232,32 @@ test('several DEFs can be loaded at once, and which one is in force is a visible
     'e2e/fixtures/casos-e2e.def',
     'e2e/fixtures/obitos-e2e.def',
   ]);
-  await expect(page.locator('#def-picker')).toBeVisible();
+  // In TabSis the DEF choice sits at the top of the tabulation panel, next to
+  // the Linhas/Colunas/Incremento/Seleções lists it governs, and each option
+  // carries the DEF's own description so the user picks by meaning.
+  const picker = page.locator('#painel-def');
+  await expect(picker).toBeVisible();
 
   // Both DEFs are held; loading the second no longer overwrites the first.
-  const picker = page.locator('#def-active');
-  await expect(picker).toContainText('casos-e2e.def');
-  await expect(picker).toContainText('obitos-e2e.def');
+  await expect(picker).toContainText('casos-e2e.def — Casos confirmados por local');
+  await expect(picker).toContainText('obitos-e2e.def — Obitos por local');
 
   // The active DEF names the measure: this is the difference between TabNet's
   // "Casos confirmados" and the bare "Freqüência" a raw file gets.
   await picker.selectOption('casos-e2e.def');
-  await expect(page.locator('#def-active-note')).toContainText('Casos confirmados por local');
+  await expect(page.locator('#painel-incrementos')).toContainText('Casos confirmados');
   await expect(page.locator('#measure-field')).toContainText('Casos confirmados');
 
   // Switching DEF re-labels the same underlying field.
   await picker.selectOption('obitos-e2e.def');
-  await expect(page.locator('#def-active-note')).toContainText('Obitos por local');
+  await expect(page.locator('#painel-incrementos')).toContainText('Obitos registrados');
   await expect(page.locator('#measure-field')).toContainText('Obitos registrados');
 
   // "Sem DEF" is a real choice, not just an absence: it puts the technical
   // names back and disables the inspector.
   await picker.selectOption('');
-  await expect(page.locator('#def-active-note')).toContainText('nomes técnicos');
+  await expect(picker).toHaveValue('');
+  await expect(page.locator('#painel-incrementos')).not.toContainText('Obitos registrados');
   await openSidebarGroup(page, 'metadata');
   await expect(page.locator('#def-inspector-button')).toBeDisabled();
   await expect(page.locator('#measure-field')).not.toContainText('Casos confirmados');
@@ -1466,7 +1483,11 @@ test('o arquivo guardado pode ser baixado sem precisar abrir a análise', async 
   const archive = [...zipSync({ 'GUARDADO01.dbc': strToU8('conteudo-de-teste') })];
 
   await page.evaluate(async (bytes) => {
-    const open = indexedDB.open('tabwin-web', 1);
+    // Sem versão: abre o banco como estiver. Se o aplicativo ainda não o
+    // criou, nasce na versão 1 (a de quem já usava antes) e a atualização do
+    // aplicativo migra o pacote para a store de metadados — que é justamente
+    // o que este teste passa a exercitar também.
+    const open = indexedDB.open('tabwin-web');
     const database: IDBDatabase = await new Promise((resolve, reject) => {
       open.onsuccess = () => resolve(open.result);
       open.onerror = () => reject(open.error);
@@ -1480,16 +1501,23 @@ test('o arquivo guardado pode ser baixado sem precisar abrir a análise', async 
         }
       };
     });
-    const transaction = database.transaction('official-archives', 'readwrite');
-    transaction.objectStore('official-archives').put({
+    const entry = {
       key: 'official-v1:teste',
       savedAt: Date.now(),
       bytes: new Uint8Array(bytes).buffer,
       sha256: 'a'.repeat(64),
       role: 'data',
       sources: [{ name: 'GUARDADO01.dbc', address: 'ftp://ftp.datasus.gov.br/x', source: 'SINAN', modality: 'Dados' }],
-    });
+    };
+    const stores = ['official-archives', ...(database.objectStoreNames.contains('archive-meta') ? ['archive-meta'] : [])];
+    const transaction = database.transaction(stores, 'readwrite');
+    transaction.objectStore('official-archives').put(entry);
+    if (stores.includes('archive-meta')) {
+      const { bytes: conteudo, ...resumo } = entry;
+      transaction.objectStore('archive-meta').put({ ...resumo, size: conteudo.byteLength });
+    }
     await new Promise((resolve) => { transaction.oncomplete = () => resolve(null); });
+    database.close();
   }, archive);
 
   await page.locator('#catalog-button').click();
@@ -1871,10 +1899,14 @@ test('a lista de combinações aparece antes das respostas, e cada linha se reso
   await expect(linhas).toHaveCount(0);
 });
 
-test('o cache guarda os seis mais recentes e descarta os antigos sem carregá-los', async ({ page }) => {
+test('o cache guarda os mais recentes e descarta os antigos sem carregá-los', async ({ page }) => {
   // A eviction nunca teve teste, e o código que ela substitui usava `getAll()`
   // — trazia os BYTES de todo pacote em cache só para ordenar por data, logo
   // depois de o navegador já ter na memória o arquivo recém-baixado.
+  //
+  // Desde o TabSis o limite principal é em BYTES (cota do navegador, ver
+  // packages/acquisition/src/cache-policy.ts); pacotes minúsculos como estes
+  // só esbarram no teto de quantidade, que é doze.
   const { zipSync, strToU8 } = await import('fflate');
   await page.route('**/wp-content/ftp.php', (route) => route.fulfill({
     status: 200, contentType: 'application/json',
@@ -1883,12 +1915,11 @@ test('o cache guarda os seis mais recentes e descarta os antigos sem carregá-lo
   await page.goto('/');
 
   const pacote = [...zipSync({ 'X.dbc': strToU8('conteudo') })];
-  // Oito pacotes com datas crescentes; o limite do aplicativo é seis.
   const resultado = await page.evaluate(async (bytes) => {
     const mod = await import('/src/archive-cache.ts');
-    for (let i = 1; i <= 8; i++) {
-      await mod.writeCachedArchive(`official-v1:pacote-${i}`, new Uint8Array(bytes), {
-        sha256: String(i).repeat(64).slice(0, 64),
+    for (let i = 1; i <= 14; i++) {
+      await mod.writeCachedArchive(`official-v1:pacote-${String(i).padStart(2, '0')}`, new Uint8Array(bytes), {
+        sha256: String(i % 10).repeat(64),
         role: 'data',
         sources: [{ name: `P${i}.dbc`, address: 'ftp://x', source: 'SINAN', modality: 'Dados' }],
       });
@@ -1899,12 +1930,9 @@ test('o cache guarda os seis mais recentes e descarta os antigos sem carregá-lo
     return guardados.map((s) => s.key);
   }, pacote);
 
-  expect(resultado).toHaveLength(6);
-  // Os dois mais antigos saíram; os seis mais novos ficaram, do novo para o velho.
-  expect(resultado).toEqual([
-    'official-v1:pacote-8', 'official-v1:pacote-7', 'official-v1:pacote-6',
-    'official-v1:pacote-5', 'official-v1:pacote-4', 'official-v1:pacote-3',
-  ]);
+  expect(resultado).toHaveLength(12);
+  // Os dois mais antigos saíram; os doze mais novos ficaram, do novo para o velho.
+  expect(resultado).toEqual(Array.from({ length: 12 }, (_, i) => `official-v1:pacote-${String(14 - i).padStart(2, '0')}`));
 });
 
 test('a consulta SQL responde sobre os dados abertos, sem tocar no motor de tabulação', async ({ page }) => {
@@ -1993,4 +2021,82 @@ test('o manual publicado abre com as figuras que ele cita', async ({ page }) => 
   const semAlt = [...html!.matchAll(/<img src="\.\/manual\/[^"]+" alt="(.*?)"/g)]
     .filter((m) => !m[1].trim()).length;
   expect(semAlt, 'há figura sem texto alternativo').toBe(0);
+});
+
+test('o painel de tabulação monta a tabela como o TabWin: Linhas, Colunas, Incremento e Seleções', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#file-input').setInputFiles([
+    'e2e/fixtures/painel-e2e.def',
+    'e2e/fixtures/uf-e2e.cnv',
+    'e2e/fixtures/sexo-e2e.cnv',
+    'e2e/fixtures/raca-e2e.cnv',
+    'e2e/fixtures/painel-e2e.csv',
+  ]);
+  const painel = page.locator('#painel');
+  await expect(painel).toBeVisible();
+
+  // As listas vêm do DEF, na ordem do arquivo; X entra nas três.
+  const textos = (id: string) => page.locator(`#${id} option`).allTextContents();
+  await expect.poll(() => textos('painel-linhas')).toEqual(['UF de residência', 'Sexo', 'Raça']);
+  expect(await textos('painel-colunas')).toEqual(['Não ativa', 'UF de residência', 'Sexo']);
+  expect(await textos('painel-selecoes-disponiveis')).toEqual(['UF de residência', 'Sexo']);
+
+  // A tabela que abre sozinha é a do TabWin: primeira Linha, Frequência.
+  await expect(page.locator('#result-title')).toContainText('segundo UF de residência');
+  const corpo = page.locator('#result-table tbody');
+  await expect(corpo).toContainText('Acre');
+
+  // Sexo × UF.
+  await page.locator('#painel-linhas').selectOption({ label: 'Sexo' });
+  await page.locator('#painel-colunas').selectOption({ label: 'UF de residência' });
+  await expect(page.locator('#painel-resumo')).toContainText('por UF de residência segundo Sexo');
+  await page.locator('#painel-executar').click();
+  await expect(page.locator('#result-table thead')).toContainText('Total');
+  await expect(corpo.locator('tr').first()).toContainText('Masculino');
+  await expect(corpo.locator('tr').first()).toContainText('3');
+
+  // Coluna com dois incrementos: o TabWin recusa, com estas palavras.
+  await page.locator('#painel-incrementos input[value^="inc:"]').check();
+  await page.locator('#painel-executar').click();
+  await expect(page.locator('#painel-erro')).toHaveText('Múltiplas colunas é incompatível com múltiplos incrementos');
+
+  // Só Casos, sem coluna, e só o Acre.
+  await page.locator('#painel-incrementos input[value="freq"]').uncheck();
+  await page.locator('#painel-colunas').selectOption({ label: 'Não ativa' });
+  await page.locator('#painel-selecoes-disponiveis').selectOption({ label: 'UF de residência' });
+  await page.locator('#painel-incluir').click();
+  await page.locator('#painel-executar').click();
+  await expect(page.locator('#painel-erro')).toHaveText('Nenhuma categoria selecionada em UF de residência');
+  await page.locator('#painel-categorias label', { hasText: 'Acre' }).locator('input').check();
+  await page.locator('#painel-executar').click();
+  await expect(page.locator('#painel-erro')).toBeHidden();
+  await expect(corpo.locator('tr', { hasText: 'Masculino' })).toContainText('2');
+  await expect(corpo.locator('tr', { hasText: 'Feminino' })).toContainText('6');
+
+  // O log sai no formato do TabWin.
+  await page.locator('#painel-log-detalhes > summary').click();
+  const log = page.locator('#painel-log');
+  await expect(log).toHaveValue(/Linha=Sexo/);
+  await expect(log).toHaveValue(/Incremento=Casos/);
+  await expect(log).toHaveValue(/UF de residência: Acre/);
+
+  // Discriminar em CNV literal: um código por linha, na ordem em que aparecem.
+  await page.locator('#painel-selecoes-ativas').selectOption({ label: 'UF de residência (1)' });
+  await page.locator('#painel-excluir').click();
+  await page.locator('#painel-incrementos input[value="freq"]').check();
+  await page.locator('#painel-incrementos input[value^="inc:"]').uncheck();
+  await page.locator('#painel-linhas').selectOption({ label: 'Raça' });
+  await page.locator('#painel-nc-discriminar').check();
+  await page.locator('#painel-executar').click();
+  await expect.poll(() => corpo.locator('tr th').allTextContents()).toEqual(['Branca', 'Parda', '04', '99']);
+
+  // Restaurar consulta a partir de um log colado.
+  await log.fill([
+    '[Opções]', 'Linha=Sexo', 'Coluna=UF de residência', 'Incremento=Freqüência',
+    'Suprime_Linhas_Zeradas=true', 'Suprime_Colunas_Zeradas=true', 'Não_Classificados=0',
+  ].join('\n'));
+  await page.locator('#painel-restaurar').click();
+  await expect(page.locator('#painel-linhas')).toHaveValue(/def:/);
+  expect(await page.locator('#painel-linhas option:checked').textContent()).toBe('Sexo');
+  expect(await page.locator('#painel-colunas option:checked').textContent()).toBe('UF de residência');
 });

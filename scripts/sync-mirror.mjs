@@ -15,9 +15,15 @@
  * O envio usa `wrangler r2 object put`, que já está instalado e autenticado
  * para o Worker. Nenhuma credencial nova.
  *
+ * Junto do `.dbc` vai a versão leve em Parquet (scripts/dbc-para-parquet.mjs),
+ * com o mesmo nome-base (`DNBR2024.parquet`) e hash próprio no manifesto. Antes
+ * de enviar, a paridade é conferida registro a registro; se divergir, o Parquet
+ * não sobe e o espelho continua servindo só o DBC. `--sem-parquet` desliga.
+ *
  * Uso:
  *   node scripts/sync-mirror.mjs --bucket tabwin-mirror --base https://espelho.tabweb.me
  *   node scripts/sync-mirror.mjs --dry-run          (baixa e calcula, não envia)
+ *   node scripts/sync-mirror.mjs --dry-run --so DOINF23.dbc   (um arquivo só)
  */
 
 import { execFileSync } from 'node:child_process';
@@ -26,6 +32,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { unzipSync } from 'fflate';
+import { converter } from './dbc-para-parquet.mjs';
 
 const PROXY = 'https://tabwin-web-datasus-proxy.tabwin-web.workers.dev';
 const ORIGEM = 'https://tabweb.me';
@@ -40,6 +47,7 @@ for (let i = 2; i < process.argv.length; i += 1) {
   argumentos.set(chave.slice(2), proximo?.startsWith('--') || proximo === undefined ? 'true' : proximo);
 }
 const ensaio = argumentos.get('dry-run') === 'true';
+const semParquet = argumentos.get('sem-parquet') === 'true';
 const bucket = argumentos.get('bucket') ?? 'tabwin-mirror';
 const base = (argumentos.get('base') ?? '').replace(/\/$/, '');
 
@@ -117,7 +125,9 @@ async function baixarPacote(url) {
   return zip;
 }
 
-const lista = JSON.parse(fs.readFileSync(LISTA, 'utf8'));
+const so = argumentos.get('so')?.toLowerCase();
+const lista = JSON.parse(fs.readFileSync(LISTA, 'utf8'))
+  .filter((arquivo) => !so || arquivo.name.toLowerCase() === so);
 const entries = [];
 const falhas = [];
 
@@ -135,17 +145,34 @@ for (const arquivo of lista) {
     const sha256 = createHash('sha256').update(bytes).digest('hex');
     const destino = `${arquivo.path ?? arquivo.name}`;
 
-    if (!ensaio) {
-      const temporario = path.join('.cache', 'mirror', arquivo.name);
-      fs.mkdirSync(path.dirname(temporario), { recursive: true });
-      fs.writeFileSync(temporario, bytes);
+    const temporario = path.join('.cache', 'mirror', arquivo.name);
+    fs.mkdirSync(path.dirname(temporario), { recursive: true });
+    fs.writeFileSync(temporario, bytes);
+    const enviar = (local, remoto, tipo) => {
       // `shell: true` porque no Windows o `npx` é um `.cmd`, e sem shell o
       // spawn não o encontra — falha com ENOENT sem dizer o porquê.
       execFileSync('npx', ['wrangler', 'r2', 'object', 'put',
-        `${bucket}/${destino}`, '--file', temporario, '--remote'],
+        `${bucket}/${remoto}`, '--file', local, '--remote',
+        // Nome com conteúdo fixo: o hash muda quando o DATASUS republica, e o
+        // manifesto (no git) é que diz qual vale. O objeto pode ficar em cache
+        // por um dia sem risco, porque quem baixa confere o hash.
+        '--content-type', tipo, '--cache-control', 'public,max-age=86400'],
       { stdio: 'pipe', shell: true });
-      fs.rmSync(temporario, { force: true });
+    };
+    if (!ensaio) enviar(temporario, destino, 'application/octet-stream');
+
+    let parquet;
+    if (!semParquet) {
+      const saida = temporario.replace(/\.(dbc|dbf)$/i, '.parquet');
+      const r = await converter(temporario, saida);
+      execFileSync(process.execPath, ['scripts/verify-parquet-parity.mjs', temporario, saida], { stdio: 'pipe' });
+      const destinoParquet = destino.replace(/\.(dbc|dbf)$/i, '.parquet');
+      if (!ensaio) enviar(saida, destinoParquet, 'application/vnd.apache.parquet');
+      parquet = { path: destinoParquet, sha256: r.parquetSha256, bytes: r.parquetBytes, rows: r.recordCount, converter: r.converter };
+      console.log(`  ${''.padEnd(16)} leve: ${(r.parquetBytes / 1048576).toFixed(1)} MB (${Math.round(r.parquetBytes / bytes.byteLength * 100)}%) · paridade conferida`);
+      fs.rmSync(saida, { force: true });
     }
+    fs.rmSync(temporario, { force: true });
 
     entries.push({
       name: arquivo.name,
@@ -154,6 +181,7 @@ for (const arquivo of lista) {
       bytes: bytes.byteLength,
       fetchedAt: new Date().toISOString(),
       source: arquivo.source,
+      ...(parquet ? { parquet } : {}),
     });
     console.log(`  ${arquivo.name.padEnd(16)} ${(bytes.byteLength / 1048576).toFixed(1)} MB · ${sha256.slice(0, 12)}`);
   } catch (erro) {
@@ -169,6 +197,21 @@ const anterior = fs.existsSync(MANIFESTO)
   : [];
 const porNome = new Map(anterior.map((entrada) => [entrada.name.toLowerCase(), entrada]));
 for (const entrada of entries) porNome.set(entrada.name.toLowerCase(), entrada);
+
+// Ensaio não envia nada, então também não pode prometer nada: um manifesto
+// que aponta para um Parquet que não subiu faria o aplicativo pedir um 404.
+if (ensaio) {
+  console.log(`\n${entries.length} conferido(s) · ensaio: manifesto NÃO regravado`);
+  process.exit(falhas.length ? 1 : 0);
+}
+
+// Sem nenhum arquivo refeito, regravar só trocaria a data — e a data é o que
+// diz ao aplicativo que o espelho foi conferido há pouco.
+if (!entries.length) {
+  console.error(`\nnenhum arquivo espelhado; manifesto mantido como estava`);
+  for (const falha of falhas) console.error(`  ${falha}`);
+  process.exit(1);
+}
 
 fs.mkdirSync(path.dirname(MANIFESTO), { recursive: true });
 fs.writeFileSync(MANIFESTO, `${JSON.stringify({

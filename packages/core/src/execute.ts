@@ -28,6 +28,25 @@ export interface ResolvedPlanRecord {
 
 const UNCLASSIFIED_KEY = '__tabwin_web_unclassified__';
 const UNCLASSIFIED_LABEL = 'Não classificados';
+/** Prefix of a row key created by "Discriminar" for one unclassified code. */
+const UNCLASSIFIED_CODE_PREFIX = '__tabsis_codigo__:';
+
+/**
+ * What an unmatched value becomes. `literal` says whether the axis compares
+ * codes as text (literal CNV or DBF lookup) — the only case in which TabWin's
+ * "Discriminar" lists each code on its own row.
+ */
+function unclassifiedValue(
+  dimension: DimensionSpec,
+  code: string,
+  literal: boolean,
+): ResolvedDimensionValue {
+  if (dimension.unclassifiedPolicy === 'discriminate') return { key: UNCLASSIFIED_KEY, label: UNCLASSIFIED_LABEL };
+  if (dimension.unclassifiedPolicy === 'discriminate-codes' && literal && code) {
+    return { key: `${UNCLASSIFIED_CODE_PREFIX}${code}`, label: code };
+  }
+  return {};
+}
 
 function measureColumnLabel(measure: MeasureSpec, plan: QueryPlan): string {
   // G001's lossless TabWin 4.15 export establishes the count header exactly.
@@ -114,16 +133,12 @@ export function resolveDimensionValue(
   if (lookup) {
     const key = String(raw ?? '').trim();
     const entry = lookup.entries.find((candidate) => candidate.key === key);
-    if (!entry) {
-      return dimension.unclassifiedPolicy === 'discriminate'
-        ? { key: UNCLASSIFIED_KEY, label: UNCLASSIFIED_LABEL } : {};
-    }
+    if (!entry) return unclassifiedValue(dimension, key, true);
     return { key: entry.key, label: entry.label };
   }
   if (!definition) {
     if (raw === null || raw === undefined || raw === '') {
-      return dimension.unclassifiedPolicy === 'discriminate'
-        ? { key: UNCLASSIFIED_KEY, label: UNCLASSIFIED_LABEL } : {};
+      return unclassifiedValue(dimension, '', false);
     }
     const value = String(raw);
     return { key: value, label: value };
@@ -131,8 +146,7 @@ export function resolveDimensionValue(
 
   const match = classifyCnv(definition, raw);
   if (!match) {
-    return dimension.unclassifiedPolicy === 'discriminate'
-      ? { key: UNCLASSIFIED_KEY, label: UNCLASSIFIED_LABEL } : {};
+    return unclassifiedValue(dimension, String(raw ?? '').trim(), definition.mode === 'literal');
   }
   return { key: String(match.sequence), label: match.label };
 }
@@ -183,6 +197,7 @@ function axisFromDimension(
     if (dimension.unclassifiedPolicy === 'discriminate') {
       items.push({ key: UNCLASSIFIED_KEY, label: UNCLASSIFIED_LABEL, source: 'conversion' });
     }
+    items.push(...discriminatedCodes(dimension, observed));
     return items;
   }
   if (dimension.conversionId) {
@@ -211,10 +226,19 @@ function axisFromDimension(
     if (dimension.unclassifiedPolicy === 'discriminate') {
       items.push({ key: UNCLASSIFIED_KEY, label: UNCLASSIFIED_LABEL, source: 'conversion' });
     }
+    items.push(...discriminatedCodes(dimension, observed));
     return items;
   }
   return [...observed.entries()]
     .sort(([a], [b]) => a.localeCompare(b, 'en', { numeric: true }))
+    .map(([key, label]) => ({ key, label, source: 'raw' as const }));
+}
+
+/** "Discriminar": one row per unclassified code, in order of first appearance (05, 02, 04 in the oracle). */
+function discriminatedCodes(dimension: DimensionSpec, observed: Map<string, string>): ResultAxisItem[] {
+  if (dimension.unclassifiedPolicy !== 'discriminate-codes') return [];
+  return [...observed.entries()]
+    .filter(([key]) => key.startsWith(UNCLASSIFIED_CODE_PREFIX))
     .map(([key, label]) => ({ key, label, source: 'raw' as const }));
 }
 

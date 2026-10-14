@@ -127,7 +127,8 @@ export function compileQueryPlan(spec: TabulationSpec): QueryPlan {
       throw new QueryPlanError(`${label} startPosition must be a positive integer`);
     }
     if (dimension?.unclassifiedPolicy !== undefined
-      && dimension.unclassifiedPolicy !== 'omit' && dimension.unclassifiedPolicy !== 'discriminate') {
+      && dimension.unclassifiedPolicy !== 'omit' && dimension.unclassifiedPolicy !== 'discriminate'
+      && dimension.unclassifiedPolicy !== 'discriminate-codes') {
       throw new QueryPlanError(`${label} unclassifiedPolicy is invalid`);
     }
   }

@@ -243,3 +243,62 @@ test('um navegador sem OPFS baixa igual, pelo mesmo caminho', async () => {
   assert.ok(r);
   assert.deepEqual(r.bytes, CONTEUDO);
 });
+
+test('com a versão leve declarada, o espelho entrega o Parquet com o nome original', async () => {
+  resetMirrorCache();
+  const { criarParquetDeTeste } = await import('./helpers/parquet-fixture.mjs');
+  const { parquetBytes, dbfBytes } = await criarParquetDeTeste();
+  // O Parquet declara por dentro o hash do arquivo de origem; o manifesto tem
+  // de declarar o mesmo para a versão leve valer.
+  const HASH_ORIGEM = createHash('sha256').update(dbfBytes).digest('hex');
+  const LEVE = parquetBytes;
+  const HASH_LEVE = createHash('sha256').update(LEVE).digest('hex');
+  const texto = JSON.stringify({
+    schema: 'tabwin-web.mirror', version: 1, baseUrl: 'https://espelho.exemplo', updatedAt: new Date().toISOString(),
+    entries: [{
+      name: 'DNBR2024.dbc', path: 'sinasc/DNBR2024.dbc', sha256: HASH_ORIGEM, bytes: dbfBytes.length,
+      fetchedAt: new Date().toISOString(), source: 'ftp://x/DNBR2024.dbc',
+      parquet: { path: 'sinasc/DNBR2024.parquet', sha256: HASH_LEVE, bytes: LEVE.length, rows: 4, converter: 't/1' },
+    }],
+  });
+  const pedidos = [];
+  const fetchImpl = async (url) => {
+    pedidos.push(String(url));
+    if (String(url).includes('mirror.json')) return { ok: true, text: async () => texto };
+    return { ok: true, status: 200, body: corpo(String(url).endsWith('.parquet') ? LEVE : dbfBytes) };
+  };
+  globalThis.fetch = fetchImpl;
+  const r = await fetchFromMirror('DNBR2024.dbc', sha256, { fetchImpl, preferirLeve: true });
+  assert.equal(r.formato, 'parquet');
+  assert.equal(r.name, 'DNBR2024.parquet');
+  assert.equal(r.sourceSha256, HASH_ORIGEM);
+  assert.deepEqual(r.bytes, LEVE);
+  assert.ok(pedidos.some((url) => url.endsWith('/sinasc/DNBR2024.parquet')));
+  // Sem pedir a versão leve, continua vindo o DBC.
+  resetMirrorCache();
+  const dbc = await fetchFromMirror('DNBR2024.dbc', sha256, { fetchImpl });
+  assert.equal(dbc.formato, 'dbc');
+  assert.equal(dbc.name, 'DNBR2024.dbc');
+});
+
+test('versão leve que não confere cai no DBC do mesmo espelho, não no DATASUS', async () => {
+  resetMirrorCache();
+  const LIXO = new Uint8Array(16).fill(7);
+  const texto = JSON.stringify({
+    schema: 'tabwin-web.mirror', version: 1, baseUrl: 'https://espelho.exemplo', updatedAt: new Date().toISOString(),
+    entries: [{
+      name: 'DNBR2024.dbc', path: 'sinasc/DNBR2024.dbc', sha256: HASH, bytes: CONTEUDO.length,
+      fetchedAt: new Date().toISOString(), source: 'ftp://x/DNBR2024.dbc',
+      // Hash do Parquet declarado certo, mas o conteúdo não é Parquet do TabSis.
+      parquet: { path: 'sinasc/DNBR2024.parquet', sha256: createHash('sha256').update(LIXO).digest('hex'), bytes: LIXO.length, rows: 1, converter: 't/1' },
+    }],
+  });
+  const fetchImpl = async (url) => {
+    if (String(url).includes('mirror.json')) return { ok: true, text: async () => texto };
+    return { ok: true, status: 200, body: corpo(String(url).endsWith('.parquet') ? LIXO : CONTEUDO) };
+  };
+  globalThis.fetch = fetchImpl;
+  const r = await fetchFromMirror('DNBR2024.dbc', sha256, { fetchImpl, preferirLeve: true });
+  assert.equal(r.formato, 'dbc');
+  assert.deepEqual(r.bytes, CONTEUDO);
+});

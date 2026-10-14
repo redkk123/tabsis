@@ -29,7 +29,7 @@ export interface ParseDefOptions {
   strict?: boolean;
 }
 
-const OPTION_DIRECTIVES = new Set(['S', 'L', 'C', 'Q', 'D', 'T']);
+const OPTION_DIRECTIVES = new Set(['S', 'L', 'C', 'Q', 'D', 'T', 'X']);
 
 function rolesForDirective(directive: DefOption['directive']): DefRole[] {
   switch (directive) {
@@ -45,6 +45,10 @@ function rolesForDirective(directive: DefOption['directive']): DefRole[] {
       return ['row', 'quad'];
     case 'T':
       return ['row', 'column', 'quad'];
+    case 'X':
+      // Oracle, 2026-10-13: TabWin 4.15 lists an X option under Linhas,
+      // Colunas and Seleções disponíveis at the same time.
+      return ['row', 'column', 'selection'];
   }
 }
 
@@ -166,6 +170,7 @@ export function parseDef(text: string, options: ParseDefOptions = {}): DefDefini
   let description: string | undefined;
   let groupedCountField: string | undefined;
   let reportFile: string | undefined;
+  let helpFile: string | undefined;
 
   for (let i = 0; i < lines.length; i++) {
     const raw = lines[i] ?? '';
@@ -220,6 +225,10 @@ export function parseDef(text: string, options: ParseDefOptions = {}): DefDefini
       }
       continue;
     }
+    if (directive === '?') {
+      if (rest && helpFile === undefined) helpFile = rest;
+      continue;
+    }
     if (directive === 'R') {
       if (strict && !rest) throw new DefParseError('R directive has no report file', sourceLine);
       if (reportFile !== undefined) warnings.push(`multiple R directives found; keeping first (${reportFile})`);
@@ -227,20 +236,13 @@ export function parseDef(text: string, options: ParseDefOptions = {}): DefDefini
       continue;
     }
 
-    // Current 4.15 CNV documentation references a DEF record type X but the
-    // supplied TabWin docs do not define its semantics. Undefined directives are
-    // comments by the older manual; retain them explicitly instead of guessing.
-    const unknown: DefUnknownLine = { directive, raw, sourceLine };
-    unknownLines.push(unknown);
-    if (directive === 'X') {
-      warnings.push(
-        `X directive detected at line ${sourceLine}; TabWin 4.15 CNV docs reference X but its DEF semantics are not yet specified, so it was not activated`,
-      );
-    }
+    // The historical manual treats any other first-position character as a
+    // comment. Keep the line for audit instead of dropping it silently.
+    unknownLines.push({ directive, raw, sourceLine });
   }
 
   if (dataSources.length === 0) warnings.push('no A data-source directive was found');
-  if (defOptions.length === 0) warnings.push('no S/L/C/Q/D/T options were found');
+  if (defOptions.length === 0) warnings.push('no S/L/C/Q/D/T/X options were found');
 
   return {
     ...(description !== undefined ? { description } : {}),
@@ -249,6 +251,7 @@ export function parseDef(text: string, options: ParseDefOptions = {}): DefDefini
     increments,
     ...(groupedCountField !== undefined ? { groupedCountField } : {}),
     ...(reportFile !== undefined ? { reportFile } : {}),
+    ...(helpFile !== undefined ? { helpFile } : {}),
     comments,
     unknownLines,
     warnings,

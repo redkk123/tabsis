@@ -1,5 +1,5 @@
 {
-  "name": "tabwin-web",
+  "name": "tabsis",
   "version": "0.8.0-dev",
   "private": true,
   "type": "module",
@@ -19,6 +19,7 @@
     "materialize:g001": "npm run build && node scripts/materialize-g001.mjs",
     "verify:g001": "npm run build && node scripts/verify-g001-local.mjs",
     "verify:goldens": "npm run build && node scripts/verify-goldens-local.mjs",
+    "verify:painel": "npm run build && node scripts/verify-painel-oracle.mjs",
     "verify:goldens:second": "npm run build && node scripts/verify-second-goldens-local.mjs",
     "verify:implode-paths": "npm run build && node scripts/verify-implode-paths.mjs",
     "verify:record-stream": "npm run build && node scripts/verify-record-stream.mjs",
@@ -36,12 +37,16 @@
     "lab:sync": "node scripts/sync-lab.mjs",
     "manual:data": "node scripts/fetch-manual-dataset.mjs",
     "manual:capture": "node scripts/capture-manual.mjs",
-    "mirror:sync": "node scripts/sync-mirror.mjs"
+    "mirror:sync": "node scripts/sync-mirror.mjs",
+    "parquet:converter": "npm run build && node scripts/dbc-para-parquet.mjs",
+    "verify:parquet": "npm run build && node scripts/verify-parquet-parity.mjs"
   },
   "dependencies": {
     "@duckdb/duckdb-wasm": "^1.33.1-dev57.0",
     "@precisa-saude/datasus-dbc": "2.0.2",
-    "fflate": "0.8.2"
+    "fflate": "0.8.2",
+    "fzstd": "0.1.1",
+    "hyparquet": "1.31.1"
   },
   "devDependencies": {
     "@duckdb/node-api": "^1.5.5-r.4",
@@ -50,5 +55,5 @@
     "vite": "8.2.2",
     "wrangler": "4.127.0"
   },
-  "license": "MIT"
+  "license": "AGPL-3.0-or-later"
 }

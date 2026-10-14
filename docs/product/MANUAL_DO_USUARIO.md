@@ -1,4 +1,4 @@
-# TabWin Web — manual do usuário
+# TabSis — manual do usuário
 
 Este manual descreve o que o programa **faz hoje**. Onde algo não é suportado,
 está dito que não é. Onde uma escolha existe mas não é óbvia, está dito qual é
@@ -8,9 +8,11 @@ o padrão — porque um padrão invisível é uma armadilha, não uma conveniên
 
 ## 1. O que é, em uma página
 
-O TabWin Web tabula microdados públicos do DATASUS no navegador, seguindo a
+O TabSis tabula microdados públicos do DATASUS no navegador, seguindo a
 semântica do **TabWin 4.15** do próprio DATASUS. Ele lê os arquivos que você já
-usa: `.DBC`, `.DBF`, `.CSV`, e os metadados legados `.DEF`, `.CNV` e `.MAP`.
+usa: `.DBC`, `.DBF`, `.CSV`, o formato leve `.parquet` do próprio TabSis, e os
+metadados legados `.DEF`, `.CNV` e `.MAP`. O guia
+[dos arquivos](./GUIA_ARQUIVOS_DATASUS.md) explica cada um.
 
 **Seus dados não saem do seu aparelho.** A leitura e o cálculo acontecem no
 navegador. Quando você busca no catálogo oficial, o que trafega é o download do
@@ -36,7 +38,7 @@ está aberto.
 
 ## 2. Primeiro uso, em quatro passos
 
-![Tela inicial do TabWin Web, com a área para abrir arquivo e o painel de configuração à esquerda](./manual/01-inicio.png "A tela inicial. A tarja **Seus dados ficam neste aparelho** não é slogan: não existe servidor de dados neste programa.")
+![Tela inicial do TabSis, com a área para abrir arquivo e o painel de configuração à esquerda](./manual/01-inicio.png "A tela inicial. A tarja **Seus dados ficam neste aparelho** não é slogan: não existe servidor de dados neste programa.")
 
 1. **Abra um arquivo.** Arraste um `.DBC` para a área tracejada, ou clique nela
    para escolher. Se você não tem um arquivo ainda, use **Buscar no DATASUS**
@@ -169,35 +171,71 @@ Instalação, endereços que ele pode acessar e modelo de ameaça estão em
 
 ## 4. Montar a tabela
 
+O **Painel de tabulação**, no topo da área principal, é o mesmo painel do
+TabWin, em quatro blocos numerados:
+
+| Bloco | O que faz | Padrão (igual ao TabWin) |
+| --- | --- | --- |
+| **1 · Linhas** | a variável cujas categorias viram as linhas | a primeira do DEF |
+| **2 · Colunas** | abre cada linha em colunas (opcional) | Não ativa |
+| **3 · Incremento** | o que se soma em cada célula; pode marcar vários | Frequência |
+| **4 · Seleções** | filtros: inclua a variável em *Ativas* e marque as categorias | nenhuma |
+
+As listas vêm do **DEF**, com os nomes exatamente como ele escreve e na ordem
+do arquivo. Escolha o DEF no seletor do alto do painel (cada um aparece com a
+sua descrição). Sem DEF, as listas mostram os campos do arquivo. Uma opção cuja
+CNV não foi carregada aparece em cinza, dizendo qual arquivo falta.
+
+Embaixo dos blocos, uma frase diz o que vai ser tabulado — *Frequência por
+Caráter atendimento segundo Sexo · UF internação: Acre* — antes de você clicar
+em **Executar**.
+
+Duas combinações o TabWin recusa, e o TabSis recusa com as mesmas palavras:
+coluna ativa com mais de um incremento (*Múltiplas colunas é incompatível com
+múltiplos incrementos*) e seleção ativa sem categoria marcada (*Nenhuma
+categoria selecionada em …*).
+
+Os controles campo a campo, os filtros por intervalo numérico e as ferramentas
+de limpeza continuam na barra lateral, em **Tabular por campos**.
+
 ![Aplicativo com o arquivo DOINF23 aberto, mostrando registros, campos, tamanho e SHA-256](./manual/02-arquivo-aberto.png "DOINF23 aberto: 32.017 registros, 87 campos, e o SHA-256 do arquivo. Esse código identifica exatamente o que você abriu, e vai junto na exportação.")
 
 ![Tabela cruzada de sexo por raça e cor, com totais por coluna](./manual/03-tabela-cruzada.png "Sexo cruzado com raça/cor. Os códigos aparecem como estão no arquivo porque nenhum CNV foi carregado — o programa não adivinha que `1` significa “masculino”.")
 
-![Painel lateral com linhas, colunas, rótulos, medida, filtros e um grupo recolhido de opções avançadas](./manual/04-controles.png "O painel de configuração depois que há dados. O caminho principal fica à vista; medidas extras, limpeza, regras cruzadas, combinações raras e transformação ficam em **Opções avançadas**, recolhido. O texto ao lado de cada seção — “nenhum”, “nenhuma etapa” — diz o estado sem precisar abrir.")
-
-| Controle | O que faz |
-| --- | --- |
-| **Linhas** | a variável que vira as linhas |
-| **Colunas** | a variável que cruza (opcional — "Sem colunas" é válido) |
-| **Rótulos / conversão** | qual CNV aplicar; "Valores originais" mostra o código cru |
-| **Medida** | frequência, soma de um campo, e outras |
-| **Definição (DEF) ativa** | qual DEF manda, quando você tem mais de um aberto |
+![Painel lateral com linhas, colunas, rótulos, medida, filtros e um grupo recolhido de opções avançadas](./manual/04-controles.png "Os controles campo a campo, hoje dentro de **Tabular por campos**, na barra lateral. O caminho principal passou a ser o Painel de tabulação.")
 
 ### Não classificados
 
-Quando a CNV não cobre todo o domínio da variável — existe código no dado que
-nenhuma categoria captura — você decide o que acontece:
+Quando a CNV não cobre todos os códigos do dado, as três opções do TabWin:
 
-- **omitir**: os registros não classificados saem da conta;
-- **discriminar**: viram uma linha própria, "Não classificados".
+- **Ignorar** (padrão): esses registros saem da tabela;
+- **Incluir**: entram numa linha (ou coluna) **Não classificados**;
+- **Discriminar**: cada código vira uma linha, rotulada com o próprio código,
+  na ordem em que aparece no arquivo — **só em CNV literal** (cabeçalho com `L`,
+  ou código com mais de 4 posições). Em CNV curta age como Ignorar, e nas
+  colunas age como Incluir. É exatamente o que o TabWin faz.
 
-Não existe terceira opção silenciosa. O total de registros lidos e aceitos fica
-sempre visível, então a diferença entre os dois é auditável.
+O total de registros lidos e aceitos fica sempre visível, então a diferença é
+auditável.
+
+### Log do TabWin e Restaurar consulta
+
+Cada execução gera o log no formato da janela *Log* do TabWin (o mesmo texto do
+topo de um `.TAB`). Em **Log do TabWin**, embaixo do painel: copie, cole um log
+antigo ou abra um `.TAB`, e clique em **Restaurar consulta**. Nome que não
+existe no DEF aberto é avisado, nunca adivinhado.
+
+### Ver registros e Testar CRC
+
+**Ver registros do arquivo**, ao lado dos arquivos, mostra os campos do DBF
+(nome, tipo, tamanho e o nome que o DEF dá) e as primeiras 50 linhas.
+**Testar CRC** confere, antes de tabular, se cada DBC descomprime exatamente no
+DBF original; arquivo corrompido não é tabulado.
 
 ### Supressão de linhas zeradas
 
 Ligada, esconde linhas cujo valor é zero em todas as colunas. Desligada, o
-TabWin Web mostra todas as categorias que a CNV declara, inclusive as vazias —
+TabSis mostra todas as categorias que a CNV declara, inclusive as vazias —
 que é o que o TabWin 4.15 faz.
 
 ### Medidas adicionais lado a lado

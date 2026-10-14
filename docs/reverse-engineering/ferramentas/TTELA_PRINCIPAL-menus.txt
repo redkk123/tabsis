@@ -1,0 +1,194 @@
+object Tela_Principal: TTela_Principal
+  Caption = 'TabWin  -  Versão 4.1.5  -  DATASUS'
+  object Panel1: TPanel
+    Caption = ' '
+    object lbTitulo: TLabel
+      Caption = 'Título'
+    object lbSubtitulo: TLabel
+      Caption = 'Subtítulo'
+    object lbRodape: TLabel
+      Caption = 'Rodapé'
+    object Arquivo1: TMenuItem
+      Caption = '&Arquivo'
+      object Abrir1: TMenuItem
+        Caption = '&Abrir tabela'
+      object AbrirMapa: TMenuItem
+        Caption = 'Abrir/importar &mapa'
+      object Nova1: TMenuItem
+        Caption = '&Nova'
+      object Salvar1: TMenuItem
+        Caption = '&Salvar como'
+      object EnviarPara: TMenuItem
+        Caption = '&Enviar para ...'
+      object N2: TMenuItem
+        Caption = '-'
+      object IncluiPRN1: TMenuItem
+        Caption = 'Incluir &tabela'
+      object IncluiDBF1: TMenuItem
+        Caption = 'Incluir dados de &DBF'
+      object Tabula1: TMenuItem
+        Caption = 'E&xecutar tabulação'
+      object Imprime1: TMenuItem
+        Caption = '&Imprimir'
+      object VerDBF: TMenuItem
+        Caption = '&Ver arquivo .DBF'
+      object VerMetafile: TMenuItem
+        Caption = 'Ver &Windows Metafile'
+      object AbreRemumajanelaseparada1: TMenuItem
+        Caption = 'Abre R em uma &janela separada'
+      object Criaresquemadeanlise1: TMenuItem
+        Caption = 'Criar esquema de análise'
+      object ComprimeExpandeDBF1: TMenuItem
+        Caption = '&Comprime/Expande .DBF'
+      object SQL1: TMenuItem
+        Caption = 'Consulta S&QL'
+      object N1: TMenuItem
+        Caption = '-'
+      object InstalarBDE1: TMenuItem
+        Caption = 'Instalar BDE standard '
+      object ExtensaoTAB1: TMenuItem
+        Caption = 'Associar &extensão .TAB'
+      object Avanado1: TMenuItem
+        Caption = 'A&vançado...'
+        object OpLinhas: TMenuItem
+          Caption = 'Criar &Linhas de DBF'
+        object CP850: TMenuItem
+          Caption = '&Converte acentuação do DOS'
+      object N4: TMenuItem
+        Caption = '-'
+      object Sair1: TMenuItem
+        Caption = 'Sai&r'
+    object Editar1: TMenuItem
+      Caption = '&Editar'
+      object Copiar1: TMenuItem
+        Caption = 'Co&piar'
+      object Colar1: TMenuItem
+        Caption = 'Co&lar'
+      object Localizar1: TMenuItem
+        Caption = 'Locali&zar'
+      object N6: TMenuItem
+        Caption = '-'
+      object CodePage: TMenuItem
+        Caption = 'DBF com &acentuação para DOS'
+      object N9: TMenuItem
+        Caption = '-'
+      object EditarLog1: TMenuItem
+        Caption = 'Editar Log'
+      object Definio1: TMenuItem
+        Caption = '&Editar arquivo DEF ou CNV'
+    object Operaes1: TMenuItem
+      Caption = '&Operações'
+      object Indicador1: TMenuItem
+        Caption = '&Calcular indicador'
+      object N3: TMenuItem
+        Caption = '-'
+      object Divide1: TMenuItem
+        Caption = '/ &Dividir'
+      object Soma1: TMenuItem
+        Caption = '+ &Somar'
+      object Mltiplica1: TMenuItem
+        Caption = '* &Multiplicar'
+      object Subtrai1: TMenuItem
+        Caption = '- S&ubtrair'
+      object Minimo1: TMenuItem
+        Caption = 'Mínim&o'
+      object Maximo1: TMenuItem
+        Caption = 'Má&ximo'
+      object N5: TMenuItem
+        Caption = '-'
+      object Fator1: TMenuItem
+        Caption = 'Multiplicar por &fator'
+      object percentagem1: TMenuItem
+        Caption = '&%percentagem'
+      object Acumula1: TMenuItem
+        Caption = '&Acumular'
+      object Normalizar1: TMenuItem
+        Caption = 'Normali&zar'
+      object Absoluto1: TMenuItem
+        Caption = 'A&bsoluto'
+      object Inteiro1: TMenuItem
+        Caption = '&Inteiro'
+      object Seqncia1: TMenuItem
+        Caption = '&Seqüência'
+      object Total1: TMenuItem
+        Caption = 'Recalcula &total'
+      object NovaColuna: TMenuItem
+        Caption = '&Nova coluna'
+    object AnaliseComR: TMenuItem
+      Caption = 'Análise com &R'
+    object Estatstica1: TMenuItem
+      Caption = 'E&statísticas'
+      object Descritivas1: TMenuItem
+        Caption = '&Descritivas de coluna'
+      object Correlacao1: TMenuItem
+        Caption = '&Coeficiente de correlação'
+      object Regressao1: TMenuItem
+        Caption = 'Regressão linear &simples'
+      object Histograma1: TMenuItem
+        Caption = '&Histograma'
+    object Quadros1: TMenuItem
+      Caption = '&Quadro'
+      object Ordenar1: TMenuItem
+        Caption = '&Ordenar'
+      object Ttulo1: TMenuItem
+        Caption = '&Cabec das colunas'
+      object LarguraCol1: TMenuItem
+        Caption = '&Largura das colunas'
+      object Decimais1: TMenuItem
+        Caption = '&Decimais'
+      object Tipodetotal1: TMenuItem
+        Caption = '&Tipo de total'
+      object EliminaColuna1: TMenuItem
+        Caption = '&Eliminar coluna'
+      object MoveColuna1: TMenuItem
+        Caption = '&Mover colunas'
+      object SupLinhas1: TMenuItem
+        Caption = '&Suprimir/agregar linhas'
+      object Trocarlinhas: TMenuItem
+        Caption = 'Trocar as linhas pelas colunas'
+      object MostrarChave1: TMenuItem
+        Caption = 'Mostrar c&have'
+      object ComprChave: TMenuItem
+        Caption = 'Fi&xar comprimento da Chave'
+      object Cabealho11: TMenuItem
+        Caption = 'Cabeçalho&1'
+      object Cabealho21: TMenuItem
+        Caption = 'Cabeçalho&2'
+      object mRodape: TMenuItem
+        Caption = '&Rodapé'
+    object Grafico1: TMenuItem
+      Caption = '&Gráfico'
+      object Mostrargrfico1: TMenuItem
+        Caption = 'Mostrar &Form'
+      object Graficovazio1: TMenuItem
+        Caption = '&Gráfico novo'
+      object N8: TMenuItem
+        Caption = '-'
+      object Linhas1: TMenuItem
+        Caption = '&Linhas'
+      object Barras1: TMenuItem
+        Caption = '&Barras'
+      object Barrahoriz1: TMenuItem
+        Caption = 'Barras &horizontais'
+      object Setores1: TMenuItem
+        Caption = '&Setores'
+      object Areas1: TMenuItem
+        Caption = '&Areas'
+      object Scater1: TMenuItem
+        Caption = '&Pontos'
+      object Bolhas1: TMenuItem
+        Caption = 'B&olhas'
+      object Setas1: TMenuItem
+        Caption = 'S&etas'
+      object N7: TMenuItem
+        Caption = '-'
+      object Mapa1: TMenuItem
+        Caption = '&Mapa'
+    object Ajuda1: TMenuItem
+      Caption = 'Aj&uda'
+      object Ajuda2: TMenuItem
+        Caption = '&Ajuda'
+      object Novidades1: TMenuItem
+        Caption = 'Novidades de versões'
+      object Sobre1: TMenuItem
+        Caption = '&Sobre'

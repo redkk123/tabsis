@@ -12,3 +12,4 @@ export * from './phase-timings.js';
 export * from './version-watch.js';
 export * from './axis-bounds.js';
 export * from './differential-seed.js';
+export * from './painel.js';

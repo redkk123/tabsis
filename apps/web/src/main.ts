@@ -26,6 +26,7 @@ import {
   type PortableTableV1,
   type TableOperation,
   type TabulationResult,
+  type TabulationSpec,
   type TotalPolicy,
   type RecipeTransformStep,
   createPhaseTimings,
@@ -33,15 +34,14 @@ import {
   watchPublishedVersion,
 } from '../../../packages/core/src/index.ts';
 import { diffTabulationResults, type TabulationDiff } from '../../../packages/core/src/tabulation-diff.ts';
+import { criarPainel, type Painel } from './painel-ui.ts';
 import {
   describeHeadline,
   describeRecordBasis,
   summarizeTable,
 } from '../../../packages/analysis/src/table-headline.ts';
 import {
-  classifyCnv,
   convertGeoJsonToTabwinMap,
-  encodeWindows1252,
   GeoJsonMapError,
   listGeoJsonFeatureProperties,
   optionsForRole,
@@ -49,14 +49,10 @@ import {
   parseDelimited,
   parseDef,
   datasusFieldLabel,
+  detectDbfTextEncoding,
+  transcodeDbfCp850ToWindows1252,
   parseTabwinMap,
-  serializeCnv,
-  validateCnvDefinition,
-  type CnvCategory,
-  type CnvCodeRange,
   type CnvDefinition,
-  type CnvDiagnostic,
-  type CnvRuleLine,
   type DefDefinition,
   type MapCoordinate,
   type TabwinMapDefinition,
@@ -96,23 +92,14 @@ import {
   type StallWatchdog,
 } from '../../../packages/acquisition/src/stall-watchdog.ts';
 import { StreamIdleTimeoutError } from '../../../packages/acquisition/src/stream-reader.ts';
-import { checkIngestBudget } from '../../../packages/analysis/src/duckdb-surface.ts';
 import {
   belongsToUf,
   findGeographicFields,
   ufCodeOf,
   type GeographicCandidate,
 } from '../../../packages/analysis/src/geographic-fields.ts';
-import {
-  exportQuery,
-  loadRecordsAsTable,
-  quoteIdentifier,
-  runQuery,
-  type DuckDbExportFormat,
-  shutdownDuckDb,
-  tableNameFor,
-  type DuckDbQueryResult,
-} from './duckdb-engine.ts';
+import { criarAbaConsulta, type AbaConsulta } from './aba-consulta.ts';
+import { criarEditorCnv } from './editor-cnv.ts';
 import {
   catalogQueryKey,
   describeCatalogMemory,
@@ -122,6 +109,7 @@ import { nextToPrepare } from '../../../packages/acquisition/src/prepare-ahead.t
 import { parseQuestion, type QuestionMatch } from '../../../packages/acquisition/src/question-parser.ts';
 import { describeRecognition, recognizeArchive } from '../../../packages/acquisition/src/known-archive.ts';
 import { fetchFromMirror } from './mirror-client.ts';
+import { describeCacheUsage } from '../../../packages/acquisition/src/cache-policy.ts';
 import { fetchTabnetPreview, tabnetPreviewAvailable } from './tabnet-client.ts';
 import {
   buildPicker,
@@ -192,6 +180,7 @@ import {
   deleteCachedArchive,
   listCachedArchives,
   readCachedArchive,
+  describeCacheBudget,
   writeCachedArchive,
   type CachedArchiveRole,
   type CachedArchiveSummary,
@@ -590,23 +579,6 @@ const geojsonNameProperty = element<HTMLSelectElement>('#geojson-name-property')
 const geojsonImportSummary = element<HTMLElement>('#geojson-import-summary');
 const geojsonImportClose = element<HTMLButtonElement>('#geojson-import-close');
 const geojsonImportCancel = element<HTMLButtonElement>('#geojson-import-cancel');
-const cnvEditorButton = element<HTMLButtonElement>('#cnv-editor-button');
-const cnvEditorDialog = element<HTMLDialogElement>('#cnv-editor-dialog');
-const cnvEditorClose = element<HTMLButtonElement>('#cnv-editor-close');
-const cnvEditorSource = element<HTMLSelectElement>('#cnv-editor-source');
-const cnvEditorNew = element<HTMLButtonElement>('#cnv-editor-new');
-const cnvEditorFilename = element<HTMLInputElement>('#cnv-editor-filename');
-const cnvEditorModeSelect = element<HTMLSelectElement>('#cnv-editor-mode');
-const cnvEditorCodeLengthInput = element<HTMLInputElement>('#cnv-editor-code-length');
-const cnvEditorCodesHeader = element<HTMLElement>('#cnv-editor-codes-header');
-const cnvEditorRowsBody = element<HTMLElement>('#cnv-editor-rows');
-const cnvEditorAddCategory = element<HTMLButtonElement>('#cnv-editor-add-category');
-const cnvEditorDiagnosticsOutput = element<HTMLElement>('#cnv-editor-diagnostics');
-const cnvEditorPreviewField = element<HTMLSelectElement>('#cnv-editor-preview-field');
-const cnvEditorPreviewButton = element<HTMLButtonElement>('#cnv-editor-preview-button');
-const cnvEditorPreviewResult = element<HTMLElement>('#cnv-editor-preview-result');
-const cnvEditorDownload = element<HTMLButtonElement>('#cnv-editor-download');
-const cnvEditorApply = element<HTMLButtonElement>('#cnv-editor-apply');
 const defInspectorButton = element<HTMLButtonElement>('#def-inspector-button');
 const defPicker = element<HTMLElement>('#def-picker');
 const defActive = element<HTMLSelectElement>('#def-active');
@@ -631,6 +603,8 @@ const tableOperationRight = element<HTMLSelectElement>('#table-operation-right')
 const tableOperationLeftLabel = element<HTMLElement>('#table-operation-left-label');
 const tableOperationRightLabel = element<HTMLElement>('#table-operation-right-label');
 const tableOperationNumberLabel = element<HTMLElement>('#table-operation-number-label');
+const tableOperationScaleLabel = element<HTMLElement>('#table-operation-scale-label');
+const tableOperationScale = element<HTMLSelectElement>('#table-operation-scale');
 const tableOperationNumber = element<HTMLInputElement>('#table-operation-number');
 const tableOperationExpressionLabel = element<HTMLElement>('#table-operation-expression-label');
 const tableOperationExpression = element<HTMLInputElement>('#table-operation-expression');
@@ -777,20 +751,6 @@ let activeMapSource = '';
 /** Parsed but not-yet-converted GeoJSON, held between file pick and property confirmation. */
 let pendingGeoJson: { source: unknown; fileName: string } | null = null;
 
-interface CnvEditorRow {
-  sequence: number;
-  label: string;
-  /** '', '#' (exclude from total), or a category sequence as a string. */
-  subtotal: string;
-  /** Comma-separated codes/ranges ("01,10-20"), or a single number in numeric-ranges mode. */
-  codesText: string;
-}
-
-/** Editor state, independent of any loaded CnvDefinition until "Aplicar" or "Baixar". */
-let cnvEditorRows: CnvEditorRow[] = [];
-let cnvEditorMode: CnvDefinition['mode'] = 'short';
-let cnvEditorCodeLength = 2;
-let cnvEditorReadOnly = false;
 let mapNameByGeocode = new Map<string, string>();
 let currentPlan: QueryPlan | null = null;
 let baseResult: TabulationResult | null = null;
@@ -812,6 +772,14 @@ let configuredFilters: FilterSpec[] = [];
 let configuredCrossFieldRules: CrossFieldRuleSpec[] = [];
 /** G017: extra increments laid out beside the primary measure, in add order. */
 let extraMeasures: MeasureSpec[] = [];
+/** O painel de tabulação (Linhas, Colunas, Incremento, Seleções); nasce depois do DOM. */
+let painel: Painel | null = null;
+/** A aba de consulta SQL (aba-consulta.ts); nasce no fim do carregamento. */
+let abaConsulta: AbaConsulta | null = null;
+/** Filtros que vieram das Seleções do painel, para trocá-los sem apagar os outros. */
+let filtrosDoPainel = new Set<FilterSpec>();
+/** Arquivos marcados no painel ("Arquivos" do TabWin); `null` = todos os abertos. */
+let arquivosDoPainel: string[] | null = null;
 let crossFieldRuleSequence = 0;
 let lastCombinationProfile: FieldCombinationProfile | null = null;
 /** Kept so "restaurar sinais descartados" can re-render without re-running the scan. */
@@ -1041,7 +1009,7 @@ function chooseDefaultField(fields: DbfHeader['fields']): string {
 
 function populateControls(preferredField?: string): void {
   populateFlowFields();
-  populateQueryFields();
+  abaConsulta?.atualizarCampos();
   if (!dbfHeader) return;
   fieldSearch.value = '';
   const previousRow = preferredField ?? rowField.value;
@@ -1065,6 +1033,7 @@ function populateControls(preferredField?: string): void {
   populateCombinationFields();
   populateConversions();
   setControlsEnabled(true);
+  painel?.atualizar();
 }
 
 function searchDimensionFields(): void {
@@ -2482,7 +2451,10 @@ function populateDefPicker(select?: string): void {
   const wanted = select ?? previous;
   defActive.value = defByName.has(wanted) ? wanted : '';
   applyActiveDef();
-  defPicker.hidden = defByName.size === 0;
+  // O painel de tabulação tem o seu próprio seletor de DEF, ao lado das
+  // listas que ele governa; este fica só como estado interno.
+  defPicker.hidden = true;
+  painel?.atualizar();
 }
 
 /** Puts the picked DEF in force and refreshes everything that reads it. */
@@ -2519,6 +2491,7 @@ function populateConversions(): void {
   applyDefDefaults();
   updateColumnControls();
   if (filterField.value) void populateFilterValues();
+  painel?.atualizar();
 }
 
 function applyDefDefaults(): void {
@@ -2592,6 +2565,7 @@ function updateDatasetStats(): void {
  * de nascer zerada em dois dos três caminhos.
  */
 function resetAnalysisState(): void {
+  arquivosDoPainel = null;
   configuredFilters = [];
   configuredCrossFieldRules = [];
   extraMeasures = [];
@@ -2622,8 +2596,9 @@ function resetAnalysisState(): void {
 async function decodeDbf(bytes: Uint8Array, file: File, isDbc: boolean, source: LoadedSource): Promise<void> {
   // A fase que o R chama de `read.dbc`: descompressão do DBC mais leitura do
   // DBF. É a única do caminho que compara diretamente com outra ferramenta.
+  const formato = extensionOf(file.name);
   const header = await temposDoDownload.measure(
-    isDbc ? `leitura do DBC` : `leitura do DBF`,
+    formato === 'PARQUET' ? 'leitura do Parquet' : isDbc ? `leitura do DBC` : `leitura do DBF`,
     () => openDatasetFile(bytes, file, isDbc),
   );
 
@@ -2635,7 +2610,9 @@ async function decodeDbf(bytes: Uint8Array, file: File, isDbc: boolean, source: 
   dbfHeader = header;
   currentDatasetFile = file;
   currentCompatibilityProfile = 'tabwin-4.15';
-  sourceDbfButton.disabled = false;
+  // "Extrair DBF original" devolve o DBF de dentro do DBC; um Parquet não
+  // carrega esses bytes (só o cabeçalho), então o botão não se aplica.
+  sourceDbfButton.disabled = formato === 'PARQUET';
   resetAnalysisState();
   // Em segundo plano: a leitura pelo campo geográfico custa uma passada, e
   // segurar a abertura do arquivo por causa de um painel lateral trocaria uma
@@ -2648,7 +2625,7 @@ async function decodeDbf(bytes: Uint8Array, file: File, isDbc: boolean, source: 
   datasetFingerprint = source;
   populateControls(chooseDefaultField(header.fields));
   updateDatasetStats();
-  await runAnalysis();
+  await primeiraTabulacao();
 }
 
 function schemaSignature(header: DbfHeader): string {
@@ -2662,10 +2639,7 @@ async function openDatasetFile(bytes: Uint8Array, file: File, isDbc: boolean): P
   setBusy(isDbc ? `Abrindo ${file.name}…` : `Lendo ${file.name}…`);
   decodeCancelButton.hidden = false;
   try {
-    return await openDataset(
-      [{ kind: 'binary', name: file.name, bytes: transferableBytes(bytes), isDbc }],
-      `Leitura de ${file.name}`,
-    );
+    return await openDataset([workerSourceFor(file.name, bytes)], `Leitura de ${file.name}`);
   } finally {
     decodeCancelButton.hidden = true;
     activeDecode = null;
@@ -2691,10 +2665,7 @@ async function appendCompatibleDbf(
     }
     // The Worker holds every source and checks the schema against the open
     // dataset, so nothing is concatenated on this thread.
-    dbfHeader = await appendDataset(
-      { kind: 'binary', name: file.name, bytes: transferableBytes(bytes), isDbc },
-      `Combinação de ${file.name}`,
-    );
+    dbfHeader = await appendDataset(workerSourceFor(file.name, bytes), `Combinação de ${file.name}`);
   } finally {
     decodeCancelButton.hidden = true;
     activeDecode = null;
@@ -2708,12 +2679,20 @@ async function appendCompatibleDbf(
   datasetFingerprint = null;
   clearCombinationProfile();
   updateDatasetStats();
-  await runAnalysis();
+  await primeiraTabulacao();
 }
 
 type DatasetWorkerSource =
   | { kind: 'binary'; name: string; bytes: ArrayBuffer; isDbc: boolean }
+  | { kind: 'parquet'; name: string; bytes: ArrayBuffer }
   | { kind: 'records'; name: string; records: DbfRecord[] };
+
+/** DBC, DBF ou o Parquet leve do TabSis, decidido pela extensão do nome original. */
+function workerSourceFor(name: string, bytes: Uint8Array): DatasetWorkerSource {
+  const extension = extensionOf(name);
+  if (extension === 'PARQUET') return { kind: 'parquet', name, bytes: transferableBytes(bytes) };
+  return { kind: 'binary', name, bytes: transferableBytes(bytes), isDbc: extension === 'DBC' };
+}
 
 /**
  * The opened dataset lives in the Worker; this thread keeps only its shape.
@@ -2857,32 +2836,18 @@ async function rebuildSourcesFromOriginalFiles(): Promise<{ sources: DatasetWork
     // appended binary source after a Worker cancellation/failure.
     const appended = await Promise.all(activeDatasetFiles.slice(1).map(async (candidate) => {
       const extension = extensionOf(candidate.name);
-      if (extension !== 'DBC' && extension !== 'DBF') {
+      if (extension !== 'DBC' && extension !== 'DBF' && extension !== 'PARQUET') {
         throw new Error(`${candidate.name}: fonte combinada não pode ser restaurada`);
       }
-      const candidateBytes = new Uint8Array(await candidate.arrayBuffer());
-      return {
-        kind: 'binary' as const,
-        name: candidate.name,
-        bytes: transferableBytes(candidateBytes),
-        isDbc: extension === 'DBC',
-      };
+      return workerSourceFor(candidate.name, new Uint8Array(await candidate.arrayBuffer()));
     }));
     return {
       sources: [{ kind: 'records', name: file.name, records: parsed.records as DbfRecord[] }, ...appended],
       fields: parsed.fields,
     };
   }
-  const sources = await Promise.all(activeDatasetFiles.map(async (file) => {
-    const extension = extensionOf(file.name);
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    return {
-      kind: 'binary' as const,
-      name: file.name,
-      bytes: transferableBytes(bytes),
-      isDbc: extension === 'DBC',
-    };
-  }));
+  const sources = await Promise.all(activeDatasetFiles.map(async (file) =>
+    workerSourceFor(file.name, new Uint8Array(await file.arrayBuffer()))));
   return { sources, fields: undefined };
 }
 
@@ -3031,19 +2996,19 @@ async function decodeDelimitedFile(bytes: Uint8Array, file: File, source: Loaded
   datasetFingerprint = source;
   populateControls(chooseDefaultField(fields));
   updateDatasetStats();
-  await runAnalysis();
+  await primeiraTabulacao();
   showToast(`${file.name}: ${integerFormat.format(datasetRecordCount)} linhas CSV carregadas`);
 }
 
 async function loadFile(file: File): Promise<void> {
   const extension = extensionOf(file.name);
-  if (!['DBC', 'DBF', 'CSV', 'TSV', 'DEF', 'CNV', 'MAP'].includes(extension)) {
+  if (!['DBC', 'DBF', 'PARQUET', 'CSV', 'TSV', 'DEF', 'CNV', 'MAP'].includes(extension)) {
     throw new Error(`${file.name}: formato ainda não suportado`);
   }
   if (file.size > MAX_LOCAL_INPUT_BYTES) {
     throw new Error(`${file.name}: excede o limite local de ${formatBytes(MAX_LOCAL_INPUT_BYTES)}`);
   }
-  const bytes = new Uint8Array(await file.arrayBuffer());
+  let bytes = new Uint8Array(await file.arrayBuffer());
   const source: LoadedSource = {
     name: file.name,
     extension,
@@ -3056,6 +3021,13 @@ async function loadFile(file: File): Promise<void> {
   // dúvida de "é o mesmo dado?" — e a resposta é por hash, não por nome.
   void reconhecerArquivoConhecido(source.sha256, file.name);
 
+  if (extension === 'DBF' && detectDbfTextEncoding(bytes) === 'cp850') {
+    // Acentuação do DOS (CP850), como parte dos DBFs auxiliares do DATASUS
+    // ainda sai. O hash já foi tirado dos bytes originais; daqui em diante o
+    // arquivo é lido como Windows-1252, com os acentos certos.
+    bytes = transcodeDbfCp850ToWindows1252(bytes);
+    showToast(`${file.name}: acentuação do DOS (CP850) convertida`);
+  }
   if (extension === 'DBF') {
     const lookupOption = activeDef?.options.find((option) =>
       option.kind === 'dbf-lookup' && baseName(option.lookupFile) === baseName(file.name));
@@ -3069,7 +3041,7 @@ async function loadFile(file: File): Promise<void> {
       return;
     }
   }
-  if (extension === 'DBC' || extension === 'DBF') {
+  if (extension === 'DBC' || extension === 'DBF' || extension === 'PARQUET') {
     if (combineCompatibleFiles.checked && dbfHeader && datasetRecordCount) {
       await appendCompatibleDbf(bytes, file, extension === 'DBC', source);
       return;
@@ -3150,363 +3122,6 @@ function confirmGeoJsonImport(): void {
     if (currentView === 'map') renderMap();
   } catch (error) {
     showToast(error instanceof GeoJsonMapError ? error.message : (error instanceof Error ? error.message : String(error)), true);
-  }
-}
-
-/**
- * CNV editor (Faixa 3.2). Works entirely on the {@link CnvDefinition} model
- * — never on raw text — via a small, explicit editable-row shape
- * (`CnvEditorRow`) that round-trips through `parseCodesText`/`codesTextOf`
- * using the exact same token grammar `cnv-parser.ts` reads (comma-separated
- * codes, `from-to` for a range). `cnvEditorDefinition()` rebuilds a full
- * `CnvDefinition` from that state on demand, so diagnostics, the
- * classification preview, "Aplicar" and "Baixar" all read one live model
- * with nothing to keep in sync.
- */
-function codesTextOf(rule: CnvRuleLine | undefined, mode: CnvDefinition['mode']): string {
-  if (!rule) return '';
-  if (mode === 'numeric-ranges') return rule.numericUpperInclusive !== undefined ? String(rule.numericUpperInclusive) : '';
-  return [...rule.exactCodes, ...rule.ranges.map((range) => `${range.from}-${range.to}`)].join(',');
-}
-
-function subtotalTextOf(category: CnvCategory): string {
-  if (category.excludeFromTotal) return '#';
-  if (category.subtotalTarget !== undefined) return String(category.subtotalTarget);
-  return '';
-}
-
-function parseCodesText(
-  text: string,
-  mode: CnvDefinition['mode'],
-): { exactCodes: string[]; ranges: CnvCodeRange[]; numericUpperInclusive?: number } {
-  const trimmed = text.trim();
-  if (mode === 'numeric-ranges') {
-    const value = Number(trimmed);
-    return { exactCodes: [], ranges: [], ...(Number.isFinite(value) ? { numericUpperInclusive: value } : {}) };
-  }
-  const exactCodes: string[] = [];
-  const ranges: CnvCodeRange[] = [];
-  for (const rawToken of trimmed.split(',')) {
-    const token = rawToken.trim();
-    if (!token) continue;
-    const hyphen = token.indexOf('-');
-    if (hyphen > 0 && hyphen < token.length - 1) {
-      ranges.push({ from: token.slice(0, hyphen).trim(), to: token.slice(hyphen + 1).trim() });
-    } else {
-      exactCodes.push(token);
-    }
-  }
-  return { exactCodes, ranges };
-}
-
-function rowsFromDefinition(definition: CnvDefinition): CnvEditorRow[] {
-  // Row order here becomes rule precedence order again in cnvEditorDefinition()
-  // (source order = array index) — it must be the file's real rule order, never
-  // definition.categories, which cnv-parser.ts sorts by sequence number for
-  // display. A broad fallback declared *before* its specific overrides (the
-  // common real layout: 00-99 first, 01/02/03 after) would silently become the
-  // rule that always wins if categories' sequence order were used instead.
-  const categoryBySequence = new Map(definition.categories.map((category) => [category.sequence, category]));
-  const orderedRules = [...definition.rules].sort((a, b) => a.sourceOrder - b.sourceOrder);
-  return orderedRules.map((rule) => {
-    const category = categoryBySequence.get(rule.categorySequence);
-    return {
-      sequence: rule.categorySequence,
-      label: category?.label ?? '',
-      subtotal: category ? subtotalTextOf(category) : '',
-      codesText: codesTextOf(rule, definition.mode),
-    };
-  });
-}
-
-function cnvEditorDefinition(): CnvDefinition {
-  const categories: CnvCategory[] = cnvEditorRows.map((row) => {
-    const subtotal = row.subtotal.trim();
-    const subtotalTarget = subtotal && subtotal !== '#' ? Number(subtotal) : undefined;
-    return {
-      sequence: row.sequence,
-      label: row.label,
-      ...(subtotal === '#' ? { excludeFromTotal: true } : {}),
-      ...(subtotalTarget !== undefined && Number.isFinite(subtotalTarget) ? { subtotalTarget } : {}),
-    };
-  });
-  const rules: CnvRuleLine[] = cnvEditorRows.map((row, index) => {
-    const parsed = parseCodesText(row.codesText, cnvEditorMode);
-    return {
-      categorySequence: row.sequence,
-      exactCodes: parsed.exactCodes,
-      ranges: parsed.ranges,
-      ...(parsed.numericUpperInclusive !== undefined ? { numericUpperInclusive: parsed.numericUpperInclusive } : {}),
-      sourceOrder: index,
-      sourceLine: index + 2,
-    };
-  });
-  return {
-    categoryCount: categories.length,
-    codeLength: Number.isFinite(cnvEditorCodeLength) && cnvEditorCodeLength > 0 ? cnvEditorCodeLength : 1,
-    mode: cnvEditorMode,
-    precedence: cnvEditorMode === 'literal' ? 'first-match-wins' : 'last-match-wins',
-    categories,
-    rules,
-    comments: [],
-    warnings: [],
-    headerLine: 1,
-  };
-}
-
-function renderCnvEditorDiagnostics(): CnvDiagnostic[] {
-  const diagnostics = validateCnvDefinition(cnvEditorDefinition());
-  const bySequence = new Map<number, CnvDiagnostic[]>();
-  const headerDiagnostics: CnvDiagnostic[] = [];
-  for (const diagnostic of diagnostics) {
-    if (diagnostic.scope === 'header' || diagnostic.categorySequence === undefined) {
-      headerDiagnostics.push(diagnostic);
-      continue;
-    }
-    const list = bySequence.get(diagnostic.categorySequence) ?? [];
-    list.push(diagnostic);
-    bySequence.set(diagnostic.categorySequence, list);
-  }
-  cnvEditorDiagnosticsOutput.replaceChildren(
-    ...headerDiagnostics.map((diagnostic) => {
-      const line = document.createElement('div');
-      line.className = `cnv-editor-diagnostic ${diagnostic.severity}`;
-      line.textContent = diagnostic.message;
-      return line;
-    }),
-  );
-  for (const rowElement of [...cnvEditorRowsBody.children] as HTMLElement[]) {
-    const sequence = Number(rowElement.dataset.sequence);
-    const rowDiagnostics = bySequence.get(sequence) ?? [];
-    rowElement.classList.toggle('cnv-editor-row-invalid', rowDiagnostics.some((d) => d.severity === 'error'));
-    rowElement.title = rowDiagnostics.map((d) => d.message).join(' · ');
-  }
-  return diagnostics;
-}
-
-function renderCnvEditorRow(row: CnvEditorRow, index: number): HTMLElement {
-  const tr = document.createElement('tr');
-  tr.dataset.sequence = String(row.sequence);
-
-  const sequenceInput = document.createElement('input');
-  sequenceInput.type = 'number';
-  sequenceInput.className = 'cnv-editor-sequence';
-  sequenceInput.value = String(row.sequence);
-  sequenceInput.addEventListener('input', () => {
-    const value = Number(sequenceInput.value);
-    if (Number.isFinite(value)) row.sequence = value;
-    tr.dataset.sequence = String(row.sequence);
-    renderCnvEditorDiagnostics();
-  });
-
-  const labelInput = document.createElement('input');
-  labelInput.type = 'text';
-  labelInput.value = row.label;
-  labelInput.addEventListener('input', () => { row.label = labelInput.value; renderCnvEditorDiagnostics(); });
-
-  const subtotalInput = document.createElement('input');
-  subtotalInput.type = 'text';
-  subtotalInput.className = 'cnv-editor-subtotal';
-  subtotalInput.placeholder = '# ou nº';
-  subtotalInput.value = row.subtotal;
-  subtotalInput.addEventListener('input', () => { row.subtotal = subtotalInput.value; renderCnvEditorDiagnostics(); });
-
-  const codesInput = document.createElement('input');
-  codesInput.type = 'text';
-  codesInput.placeholder = cnvEditorMode === 'numeric-ranges' ? 'limite superior' : '01,10-20';
-  codesInput.value = row.codesText;
-  codesInput.addEventListener('input', () => { row.codesText = codesInput.value; renderCnvEditorDiagnostics(); });
-
-  const removeCell = document.createElement('td');
-  removeCell.className = 'cnv-editor-row-remove';
-  const removeButton = document.createElement('button');
-  removeButton.type = 'button';
-  removeButton.className = 'secondary-button';
-  removeButton.textContent = '×';
-  removeButton.title = 'Remover categoria';
-  removeButton.addEventListener('click', () => {
-    cnvEditorRows.splice(index, 1);
-    renderCnvEditorTable();
-  });
-  removeCell.append(removeButton);
-
-  for (const input of [sequenceInput, labelInput, subtotalInput, codesInput]) input.disabled = cnvEditorReadOnly;
-  removeButton.disabled = cnvEditorReadOnly;
-
-  for (const input of [sequenceInput, labelInput, subtotalInput, codesInput]) {
-    const td = document.createElement('td');
-    td.append(input);
-    tr.append(td);
-  }
-  tr.append(removeCell);
-  return tr;
-}
-
-function renderCnvEditorTable(): void {
-  const codesLabel = cnvEditorMode === 'numeric-ranges' ? 'Limite superior' : 'Códigos / faixas';
-  cnvEditorCodesHeader.textContent = cnvEditorReadOnly ? `${codesLabel} (somente leitura)` : codesLabel;
-  cnvEditorRowsBody.replaceChildren(...cnvEditorRows.map((row, index) => renderCnvEditorRow(row, index)));
-  renderCnvEditorDiagnostics();
-}
-
-function setCnvEditorReadOnly(readOnly: boolean): void {
-  cnvEditorReadOnly = readOnly;
-  cnvEditorFilename.disabled = readOnly;
-  cnvEditorModeSelect.disabled = readOnly;
-  cnvEditorCodeLengthInput.disabled = readOnly;
-  cnvEditorAddCategory.disabled = readOnly;
-  cnvEditorApply.disabled = readOnly;
-  cnvEditorDownload.disabled = readOnly;
-}
-
-function resetCnvEditorToBlank(): void {
-  setCnvEditorReadOnly(false);
-  cnvEditorRows = [{ sequence: 1, label: '', subtotal: '', codesText: '' }];
-  cnvEditorMode = 'short';
-  cnvEditorCodeLength = 2;
-  cnvEditorFilename.value = '';
-  cnvEditorModeSelect.value = cnvEditorMode;
-  cnvEditorCodeLengthInput.value = String(cnvEditorCodeLength);
-  renderCnvEditorTable();
-}
-
-function loadCnvIntoEditor(name: string): void {
-  const definition = cnvByName.get(name);
-  if (!definition) return;
-  setCnvEditorReadOnly(definition.mode === 'new-format');
-  cnvEditorRows = rowsFromDefinition(definition);
-  cnvEditorMode = definition.mode;
-  cnvEditorCodeLength = definition.codeLength;
-  cnvEditorFilename.value = name;
-  cnvEditorModeSelect.value = cnvEditorMode;
-  cnvEditorCodeLengthInput.value = String(cnvEditorCodeLength);
-  if (definition.mode === 'new-format') {
-    showToast(`${name}: formato N é executável, mas o editor não regrava esse layout — use como somente leitura`, true);
-  }
-  renderCnvEditorTable();
-}
-
-function populateCnvEditorSourceList(): void {
-  const previous = cnvEditorSource.value;
-  cnvEditorSource.replaceChildren(new Option('Nova CNV…', ''));
-  for (const name of [...cnvByName.keys()].sort((a, b) => a.localeCompare(b))) {
-    cnvEditorSource.add(new Option(name, name));
-  }
-  cnvEditorSource.value = cnvByName.has(previous) ? previous : '';
-}
-
-function populateCnvEditorPreviewField(): void {
-  cnvEditorPreviewField.replaceChildren();
-  if (!dbfHeader) {
-    cnvEditorPreviewField.add(new Option('Abra um conjunto de dados para pré-visualizar', ''));
-    cnvEditorPreviewField.disabled = true;
-    cnvEditorPreviewButton.disabled = true;
-    return;
-  }
-  cnvEditorPreviewField.disabled = false;
-  cnvEditorPreviewButton.disabled = false;
-  for (const field of dbfHeader.fields) cnvEditorPreviewField.add(new Option(fieldLabel(field.name), field.name));
-}
-
-async function updateCnvEditorPreview(): Promise<void> {
-  const field = cnvEditorPreviewField.value;
-  if (!field) return;
-  cnvEditorPreviewResult.textContent = 'Lendo os valores do campo…';
-  try {
-    const definition = cnvEditorDefinition();
-    const { values, truncated } = await askDataset<{ values: string[]; truncated: boolean }>(
-      { type: 'distinct', field, limit: 500 },
-      { label: 'Prévia de classificação' },
-    );
-    const counts = new Map<string, number>();
-    let unclassified = 0;
-    for (const value of values) {
-      const match = classifyCnv(definition, value);
-      if (!match) { unclassified++; continue; }
-      counts.set(match.label, (counts.get(match.label) ?? 0) + 1);
-    }
-    const table = document.createElement('table');
-    const thead = document.createElement('thead');
-    thead.innerHTML = '<tr><th>Categoria</th><th>Valores distintos</th></tr>';
-    const tbody = document.createElement('tbody');
-    for (const category of definition.categories) {
-      const row = document.createElement('tr');
-      const labelCell = document.createElement('td');
-      labelCell.textContent = category.label || `(sequência ${category.sequence})`;
-      const countCell = document.createElement('td');
-      countCell.textContent = integerFormat.format(counts.get(category.label) ?? 0);
-      row.append(labelCell, countCell);
-      tbody.append(row);
-    }
-    const unclassifiedRow = document.createElement('tr');
-    const unclassifiedLabel = document.createElement('td');
-    unclassifiedLabel.textContent = 'Não classificado';
-    const unclassifiedCount = document.createElement('td');
-    unclassifiedCount.textContent = integerFormat.format(unclassified);
-    unclassifiedRow.append(unclassifiedLabel, unclassifiedCount);
-    tbody.append(unclassifiedRow);
-    table.append(thead, tbody);
-    const note = document.createElement('p');
-    note.className = 'dialog-note';
-    note.textContent = `${integerFormat.format(values.length)}${truncated ? '+' : ''} valor(es) distinto(s) de "${field}" — contagem de valores distintos, não de registros.`;
-    cnvEditorPreviewResult.replaceChildren(note, table);
-  } catch (error) {
-    cnvEditorPreviewResult.textContent = error instanceof Error ? error.message : String(error);
-  }
-}
-
-function openCnvEditor(name?: string): void {
-  populateCnvEditorSourceList();
-  populateCnvEditorPreviewField();
-  cnvEditorPreviewResult.replaceChildren();
-  if (name && cnvByName.has(name)) {
-    cnvEditorSource.value = name;
-    loadCnvIntoEditor(name);
-  } else {
-    cnvEditorSource.value = '';
-    resetCnvEditorToBlank();
-  }
-  cnvEditorDialog.showModal();
-}
-
-function requireCnvEditorFilename(): string {
-  const raw = cnvEditorFilename.value.trim() || 'nova.cnv';
-  return /\.cnv$/i.test(raw) ? raw : `${raw}.cnv`;
-}
-
-function applyCnvEditor(): void {
-  if (cnvEditorReadOnly) {
-    showToast('Formato N pode ser usado na tabulação, mas o editor não regrava esse layout', true);
-    return;
-  }
-  const diagnostics = renderCnvEditorDiagnostics();
-  if (diagnostics.some((d) => d.severity === 'error')) {
-    showToast('Corrija os erros listados antes de aplicar', true);
-    return;
-  }
-  const name = requireCnvEditorFilename();
-  cnvByName.set(name, cnvEditorDefinition());
-  populateConversions();
-  if (dbfHeader && (rowConversion.value === name || columnConversion.value === name)) void runAnalysis();
-  showToast(`${name}: aplicado ao conjunto atual (${cnvEditorRows.length} categorias)`);
-}
-
-function downloadCnvEditorFile(): void {
-  if (cnvEditorReadOnly) {
-    showToast('Formato N não pode ser regravado: só a leitura do layout está provada, não a escrita', true);
-    return;
-  }
-  const diagnostics = renderCnvEditorDiagnostics();
-  if (diagnostics.some((d) => d.severity === 'error')) {
-    showToast('Corrija os erros listados antes de baixar', true);
-    return;
-  }
-  try {
-    const text = serializeCnv(cnvEditorDefinition());
-    const bytes = encodeWindows1252(text);
-    downloadBlob(new Blob([bytes], { type: 'text/plain' }), requireCnvEditorFilename());
-  } catch (error) {
-    showToast(error instanceof Error ? error.message : String(error), true);
   }
 }
 
@@ -3801,7 +3416,7 @@ async function downloadSelectedDbf(): Promise<void> {
     // The Worker selects with the same resolvePlanRecord boundary the table
     // used, so the exported subset cannot disagree with the accepted count.
     const reply = await askDataset<{ bytes: ArrayBuffer }>(
-      { type: 'selected-dbf', plan: currentPlan, conversions },
+      { type: 'selected-dbf', plan: currentPlan, conversions, ...(arquivosDoPainel ? { sourceNames: arquivosDoPainel } : {}) },
       { label: 'Exportação de registros selecionados', progress: datasetProgress('Selecionando') },
     );
     const bytes = new Uint8Array(reply.bytes);
@@ -3828,7 +3443,7 @@ async function loadFiles(files: File[]): Promise<void> {
     // Metadata first lets a DEF/CNV influence the automatic first analysis even
     // when the user selected all files in one gesture.
     const ordered = [...files].sort((a, b) => {
-      const rank = (file: File) => ({ DEF: 0, CNV: 1, MAP: 2, DBC: 3, DBF: 3, CSV: 3, TSV: 3 } as Record<string, number>)[extensionOf(file.name)] ?? 9;
+      const rank = (file: File) => ({ DEF: 0, CNV: 1, MAP: 2, DBC: 3, DBF: 3, PARQUET: 3, CSV: 3, TSV: 3 } as Record<string, number>)[extensionOf(file.name)] ?? 9;
       return rank(a) - rank(b);
     });
     for (const file of ordered) await loadFile(file);
@@ -3932,7 +3547,7 @@ function clearAnalysisResult(message: string): void {
   resultTitle.textContent = message;
 }
 
-async function runAnalysis(measureOverride?: MeasureSpec): Promise<boolean> {
+async function runAnalysis(measureOverride?: MeasureSpec, planOverride?: QueryPlan): Promise<boolean> {
   if (!dbfHeader || !rowField.value) return false;
   if (!datasetRecordCount) {
     clearAnalysisResult('O conjunto atual não contém registros para tabular.');
@@ -3947,10 +3562,10 @@ async function runAnalysis(measureOverride?: MeasureSpec): Promise<boolean> {
   await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
   decodeCancelButton.hidden = false;
   try {
-    const plan = buildPlan(measureOverride);
+    const plan = planOverride ?? buildPlan(measureOverride);
     const conversions = conversionsForPlan(plan);
     const { result, cached } = await askDataset<{ result: TabulationResult; cached: boolean }>(
-      { type: 'tabulate', plan, conversions },
+      { type: 'tabulate', plan, conversions, ...(arquivosDoPainel ? { sourceNames: arquivosDoPainel } : {}) },
       { label: 'Tabulação', progress: datasetProgress('Tabulando') },
     );
     currentPlan = plan;
@@ -4048,6 +3663,7 @@ function operationLabel(operation: TableOperation): string {
     add: 'soma', subtract: 'subtração', multiply: 'produto', divide: 'divisão',
     minimum: 'mínimo', maximum: 'máximo', percentage: 'percentual', factor: 'fator',
     cumulative: 'acumulado', absolute: 'absoluto', integer: 'inteiro', sequence: 'sequência', constant: 'constante',
+    'percent-of-total': 'percentual do total', normalize: 'normalizar (escore z)', indicator: 'indicador',
     expression: 'expressão',
   };
   if (operation.kind === 'rename-column') return `${operation.label} · renomear coluna`;
@@ -4077,7 +3693,8 @@ function updateTableOperationControls(): void {
   else if (tableOperationRight.options.length > 1) tableOperationRight.selectedIndex = 1;
 
   const kind = tableOperationKind.value;
-  const binary = ['add', 'subtract', 'multiply', 'divide', 'minimum', 'maximum', 'percentage'].includes(kind);
+  const binary = ['add', 'subtract', 'multiply', 'divide', 'minimum', 'maximum', 'percentage', 'indicator'].includes(kind);
+  tableOperationScaleLabel.hidden = kind !== 'indicator';
   const sourceFree = kind === 'sequence' || kind === 'constant' || kind === 'expression';
   tableOperationLeftLabel.hidden = sourceFree;
   tableOperationRightLabel.hidden = !binary;
@@ -4142,6 +3759,9 @@ function suggestedOperationLabel(kind: string): string {
     divide: `${left} ÷ ${right}`, minimum: `Mínimo (${left}, ${right})`, maximum: `Máximo (${left}, ${right})`,
     percentage: `% ${left} / ${right}`, factor: `${left} × ${tableOperationNumber.value || '1'}`,
     cumulative: `Acumulado: ${left}`, absolute: `Absoluto: ${left}`, integer: `Inteiro: ${left}`,
+    // Os mesmos cabeçalhos que o TabWin dá: "%" e "Z" antes do nome da coluna.
+    'percent-of-total': `%${left}`, normalize: `Z${left}`,
+    indicator: `${left} ÷ ${right} ${tableOperationScale.selectedOptions[0]?.textContent ?? ''}`.trim(),
     sequence: 'Sequência', constant: 'Nova coluna', expression: 'Coluna calculada',
   };
   return labels[kind] ?? 'Nova coluna';
@@ -4168,7 +3788,12 @@ function applySelectedTableOperation(): void {
     };
   } else if (kind === 'factor') {
     operation = { kind, sourceColumnKey: tableOperationLeft.value, factor: numeric, output };
-  } else if (kind === 'cumulative' || kind === 'absolute') {
+  } else if (kind === 'indicator') {
+    operation = {
+      kind, numeratorColumnKey: tableOperationLeft.value, denominatorColumnKey: tableOperationRight.value,
+      scalePower: Number(tableOperationScale.value), output,
+    };
+  } else if (kind === 'cumulative' || kind === 'absolute' || kind === 'percent-of-total' || kind === 'normalize') {
     operation = { kind, sourceColumnKey: tableOperationLeft.value, output };
   } else if (kind === 'integer') {
     operation = { kind, sourceColumnKey: tableOperationLeft.value, rounding: 'truncate', output };
@@ -4297,7 +3922,21 @@ let tableScrollBound = false;
 const TABLE_ROW_OVERSCAN = 8;
 
 function tableColumnCount(result: TabulationResult): number {
-  return result.columns.length + (tableKeyVisible.checked ? 1 : 0);
+  return result.columns.length + (tableKeyVisible.checked ? 1 : 0) + (showRowTotalColumn(result) ? 1 : 0);
+}
+
+/**
+ * Coluna "Total" à direita, como o TabWin desenha quando há variável de coluna.
+ *
+ * Só aparece sobre colunas que são categorias de UMA medida — somar colunas
+ * calculadas ou medidas diferentes (Frequência + Valor Total) daria um número
+ * sem significado.
+ */
+function showRowTotalColumn(result: TabulationResult): boolean {
+  return Boolean(currentPlan?.spec.columns)
+    && !currentPlan?.spec.measures?.length
+    && result.columns.length >= 2
+    && result.columns.every((column) => column.source !== 'derived' && (column.totalPolicy ?? 'sum') === 'sum');
 }
 
 /** A borderless spacer row: its only job is to hold the scrollbar to the table's true full height. */
@@ -4326,6 +3965,12 @@ function buildTableRow(result: TabulationResult, rowIndex: number): HTMLTableRow
   for (const value of result.cells[rowIndex] ?? []) {
     const td = document.createElement('td');
     td.textContent = tableNumber(value);
+    tr.append(td);
+  }
+  if (showRowTotalColumn(result)) {
+    const td = document.createElement('td');
+    td.className = 'row-total';
+    td.textContent = tableNumber((result.cells[rowIndex] ?? []).reduce((sum, value) => sum + value, 0));
     tr.append(td);
   }
   return tr;
@@ -4461,6 +4106,13 @@ function renderTable(result: TabulationResult): void {
     th.textContent = column.label;
     headerRow.append(th);
   }
+  if (showRowTotalColumn(result)) {
+    const th = document.createElement('th');
+    th.scope = 'col';
+    th.className = 'row-total';
+    th.textContent = 'Total';
+    headerRow.append(th);
+  }
   head.append(headerRow);
 
   virtualTable = { result, indexes: currentTableRowIndexes() };
@@ -4481,8 +4133,15 @@ function renderTable(result: TabulationResult): void {
   for (const column of result.columns) {
     const cell = document.createElement('td');
     const policy = column.totalPolicy ?? 'sum';
-    const total = policy === 'precalculated' ? undefined : calculateColumnTotal(result, column.key, policy);
+    const total = policy === 'precalculated' ? column.precalculatedTotal : calculateColumnTotal(result, column.key, policy);
     cell.textContent = total === undefined ? '—' : tableNumber(total);
+    totalRow.append(cell);
+  }
+  if (showRowTotalColumn(result)) {
+    const cell = document.createElement('td');
+    cell.className = 'row-total';
+    // Soma dos totais de coluna, que já pulam as linhas de detalhe de subtotal.
+    cell.textContent = tableNumber(result.columns.reduce((sum, column) => sum + (calculateColumnTotal(result, column.key, 'sum') ?? 0), 0));
     totalRow.append(cell);
   }
   foot.append(totalRow);
@@ -5521,7 +5180,7 @@ function renderTabulationDiff(entry: TabulationLogEntry): void {
 
 function renderAudit(): void {
   const audit = {
-    application: { name: 'TabWin Web', version: '0.8.0-dev', compatibilityProfile: currentCompatibilityProfile },
+    application: { name: 'TabSis', version: '0.8.0-dev', compatibilityProfile: currentCompatibilityProfile },
     source: datasetFingerprint,
     datasetSources: activeDatasetSources,
     relatedFiles: loadedSources.filter((source) => !activeDatasetSources.some((datasetSource) =>
@@ -7162,6 +6821,9 @@ async function downloadCatalogEntries(
   if (!archive && files.length === 1 && files[0]) {
     const doEspelho = await fetchFromMirror(files[0].name, sha256, {
       ...(signal ? { signal } : {}),
+      // A versão leve (Parquet) vem primeiro quando o espelho a tiver: metade
+      // do tamanho, e a tabulação lê só as colunas que usa.
+      preferirLeve: true,
       onProgress: (recebidos, total) => {
         onActivity?.();
         const pedaco = total
@@ -7183,9 +6845,23 @@ async function downloadCatalogEntries(
       // O espelho entrega o `.dbc` direto, não o `.zip` do portal. O resto do
       // fluxo espera um pacote, então ele é embalado aqui — sem recompressão,
       // porque o DBC já é comprimido por dentro.
-      archive = zipSync({ [files[0].name]: [doEspelho.bytes, { level: 0 }] });
+      archive = zipSync({ [doEspelho.name]: [doEspelho.bytes, { level: 0 }] });
       temposDoDownload.add('espelho', 0);
-      setCatalogStatus(`${files[0].name} veio do espelho, com hash conferido.`);
+      setCatalogStatus(doEspelho.formato === 'parquet'
+        ? `${files[0].name} veio do espelho na versão leve (${doEspelho.name}, ${formatBytes(doEspelho.bytes.byteLength)}), com os dois hashes conferidos.`
+        : `${files[0].name} veio do espelho, com hash conferido.`);
+      // Guarda como guardaria o pacote do DATASUS: abrir de novo amanhã não
+      // precisa baixar outra vez, e a política de espaço vale igual.
+      const pacote = archive;
+      const pacoteSha256 = await sha256(pacote);
+      const fontes = files.map(({ name, address, source, modality, catalogQuery }) => ({
+        name, address, source, modality, ...(catalogQuery ? { catalogQuery: { ...catalogQuery } } : {}),
+      }));
+      try {
+        summary = await writeCachedArchive(cacheKey, pacote, { sha256: pacoteSha256, role, sources: fontes });
+      } catch {
+        summary = { key: cacheKey, savedAt: Date.now(), size: pacote.byteLength, sha256: pacoteSha256, role, sources: fontes };
+      }
     }
   }
 
@@ -7587,7 +7263,7 @@ async function openOfficialFile(
     // leitor de fluxo, que mede só a rede e sabe cancelá-la.
     watchdog.dispose();
     const wanted = downloaded.files.find((entry) => displayBaseName(entry.name).toLowerCase() === remote.name.toLowerCase())
-      ?? downloaded.files.find((entry) => ['DBC', 'DBF'].includes(extensionOf(entry.name)));
+      ?? downloaded.files.find((entry) => ['DBC', 'DBF', 'PARQUET'].includes(extensionOf(entry.name)));
     if (!wanted) throw new Error('O pacote oficial não contém um DBC ou DBF reconhecido');
     await loadFile(archiveFile(wanted));
     const source = loadedSources.find((item) => item.name.toLowerCase() === displayBaseName(wanted.name).toLowerCase());
@@ -7755,7 +7431,7 @@ async function packageOfficialFileBatch(
       );
       prepararProximo(files, index, preparandoPacote);
       const downloaded = await downloadCatalogEntries([remote], controller.signal, 24 * 60 * 60 * 1000, 'data');
-      const wanted = downloaded.files.filter((entry) => ['DBC', 'DBF'].includes(extensionOf(entry.name)));
+      const wanted = downloaded.files.filter((entry) => ['DBC', 'DBF', 'PARQUET'].includes(extensionOf(entry.name)));
       if (!wanted.length) throw new Error(`${remote.name} não trouxe DBC ou DBF`);
       for (const entry of wanted) {
         const name = displayBaseName(entry.name);
@@ -7796,7 +7472,7 @@ async function packageOfficialFileBatch(
         cancelado: batch.cancelled,
         arquivos: manifest,
         observacao: 'Microdados públicos do DATASUS/Ministério da Saúde. '
-          + 'Este pacote foi montado pelo TabWin Web, que não é afiliado ao órgão.',
+          + 'Este pacote foi montado pelo TabSis, que não é afiliado ao órgão.',
       }, null, 2)),
       { level: 0 },
     ];
@@ -7875,7 +7551,7 @@ async function openRecentArchive(summary: CachedArchiveSummary): Promise<void> {
     const extracted = extractSupportedArchiveFiles(cached.bytes);
     const expectedNames = new Set(summary.sources.map((source) => source.name.toLowerCase()));
     const wanted = extracted.find((entry) => expectedNames.has(displayBaseName(entry.name).toLowerCase()))
-      ?? extracted.find((entry) => ['DBC', 'DBF'].includes(extensionOf(entry.name)));
+      ?? extracted.find((entry) => ['DBC', 'DBF', 'PARQUET'].includes(extensionOf(entry.name)));
     if (!wanted) throw new Error('O pacote salvo não contém um DBC ou DBF reconhecido');
     // Propagate decode/schema failures. The UI-oriented multi-file wrapper
     // intentionally catches errors and would otherwise report a false success.
@@ -7926,7 +7602,7 @@ function saveExtractedFilesToDisk(
   extracted: readonly ExtractedArchiveFile[],
   original: { bytes: Uint8Array; filename: string } | null,
 ): string {
-  const data = extracted.filter((entry) => ['DBC', 'DBF'].includes(extensionOf(entry.name)));
+  const data = extracted.filter((entry) => ['DBC', 'DBF', 'PARQUET'].includes(extensionOf(entry.name)));
   const wanted = data.length ? data : extracted;
 
   if (wanted.length === 1) {
@@ -8116,7 +7792,7 @@ async function saveAllCachedArchives(summaries: readonly CachedArchiveSummary[])
       const cached = await readCachedArchive(summary.key, Number.POSITIVE_INFINITY);
       if (!cached) throw new Error('não está mais no cache');
       for (const entry of extractSupportedArchiveFiles(cached.bytes)) {
-        if (!['DBC', 'DBF'].includes(extensionOf(entry.name))) continue;
+        if (!['DBC', 'DBF', 'PARQUET'].includes(extensionOf(entry.name))) continue;
         const name = displayBaseName(entry.name);
         // Nomes repetidos não podem se sobrescrever em silêncio.
         bundle[bundle[name] ? `${summary.key.slice(-6)}-${name}` : name] = [entry.bytes, { level: 0 }];
@@ -8251,9 +7927,13 @@ async function renderRecentArchives(): Promise<void> {
     catalogRecentList.replaceChildren();
     const totalBytes = archives.reduce((sum, archive) => sum + archive.size, 0);
     const dataCount = archives.filter((archive) => archive.role === 'data').length;
+    // O teto vem da cota que o navegador informa: guardar além dele faz o
+    // navegador apagar o site inteiro, e é isso que a pessoa precisa saber.
+    const { budgetBytes } = await describeCacheBudget();
+    if (generation !== recentArchivesGeneration) return;
     catalogRecentSummary.textContent = archives.length
-      ? `${integerFormat.format(dataCount)} arquivo(s) de dados · ${formatBytes(totalBytes)} em ${integerFormat.format(archives.length)} pacote(s)`
-      : 'Nenhum download oficial salvo neste aparelho.';
+      ? `${integerFormat.format(dataCount)} arquivo(s) de dados · ${describeCacheUsage(totalBytes, budgetBytes)} reservados neste navegador · os mais antigos saem quando o espaço acaba`
+      : `Nenhum download oficial salvo neste aparelho (espaço reservado: ${describeCacheUsage(0, budgetBytes).split(' de ')[1]}).`;
     catalogCacheClear.disabled = archives.length === 0;
 
     // Com vários pacotes guardados, salvar um a um é trabalho manual sem
@@ -9920,36 +9600,140 @@ geojsonImportCancel.addEventListener('click', () => { pendingGeoJson = null; geo
 geojsonImportDialog.addEventListener('click', (event) => {
   if (event.target === geojsonImportDialog) { pendingGeoJson = null; geojsonImportDialog.close(); }
 });
-cnvEditorButton.addEventListener('click', () => openCnvEditor(rowConversion.value || columnConversion.value || undefined));
-cnvEditorClose.addEventListener('click', () => cnvEditorDialog.close());
-cnvEditorDialog.addEventListener('click', (event) => {
-  if (event.target === cnvEditorDialog) cnvEditorDialog.close();
+const editorCnv = criarEditorCnv({
+  conversoes: () => cnvByName,
+  campos: () => (dbfHeader ? dbfHeader.fields.map((field) => field.name) : null),
+  rotuloDoCampo: (campo) => fieldLabel(campo),
+  valoresDistintos: (campo, limite) => askDataset<{ values: string[]; truncated: boolean }>(
+    { type: 'distinct', field: campo, limit: limite },
+    { label: 'Prévia de classificação' },
+  ),
+  aplicar: (nome, definicao) => {
+    cnvByName.set(nome, definicao);
+    populateConversions();
+    if (dbfHeader && (rowConversion.value === nome || columnConversion.value === nome)) void runAnalysis();
+  },
+  aviso: showToast,
+  baixar: downloadBlob,
 });
-cnvEditorSource.addEventListener('change', () => {
-  if (cnvEditorSource.value) loadCnvIntoEditor(cnvEditorSource.value);
-  else resetCnvEditorToBlank();
+const cnvEditorButton = element<HTMLButtonElement>('#cnv-editor-button');
+cnvEditorButton.addEventListener('click', () => editorCnv.abrir(rowConversion.value || columnConversion.value || undefined));
+
+/**
+ * Leva a escolha do painel para os controles da barra lateral.
+ *
+ * O painel é o caminho principal, mas o resto do aplicativo — receita salva,
+ * mapa, auditoria, ferramentas avançadas — ainda lê aqueles controles. Mantê-los
+ * iguais ao que foi executado é o que impede a receita salva de descrever uma
+ * tabela diferente da que está na tela.
+ */
+function sincronizarControlesComPainel(spec: TabulationSpec): void {
+  if (![...rowField.options].some((option) => option.value === spec.rows.field)) populateControls(spec.rows.field);
+  rowField.value = spec.rows.field;
+  rowConversion.value = spec.rows.conversionId ?? spec.rows.lookupId ?? '';
+  startPosition.value = String(spec.rows.startPosition ?? 1);
+  discriminateUnclassified.checked = spec.rows.unclassifiedPolicy === 'discriminate';
+  columnField.value = spec.columns?.field ?? '';
+  columnConversion.value = spec.columns?.conversionId ?? spec.columns?.lookupId ?? '';
+  columnStartPosition.value = String(spec.columns?.startPosition ?? 1);
+  discriminateColumnUnclassified.checked = spec.columns?.unclassifiedPolicy === 'discriminate';
+  measureKind.value = spec.measure.kind;
+  updateMeasureControls();
+  if (spec.measure.kind === 'sum' && spec.measure.field) measureField.value = spec.measure.field;
+  extraMeasures = (spec.measures ?? []).slice(1).map((measure) => ({ ...measure }));
+  renderExtraMeasures();
+  configuredFilters = [...configuredFilters.filter((filter) => !filtrosDoPainel.has(filter)), ...spec.filters];
+  filtrosDoPainel = new Set(spec.filters);
+  renderConfiguredFilters();
+  updateFilterCount();
+  suppressZero.checked = spec.suppressZeroRows ?? false;
+  suppressZeroColumns.checked = spec.suppressZeroColumns ?? true;
+  updateColumnControls();
+}
+
+/**
+ * A tabela que aparece sozinha ao abrir um arquivo.
+ *
+ * Com o painel montado, ela sai dele — a primeira variável de Linhas do DEF,
+ * Frequência, como o TabWin abre. Sem DEF que sirva ao arquivo, cai no caminho
+ * antigo, que escolhe um campo plausível sozinho.
+ */
+async function primeiraTabulacao(): Promise<void> {
+  if (painel && await painel.executarAgora()) return;
+  await runAnalysis();
+}
+
+async function executarDoPainel(spec: TabulationSpec, info: { titulo?: string; subtitulo: string; linha: string; arquivos: string[] }): Promise<TabulationResult | null> {
+  if (!dbfHeader) return null;
+  arquivosDoPainel = info.arquivos.length < activeDatasetSources.length ? [...info.arquivos] : null;
+  const extras = configuredFilters.filter((filter) => !filtrosDoPainel.has(filter));
+  sincronizarControlesComPainel(spec);
+  // Filtros de fora do painel (o recorte "Onde", limpeza assistida) continuam
+  // valendo, e entram no mesmo plano.
+  const plan = compileQueryPlan({ ...spec, filters: [...spec.filters, ...extras] });
+  const ok = await runAnalysis(undefined, plan);
+  if (!ok || !currentResult) return null;
+  const nomes = arquivosDoPainel ? arquivosDoPainel.join(' + ') : datasetName;
+  resultKicker.textContent = info.titulo ? `${nomes} · ${info.titulo}` : nomes;
+  resultTitle.textContent = info.subtitulo;
+  // O canto da tabela leva o nome da Linha como o DEF escreve, igual ao TabWin.
+  currentRowLabel = info.linha;
+  tableTitle.value = info.titulo ?? info.subtitulo;
+  tableSubtitle.value = info.titulo ? info.subtitulo : '';
+  renderTable(currentResult);
+  renderChart(currentResult);
+  renderAudit();
+  return currentResult;
+}
+
+// Grupos recolhíveis marcados com data-lembrar ("Tabular por campos" e as
+// ferramentas da tabela) lembram se a pessoa os deixa abertos. É conveniência
+// de quem usa essas ferramentas sempre, guardada só neste navegador.
+for (const grupo of document.querySelectorAll<HTMLDetailsElement>('details[data-lembrar]')) {
+  const chave = `tabsis.aberto.${grupo.id}`;
+  try { grupo.open = localStorage.getItem(chave) === '1'; } catch { /* sem armazenamento: fica fechado */ }
+  grupo.addEventListener('toggle', () => {
+    try { localStorage.setItem(chave, grupo.open ? '1' : '0'); } catch { /* ignora */ }
+  });
+}
+
+painel = criarPainel(element<HTMLElement>('#painel'), {
+  defs: () => defByName,
+  defAtivo: () => defActive.value,
+  escolherDef: (nome) => {
+    defActive.value = defByName.has(nome) ? nome : '';
+    applyActiveDef();
+    painel?.atualizar();
+  },
+  conversoes: () => cnvByName,
+  lookups: () => lookupByName,
+  campos: () => (dbfHeader
+    ? dbfHeader.fields.map((field) => ({ name: field.name, type: field.type, length: field.length, decimalCount: field.decimalCount }))
+    : null),
+  rotuloDoCampo: (campo) => fieldLabel(campo),
+  campoInicial: () => rowField.value || undefined,
+  arquivos: () => activeDatasetSources.map((source) => ({ name: source.name, size: source.size })),
+  valoresDistintos: (campo) => askDataset<{ values: string[]; truncated: boolean }>(
+    { type: 'distinct', field: campo, limit: 2000 },
+    { label: 'Leitura de valores' },
+  ),
+  primeirosRegistros: async (campos, limite) => (await askDataset<{ records: Array<Record<string, unknown>> }>(
+    { type: 'records', fields: campos, maxRecords: limite },
+    { label: 'Leitura de registros' },
+  )).records,
+  salvarRegistros: () => downloadSelectedDbf(),
+  testarCrc: async () => (await askDataset<{ reports: Array<{ name: string; report: { ok: boolean; stored: string; computed: string } | null }> }>(
+    { type: 'crc' },
+    { label: 'Teste de CRC' },
+  )).reports,
+  perfil: () => currentCompatibilityProfile,
+  executar: executarDoPainel,
+  aviso: showToast,
 });
-cnvEditorNew.addEventListener('click', () => { cnvEditorSource.value = ''; resetCnvEditorToBlank(); });
-cnvEditorModeSelect.addEventListener('change', () => {
-  if (cnvEditorReadOnly) return;
-  cnvEditorMode = cnvEditorModeSelect.value as CnvDefinition['mode'];
-  renderCnvEditorTable();
-});
-cnvEditorCodeLengthInput.addEventListener('input', () => {
-  if (cnvEditorReadOnly) return;
-  cnvEditorCodeLength = Number(cnvEditorCodeLengthInput.value);
-});
-cnvEditorAddCategory.addEventListener('click', () => {
-  if (cnvEditorReadOnly) return;
-  const nextSequence = cnvEditorRows.reduce((max, row) => Math.max(max, row.sequence), 0) + 1;
-  cnvEditorRows.push({ sequence: nextSequence, label: '', subtotal: '', codesText: '' });
-  renderCnvEditorTable();
-});
-cnvEditorPreviewButton.addEventListener('click', () => { void updateCnvEditorPreview(); });
-cnvEditorApply.addEventListener('click', applyCnvEditor);
-cnvEditorDownload.addEventListener('click', downloadCnvEditorFile);
+
 defActive.addEventListener('change', () => {
   applyActiveDef();
+  painel?.atualizar();
   showToast(activeDef ? `DEF ativo: ${defActive.value}` : 'Nenhum DEF ativo; os nomes técnicos do arquivo voltam a valer');
   if (currentResult) void runAnalysis();
 });
@@ -10030,7 +9814,11 @@ function renderQuestionResults(): void {
     botao.className = 'question-result';
     botao.setAttribute('role', 'option');
     const titulo = document.createElement('b');
-    titulo.textContent = match.label;
+    // O nome do arquivo do DATASUS vem primeiro: é por ele que quem usa o
+    // TabWin procura e reconhece o dado (DOINF23.dbc, RDAC2401.dbc).
+    const codigo = document.createElement('code');
+    codigo.textContent = `${match.fileType}*.dbc`;
+    titulo.append(codigo, ` — ${match.label}`);
     const detalhe = document.createElement('small');
     const partes = [match.year ?? 'ano a escolher', match.uf === 'BR' ? 'Brasil' : match.uf ?? 'UF a escolher'];
     detalhe.textContent = `${partes.join(' · ')} — ${match.because.join('; ')}`;
@@ -10124,224 +9912,15 @@ window.addEventListener('resize', () => {
 });
 initializeCatalog();
 
-
-// ---------------------------------------------------------------------------
-// Consulta SQL — superfície de análise, separada do motor de tabulação.
-//
-// A tabela do TabWin continua saindo do executor de referência, provado contra
-// o TabWin 4.15 com tolerância zero. Aqui é outra coisa: junções, percentis,
-// funções de janela, faixas contínuas — o que o modelo de plano não expressa e
-// que hoje só existia em script fora do aplicativo.
-//
-// O motor pesa ~7 MB e só é baixado quando alguém carrega dados nesta aba.
-// ---------------------------------------------------------------------------
-
-/** Teto de linhas trazidas do worker para o motor de consulta. */
-const QUERY_MAX_RECORDS = 400_000;
-
-const queryStatus = element<HTMLElement>('#query-status');
-const querySql = element<HTMLTextAreaElement>('#query-sql');
-const queryRun = element<HTMLButtonElement>('#query-run');
-const queryExport = element<HTMLButtonElement>('#query-export');
-const queryExportParquet = element<HTMLButtonElement>('#query-export-parquet');
-const queryUnload = element<HTMLButtonElement>('#query-unload');
-const queryLoad = element<HTMLButtonElement>('#query-load');
-const queryResult = element<HTMLElement>('#query-result');
-const queryFields = element<HTMLSelectElement>('#query-fields');
-const queryFieldsAll = element<HTMLButtonElement>('#query-fields-all');
-
-let queryTable: string | null = null;
-let queryLastResult: DuckDbQueryResult | null = null;
-
-function setQueryStatus(mensagem: string, tom: 'normal' | 'trabalhando' | 'erro' = 'normal'): void {
-  queryStatus.textContent = mensagem;
-  queryStatus.classList.toggle('trabalhando', tom === 'trabalhando');
-  queryStatus.classList.toggle('erro', tom === 'erro');
-}
-
-function renderQueryResult(resultado: DuckDbQueryResult): void {
-  queryResult.replaceChildren();
-  if (!resultado.rows.length) {
-    const vazio = document.createElement('p');
-    vazio.className = 'vazio';
-    vazio.textContent = 'A consulta não devolveu nenhuma linha.';
-    queryResult.append(vazio);
-    return;
-  }
-  const table = document.createElement('table');
-  const thead = document.createElement('thead');
-  const headRow = document.createElement('tr');
-  for (const coluna of resultado.columns) {
-    const th = document.createElement('th');
-    th.textContent = coluna.name;
-    headRow.append(th);
-  }
-  thead.append(headRow);
-  const tbody = document.createElement('tbody');
-  for (const linha of resultado.rows) {
-    const tr = document.createElement('tr');
-    linha.forEach((valor, indice) => {
-      const td = document.createElement('td');
-      if (resultado.columns[indice]?.type === 'número') td.className = 'numero';
-      td.textContent = valor === null
-        ? '—'
-        : valor instanceof Date ? valor.toISOString().slice(0, 10) : String(valor);
-      tr.append(td);
-    });
-    tbody.append(tr);
-  }
-  table.append(thead, tbody);
-  queryResult.append(table);
-}
-
-/**
- * Preenche a lista de campos quando um arquivo é aberto.
- *
- * Marca todos por padrão quando cabem no orçamento, e nenhum quando não cabem
- * — obrigar a escolha é melhor que deixar marcado algo que vai ser recusado.
- */
-function populateQueryFields(): void {
-  const campos = (dbfHeader?.fields ?? []).map((field) => field.name);
-  queryFields.replaceChildren();
-  for (const nome of campos) queryFields.add(new Option(nome, nome));
-  const orcamento = checkIngestBudget(datasetRecordCount || QUERY_MAX_RECORDS, campos.length);
-  for (const opcao of queryFields.options) opcao.selected = orcamento.withinBudget;
-  if (campos.length) {
-    setQueryStatus(orcamento.withinBudget
-      ? `${campos.length} campo(s) disponíveis, todos marcados. ${orcamento.message}`
-      : `${orcamento.message} Marque os campos que interessam.`,
-      orcamento.withinBudget ? 'normal' : 'erro');
-  }
-}
-
-async function loadDatasetIntoQueryEngine(): Promise<void> {
-  if (!datasetName) { setQueryStatus('Abra um arquivo antes de consultar.', 'erro'); return; }
-  const campos = [...queryFields.selectedOptions].map((opcao) => opcao.value);
-  if (!campos.length) { setQueryStatus('Marque ao menos um campo para carregar.', 'erro'); return; }
-  // O limite é conferido ANTES de pedir os registros: descobrir que não cabe
-  // depois de materializar quatrocentas mil linhas seria descobrir tarde.
-  const orcamento = checkIngestBudget(
-    Math.min(datasetRecordCount || QUERY_MAX_RECORDS, QUERY_MAX_RECORDS), campos.length);
-  if (!orcamento.withinBudget) { setQueryStatus(orcamento.message, 'erro'); return; }
-  queryLoad.disabled = true;
-  try {
-    setQueryStatus('Lendo os registros do conjunto aberto…', 'trabalhando');
-    const resposta = await askDataset<{
-      records: Array<Record<string, unknown>>; seen: number; truncated: boolean;
-    }>({ type: 'records', fields: campos, maxRecords: QUERY_MAX_RECORDS },
-      { label: 'Leitura para consulta' });
-
-    const tabela = tableNameFor(datasetName);
-    const carregada = await loadRecordsAsTable(
-      tabela, resposta.records, campos, (mensagem) => setQueryStatus(mensagem, 'trabalhando'));
-    queryTable = carregada.name;
-    querySql.value = querySql.value.trim()
-      || `SELECT * FROM ${quoteIdentifier(carregada.name)} LIMIT 100`;
-    queryRun.disabled = false;
-    queryUnload.disabled = false;
-    // Um corte silencioso faria a consulta responder sobre um pedaço do
-    // arquivo como se fosse o arquivo inteiro.
-    const aviso = resposta.truncated
-      ? ` ATENÇÃO: o conjunto tem ${integerFormat.format(resposta.seen)} registros e só os `
-        + `${integerFormat.format(carregada.rowCount)} primeiros foram carregados. As consultas respondem`
-        + ' sobre esse recorte, não sobre o arquivo inteiro.'
-      : '';
-    setQueryStatus(
-      `Tabela ${carregada.name} pronta com ${integerFormat.format(carregada.rowCount)} linha(s) e `
-      + `${integerFormat.format(carregada.columns.length)} coluna(s).${aviso}`,
-      resposta.truncated ? 'erro' : 'normal',
-    );
-  } catch (error) {
-    setQueryStatus(error instanceof Error ? error.message : String(error), 'erro');
-  } finally {
-    queryLoad.disabled = false;
-  }
-}
-
-queryLoad.addEventListener('click', () => void loadDatasetIntoQueryEngine());
-
-queryRun.addEventListener('click', () => {
-  const sql = querySql.value.trim();
-  if (!sql) { setQueryStatus('Escreva uma consulta.', 'erro'); return; }
-  queryRun.disabled = true;
-  setQueryStatus('Executando…', 'trabalhando');
-  void runQuery(sql)
-    .then((resultado) => {
-      queryLastResult = resultado;
-      renderQueryResult(resultado);
-      queryExport.disabled = !resultado.rows.length;
-      queryExportParquet.disabled = !resultado.rows.length;
-      const corte = resultado.truncated
-        ? ` Mostrando as primeiras ${integerFormat.format(resultado.rows.length)}; exporte para ver todas.`
-        : '';
-      setQueryStatus(
-        `${integerFormat.format(resultado.rowCount)} linha(s) em ${resultado.milliseconds.toFixed(0)} ms.${corte}`,
-      );
-    })
-    .catch((error: unknown) => {
-      queryLastResult = null;
-      queryExport.disabled = true;
-      queryExportParquet.disabled = true;
-      queryResult.replaceChildren();
-      setQueryStatus(error instanceof Error ? error.message : String(error), 'erro');
-    })
-    .finally(() => { queryRun.disabled = false; });
+abaConsulta = criarAbaConsulta({
+  campos: () => (dbfHeader?.fields ?? []).map((field) => field.name),
+  nomeDoConjunto: () => datasetName,
+  registrosNoConjunto: () => datasetRecordCount,
+  lerRegistros: (campos, maximo) => askDataset<{ records: Array<Record<string, unknown>>; seen: number; truncated: boolean }>(
+    { type: 'records', fields: campos, maxRecords: maximo },
+    { label: 'Leitura para consulta' },
+  ),
+  baixar: downloadBlob,
+  ligarSelecionarTodos: wireSelectAll,
 });
-
-/**
- * Exporta o resultado INTEIRO da consulta.
- *
- * O que havia aqui antes escrevia `queryLastResult.rows`, que já vem cortado
- * em MAX_RESULT_ROWS — enquanto o status dizia "exporte para ver todas". Quem
- * consultasse quatrocentas mil linhas levava cinco mil acreditando ter tudo,
- * e nada na tela desmentia. Agora o próprio motor escreve o arquivo, rodando
- * a consulta de novo: as linhas não passam por JavaScript, então o custo é o
- * do arquivo e não o de um objeto por registro.
- */
-async function exportQueryResult(format: DuckDbExportFormat): Promise<void> {
-  const sql = querySql.value.trim();
-  if (!sql) { setQueryStatus('Escreva uma consulta antes de exportar.', 'erro'); return; }
-  const botoes = [queryExport, queryExportParquet];
-  for (const botao of botoes) botao.disabled = true;
-  try {
-    setQueryStatus(`Escrevendo o ${format === 'parquet' ? 'Parquet' : 'CSV'} com o resultado completo…`, 'trabalhando');
-    const inicio = performance.now();
-    const bytes = await exportQuery(sql, format);
-    const nome = `consulta-${new Date().toISOString().slice(0, 10)}.${format}`;
-    downloadBlob(
-      new Blob([bytes as BlobPart], {
-        type: format === 'parquet' ? 'application/vnd.apache.parquet' : 'text/csv;charset=utf-8',
-      }),
-      nome,
-    );
-    const mb = bytes.byteLength / 1048576;
-    setQueryStatus(
-      `${nome} pronto: ${mb >= 1 ? `${mb.toFixed(1)} MB` : `${Math.round(bytes.byteLength / 1024)} kB`}`
-      + ` em ${((performance.now() - inicio) / 1000).toFixed(1)} s, com todas as linhas do resultado.`,
-    );
-  } catch (error) {
-    setQueryStatus(error instanceof Error ? error.message : String(error), 'erro');
-  } finally {
-    // Só volta a habilitar o que fazia sentido antes: sem resultado na tela,
-    // não há consulta conferida para exportar.
-    for (const botao of botoes) botao.disabled = !queryLastResult?.rows.length;
-  }
-}
-
-queryExport.addEventListener('click', () => void exportQueryResult('csv'));
-queryExportParquet.addEventListener('click', () => void exportQueryResult('parquet'));
-
-queryUnload.addEventListener('click', () => {
-  queryUnload.disabled = true;
-  void shutdownDuckDb().finally(() => {
-    queryTable = null;
-    queryLastResult = null;
-    queryResult.replaceChildren();
-    queryRun.disabled = true;
-    queryExport.disabled = true;
-    queryExportParquet.disabled = true;
-    setQueryStatus('Motor descarregado. A memória dele voltou para o navegador.');
-  });
-});
-
-wireSelectAll(queryFieldsAll, queryFields, 'todos');
+abaConsulta.atualizarCampos();

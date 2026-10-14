@@ -41,7 +41,7 @@ export function tabulationToXml(result: TabulationResult, context: TabulationExp
   }).join('\n');
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
-    '<tabulation xmlns="https://github.com/redkk123/tabwin-web/schema/tabulation/1" version="1">',
+    '<tabulation xmlns="https://github.com/redkk123/tabsis/schema/tabulation/1" version="1">',
     `  <provenance source="${xmlEscape(context.sourceName)}" generatedAt="${xmlEscape(generatedAt)}" />`,
     `  <dimension label="${xmlEscape(context.rowLabel)}" />`,
     '  <columns>',

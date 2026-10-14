@@ -3,7 +3,7 @@
  * Traz o Tabwin Lab para dentro do site, em `/lab/`.
  *
  * O Lab vive em outro repositório e não tem etapa de build: é HTML, CSS e
- * módulos ES servidos como estão. Publicá-lo junto do TabWin Web evita um
+ * módulos ES servidos como estão. Publicá-lo junto do TabSis evita um
  * segundo domínio e um segundo deploy, ao custo de manter uma cópia versionada
  * aqui. A cópia registra o commit de origem em `lab/ORIGEM.json`, para que
  * "está velha?" seja uma pergunta com resposta em vez de um palpite.

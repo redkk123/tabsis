@@ -1,5 +1,77 @@
 # Plano atual
 
+## Bloco 6 — TabSis: os pedidos do professor (2026-10-13) ✅ no código, ⏳ publicação
+
+Pedidos, na ordem em que vieram: foco em **tabulação** (dashboard é fácil),
+converter o DBC para algo mais leve e guardar na Cloudflare, entender CNV, DBC,
+DBF e DEF, deixar amigável para quem sempre usou e para quem é novo, cuidado
+com o cache do navegador, trocar o nome para **TabSis**, licença GPLv3 ou
+AGPLv3, interface difícil, prioridade para **Incremento, Seleções, Colunas e
+Linhas**, e **nomes originais dos arquivos**. Tudo na branch `tabsis`.
+
+- [x] **Engenharia reversa do TabWin 4.15** com Wine (sem sudo) + rea/Ghidra:
+      [RE_002](../reverse-engineering/RE_002_PAINEL_TABULA.md). Achados que
+      mudaram o código: `X` = Linha+Coluna+Seleção (47 opções do RD2008 sumiam),
+      recusas com as palavras do TabWin, "Não classificados" (Incluir /
+      Discriminar decompilado), formato do log, `%percentagem`, `Normalizar`,
+      CRC do DBC.
+- [x] **Painel de tabulação** como tela principal: Linhas, Colunas,
+      Incremento e Seleções em quatro blocos numerados, com os nomes do DEF na
+      ordem do arquivo, padrões do TabWin, frase dizendo o que vai ser tabulado,
+      log do TabWin com "Restaurar consulta" (log colado ou `.TAB`).
+      Conferido: `npm run verify:painel` → 6/6 casos iguais ao TabWin real.
+- [x] Tabela logo depois das abas; Quadro, Operações e Editar recolhidos
+      embaixo; coluna Total quando há Colunas; canto com o nome da Linha.
+- [x] Nomes originais: `RDAC2401.dbc` sem caixa alta forçada; busca por texto
+      mostra `DOINF*.dbc` primeiro; Parquet herda o nome-base.
+- [x] **Formato leve**: DBC → Parquet (metade do tamanho, leitura por coluna),
+      paridade registro a registro (RDAC2401, DOINF23, DENGBR25), app abre
+      `.parquet`, espelho declara e prefere a versão leve.
+      [FORMATO_LEVE_PARQUET](./FORMATO_LEVE_PARQUET.md).
+- [x] **Cache do navegador**: teto em bytes pela cota do navegador, índice de
+      metadados (banco v2), uso visível; downloads do espelho guardados.
+- [x] **TabSis + AGPL-3.0-or-later** (identificadores de formato mantidos, para
+      receitas e tabelas antigas continuarem abrindo).
+- [x] Guia dos arquivos para iniciantes e veteranos:
+      [GUIA_ARQUIVOS_DATASUS](./GUIA_ARQUIVOS_DATASUS.md); "Ver registros do
+      arquivo" e "Testar CRC" no painel.
+- [x] Correção: a manchete somava subtotal e detalhe de CNV (8.630 em vez de
+      4.315).
+
+Publicação (2026-10-14):
+
+- [x] Repositório renomeado para `redkk123/tabsis`; `tabweb.me` continua.
+- [x] Espelho sincronizado com as versões leves: DNBR2024 112,2 → 49,7 MB,
+      DNBR2023 119,7 → 56,5 MB, DOINF23 3,4 → 1,6 MB; paridade conferida antes
+      de cada envio e hashes publicados conferidos byte a byte.
+- [x] PR redkk123/tabsis#2.
+- [ ] `datasus-dbc`: os 4 commits do bundle foram trazidos para cima da 2.0.4
+      (63/63 testes), mas o fork público para abrir o PR não foi criado —
+      fica para o dono decidir.
+
+Funções do TabWin acrescentadas depois (2026-10-14), todas tiradas do
+binário com o rea:
+
+- [x] **Calcular indicador**: numerador × 10ⁿ ÷ denominador ("por 1" a "por
+      1.000.000"), zero com denominador zero, total = razão dos totais
+      (Indicador1Click decompilado).
+- [x] **Arquivos** no painel: escolher quais dos arquivos abertos entram, como
+      a lista do TabWin; o log e "Salvar registros" seguem a escolha.
+- [x] **Salvar registros** no painel.
+- [x] **Acentuação do DOS**: DBF em CP850 é detectado pelo conteúdo e lido
+      com os acentos certos (HUF_MEC.dbf e HUF_FILIAL.dbf do TAB_SIH são CP850).
+- [ ] "Fixar comprimento da chave": a rotina só guarda um número; o uso está
+      em outra função, ainda não lida.
+- [ ] Comprimir DBF → DBC (o TabWin comprime; o TabSis só expande).
+
+Próximos passos sugeridos para a tabulação:
+
+- [ ] Seleção por tabela DBF (ex.: "Hospital AC (CNES)") conferida contra o
+      TabWin real.
+- [ ] Assistente para criar DEF (o TabWin tem o formulário `TFFAZDEF`).
+
+---
+
 Escrito em 2026-09-02. A ordem é de prioridade: cada bloco só começa quando o
 anterior passa no portão (`npm run check:all`). Erros relatados pelo usuário
 entram na frente de tudo — o resto da fila espera.
@@ -115,7 +187,7 @@ Três decisões que a verificação forçou, e que valem ficar escritas:
   o botão simplesmente não aparece — melhor do que oferecer e falhar.
 
 O diálogo diz em destaque que esta é a única parte do aplicativo em que a
-pergunta viaja. Isso não é ornamento: o resto do TabWin Web baixa o arquivo
+pergunta viaja. Isso não é ornamento: o resto do TabSis baixa o arquivo
 e tabula no aparelho sem contar a ninguém o que se quis saber, e perder
 isso de vista por conveniência seria trair o motivo do projeto existir.
 

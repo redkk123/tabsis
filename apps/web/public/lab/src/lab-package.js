@@ -1,5 +1,5 @@
 /**
- * Leitor do pacote de laboratório exportado pelo TabWin Web.
+ * Leitor do pacote de laboratório exportado pelo TabSis.
  *
  * ## Por que a implementação é independente
  *
@@ -77,7 +77,7 @@ function validateProvenance(raw) {
     throw new LabPackageError('PROVENIENCIA.json não é um JSON válido');
   }
   if (parsed?.schema !== LAB_PACKAGE_SCHEMA) {
-    throw new LabPackageError('Este arquivo não é um pacote de laboratório do TabWin Web');
+    throw new LabPackageError('Este arquivo não é um pacote de laboratório do TabSis');
   }
   // Versão diferente é recusa, não tentativa de adivinhar: um pacote mais novo
   // pode ter mudado o significado de um campo, e ler errado em silêncio é pior

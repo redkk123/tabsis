@@ -15,8 +15,21 @@ export interface DimensionSpec {
   lookupId?: string;
   /** 1-based initial character position inside the source field, as in DEF Campo D. */
   startPosition?: number;
-  /** Explicit handling when a raw value is empty or has no CNV match. */
-  unclassifiedPolicy?: 'omit' | 'discriminate';
+  /**
+   * Explicit handling when a raw value is empty or has no CNV match.
+   *
+   * TabWin 4.15's "Não classificados" radio maps as follows (oracle and
+   * decompiled classification routine, 2026-10-13, RE_002):
+   * - Ignorar → `omit` (the default);
+   * - Incluir → `discriminate`: ONE extra "Não classificados" row/column;
+   * - Discriminar → `discriminate-codes` on rows: one extra row per distinct
+   *   unclassified code, labelled with the code itself, in order of first
+   *   appearance — but only when the CNV is literal (`L`, or codes longer than
+   *   four characters) or the axis is a DBF lookup. A short CNV ignores them,
+   *   exactly as TabWin did with RACA1.CNV. On columns TabWin treats
+   *   Discriminar like Incluir, so callers pass `discriminate` there.
+   */
+  unclassifiedPolicy?: 'omit' | 'discriminate' | 'discriminate-codes';
 }
 
 /** Immutable, renderer-independent lookup table loaded from a DEF-related DBF. */
@@ -148,6 +161,8 @@ export interface ResultAxisItem {
   excludeFromTotal?: boolean;
   /** Explicit display policy for a post-tabulation derived column. */
   totalPolicy?: TotalPolicy;
+  /** The total shown when `totalPolicy` is `precalculated` (TabWin "Pré Calculado"). */
+  precalculatedTotal?: number;
 }
 
 export interface TabulationResult {
@@ -185,6 +200,41 @@ export type TableOperation =
     }
   | {
       kind: 'cumulative';
+      sourceColumnKey: string;
+      output: DerivedColumnSpec;
+    }
+  | {
+      /**
+       * TabWin "Operações → %percentagem": each value as a percentage of the
+       * column total (the total that skips CNV subtotal detail rows). Decompiled
+       * from percentagem1Click; TabWin heads the new column "%" + header.
+       */
+      kind: 'percent-of-total';
+      sourceColumnKey: string;
+      output: DerivedColumnSpec;
+    }
+  | {
+      /**
+       * TabWin "Operações → Calcular indicador" (decompiled Indicador1Click):
+       * numerator × 10^scalePower ÷ denominator per row, zero where the
+       * denominator is zero; the column total is NOT a sum but the same ratio
+       * over the column totals (total numerator × scale ÷ total denominator).
+       */
+      kind: 'indicator';
+      numeratorColumnKey: string;
+      denominatorColumnKey: string;
+      /** 0..6: "por 1", "por 10", … "por 1.000.000", as the TabWin dialog offers. */
+      scalePower: number;
+      output: DerivedColumnSpec;
+    }
+  | {
+      /**
+       * TabWin "Operações → Normalizar": z-score over every row,
+       * (x − média) ÷ desvio padrão amostral (n − 1). Decompiled from
+       * Normalizar1Click; TabWin heads the new column "Z" + header and leaves
+       * its total at zero.
+       */
+      kind: 'normalize';
       sourceColumnKey: string;
       output: DerivedColumnSpec;
     }

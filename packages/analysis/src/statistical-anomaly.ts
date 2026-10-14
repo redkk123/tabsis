@@ -1,5 +1,5 @@
 /**
- * Statistical anomaly primitives for TabWin Web.
+ * Statistical anomaly primitives for TabSis.
  *
  * Design contract:
  * - statistical unusualness is evidence, never a declaration that a record is wrong;

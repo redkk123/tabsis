@@ -109,3 +109,13 @@ test('tabela com várias colunas soma a linha inteira', () => {
   assert.equal(h.top[0].label, 'Masc');
   assert.equal(h.top[0].value, 60);
 });
+
+test('subtotal detail rows do not count twice in the headline', async () => {
+  const { summarizeTable } = await import('../dist/packages/analysis/src/table-headline.js');
+  const headline = summarizeTable({
+    rows: [{ label: 'Região Norte' }, { label: '.. Acre', excludeFromTotal: true }, { label: '.. Pará', excludeFromTotal: true }],
+    cells: [[4315], [4315], [0]],
+  });
+  assert.equal(headline.total, 4315);
+  assert.equal(headline.categories, 3);
+});

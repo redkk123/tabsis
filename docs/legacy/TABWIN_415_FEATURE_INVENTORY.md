@@ -29,7 +29,7 @@ Status vocabulary:
 | Open `.DBC` and `.DBF` | **Web** | Browser-compatible decoder; no upload. |
 | Search/download official microdata | **Web / modern extension** | Official DATASUS catalog, system/type/year/month/UF filters, official HTTPS preparation and local opening. Not a claimed 4.15 compatibility behavior. |
 | Resolve official DEF/CNV auxiliaries | **Web / partial** | Verified SIH-RD rule downloads current `TAB_SIH.zip` and loads `RD2008.DEF` plus referenced CNVs. Other systems remain explicit pending rules. |
-| Select `.DEF` | **Web / Parsed** | `A`, `R`, `S/L/C/Q/D/T`, `I`, `G`; unknown directives retained. |
+| Select `.DEF` | **Web / Parsed** | `A`, `R`, `S/L/C/Q/D/T/X`, `I`, `G`, `?`; `X` = row+column+selection (RE-002). Panel built from the DEF in file order. |
 | Apply `.CNV` | **Web / Kernel** | Legacy short, literal and numeric-range forms; source-order precedence retained. New `N` layout remains guarded. |
 | Row and column dimensions | **Web** | Raw rows/columns; row CNV in the current UI. |
 | Frequency | **Web** | Ordinary and `G` weighted frequency in kernel. |
@@ -38,11 +38,11 @@ Status vocabulary:
 | Selections / filters | **Web / Kernel** | Multiple simultaneous raw or DEF/CNV-backed inclusion/exclusion filters, explicit numeric intervals and selection-all/clear controls. Exact 4.15 dialog defaults remain golden-pending. |
 | Suppress zero rows | **Web** | Applied after materializing CNV categories. |
 | Row subtotals | **Kernel** | CNV subtotal propagation tested. |
-| Tabulate list of files | **Cataloged** | Multi-period ingestion/merge semantics pending oracle cases. |
+| Tabulate list of files | **Web** | Panel "Arquivos" list: choose which open files enter the tabulation (log and saved records follow). |
 | Value ranges | **Web / Kernel** | Numeric-range CNV plus explicit open/closed filter bounds in the browser. |
 | Top `n` categories | **Cataloged** | Must define tie/order semantics from the oracle. |
-| Unclassified data | **Web / explicit policy** | Omit remains the default; users may select unmatched CNV values in filters or materialize a `Não classificados` axis row. Exact 4.15 label/default remains golden-pending. |
-| Log file | **Replaced** | Audit JSON exists; legacy log import/export pending. |
+| Unclassified data | **Web / oracle-checked** | Ignorar/Incluir/Discriminar as TabWin: Incluir = one `Não classificados` row/column; Discriminar = one row per unmatched code on literal CNV/DBF lookups, first-appearance order, ignored on short CNV (RE-002, `verify:painel`). |
+| Log file | **Web** | TabWin log written after each panel run; pasted log or `.TAB` restores the panel (RE-002). |
 
 ## 2. Tables, saved work and exports
 
@@ -63,12 +63,13 @@ explicit, replayable result transforms and must never mutate the source
 
 | Operation | Status |
 | --- | --- |
-| Indicator calculation | **Web / partial** — explicit numerator/denominator percentage is available; legacy indicator dialog defaults still need an oracle. |
+| Indicator calculation | **Web** — TabWin `Calcular indicador`: numerator × 10ⁿ ÷ denominator (scale 1…1,000,000), zero on zero denominator, precalculated total = ratio of totals (decompiled, RE-002). |
 | Add two or more columns | **Web / modern policy** — pairwise addition can be chained and is persisted in recipes. |
 | Subtract, multiply or divide two columns | **Web / modern policy** — division-by-zero behavior is explicit (`error` or `zero`). |
 | Minimum and maximum | **Web / modern policy** |
 | Multiply by a factor | **Web / modern policy** |
-| Percentage | **Web / modern policy** — computes `A / B × 100` with explicit zero policy. |
+| Percentage | **Web** — `A / B × 100` (modern) and TabWin `%percentagem` (value ÷ column total × 100, header `%`), decompiled. |
+| Normalize | **Web** — TabWin `Normalizar`: z-score with sample SD (n − 1), header `Z`, decompiled (RE-002). |
 | Accumulate a column | **Web / modern policy** — current result row order is authoritative. |
 | Absolute value and integer values | **Web / modern policy** — UI integer conversion uses truncation toward zero; kernel also represents round/floor/ceil. |
 | Define sequence | **Web / modern policy** — UI exposes start value and unit step. |
@@ -154,10 +155,11 @@ policy, before compatibility claims.
 ## 8. DEF/CNV authoring and DBF utilities
 
 Confirmed topics include concepts, edit and create flows for DEF/CNV; DBF
-viewer; DBF compression to DBC; DBC expansion; CRC test; accent conversion;
+viewer (**Web**: "Ver registros do arquivo"); DBF compression to DBC; DBC expansion; CRC test; accent conversion;
 and saving records to a new DBF. Reading/parsing, DBC expansion and
 executor-selected record writing are now **Web**. DBF-to-DBC encoding,
-authoring, CRC reporting and accent conversion remain **Cataloged**.
+authoring and accent conversion remain **Cataloged**; CRC testing is **Web**
+(CRC-32 of the decompressed DBF, RE-002).
 
 ## 9. Integrations and historical mechanisms
 

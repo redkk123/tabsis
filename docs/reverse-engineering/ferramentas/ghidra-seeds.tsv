@@ -1,0 +1,6 @@
+# inicios provaveis (prologo 55 8B EC apos ret), achados a partir das xrefs de "Nao classificados"
+0x53a718	function	TabulaClassifica_1
+0x53ba04	function	TabulaExecuta_1
+0x5652c4	function	Normalizar1Click
+0x5651cc	function	percentagem1Click
+0x564f44	function	Acumula1Click

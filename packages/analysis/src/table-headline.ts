@@ -36,7 +36,12 @@ export interface TableHeadline {
 }
 
 export interface HeadlineSource {
-  rows: readonly { label: string }[];
+  /**
+   * `excludeFromTotal` marks CNV subtotal detail rows (".. Acre" under
+   * "Região Norte"): their value is already inside the parent row, so adding
+   * them again would double the total — the table's own Total row skips them.
+   */
+  rows: readonly { label: string; excludeFromTotal?: boolean }[];
   cells: readonly (readonly number[])[];
   measureLabel?: string;
   recordsAccepted?: number;
@@ -47,10 +52,10 @@ const somar = (valores: readonly number[]): number =>
   valores.reduce((soma, valor) => (Number.isFinite(valor) ? soma + valor : soma), 0);
 
 export function summarizeTable(source: HeadlineSource, topCount = 3): TableHeadline {
-  const pesos = source.rows.map((row, index) => ({
+  const pesos = source.rows.flatMap((row, index) => (row.excludeFromTotal ? [] : [{
     label: row.label,
     value: somar(source.cells[index] ?? []),
-  }));
+  }]));
   const total = somar(pesos.map((peso) => peso.value));
 
   // Proporção só existe com total positivo. Numa medida que soma valores com

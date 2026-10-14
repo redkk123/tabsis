@@ -1,0 +1,380 @@
+object Tabula: TTabula
+  Left = 106
+  Top = 300
+  HelpContext = 7
+  BorderStyle = bsDialog
+  Caption = 'Tabula'
+  ClientHeight = 547
+  ClientWidth = 1107
+  Color = clBtnFace
+  OldCreateOrder = True
+  Position = poScreenCenter
+  OnClose = FormClose
+  OnCreate = FormCreate
+  object Label1: TLabel
+    Left = 96
+    Top = 4
+    Width = 38
+    Height = 16
+    Caption = 'Linhas'
+    ParentFont = False
+  end
+  object Label2: TLabel
+    Left = 648
+    Top = 4
+    Width = 64
+    Height = 16
+    Caption = 'Incremento'
+    ParentFont = False
+  end
+  object Label3: TLabel
+    Left = 432
+    Top = 207
+    Width = 91
+    Height = 16
+    Caption = 'Seleções ativas'
+    ParentFont = False
+  end
+  object Label4: TLabel
+    Left = 931
+    Top = 4
+    Width = 49
+    Height = 16
+    Caption = 'Arquivos'
+    ParentFont = False
+  end
+  object Label5: TLabel
+    Left = 392
+    Top = 4
+    Width = 47
+    Height = 16
+    Caption = 'Colunas'
+    ParentFont = False
+  end
+  object Label6: TLabel
+    Left = 426
+    Top = 339
+    Width = 142
+    Height = 16
+    Caption = 'Categorias selecionadas'
+    ParentFont = False
+  end
+  object Label7: TLabel
+    Left = 50
+    Top = 208
+    Width = 121
+    Height = 16
+    Caption = 'Seleções disponíveis'
+    ParentFont = False
+  end
+  object bFTP: TSpeedButton
+    Left = 1036
+    Top = 240
+    Width = 23
+    Height = 25
+    Hint = 'Baixar Arquivos via FTP'
+    ParentShowHint = False
+    ShowHint = True
+    OnClick = bFTPClick
+  end
+  object ListLinha: TListBox
+    Left = 8
+    Top = 22
+    Width = 220
+    Height = 153
+    ItemHeight = 13
+    ParentFont = False
+    TabOrder = 0
+    OnMouseDown = ListLinhaMouseDown
+  end
+  object ListIncr: TListBox
+    Left = 567
+    Top = 22
+    Width = 220
+    Height = 153
+    ItemHeight = 13
+    MultiSelect = True
+    ParentFont = False
+    TabOrder = 2
+    OnMouseDown = ListLinhaMouseDown
+  end
+  object ListSelecao: TListBox
+    Left = 370
+    Top = 227
+    Width = 220
+    Height = 94
+    ItemHeight = 13
+    ParentFont = False
+    TabOrder = 4
+    OnClick = ListSelecaoClick
+    OnMouseDown = ListLinhaMouseDown
+  end
+  object EspecArquivos: TEdit
+    Left = 847
+    Top = 22
+    Width = 220
+    Height = 21
+    ParentFont = False
+    ParentShowHint = False
+    ShowHint = True
+    TabOrder = 6
+    OnChange = EspecArquivosChange
+  end
+  object ListArquivos: TListBox
+    Left = 847
+    Top = 85
+    Width = 134
+    Height = 244
+    ItemHeight = 13
+    MultiSelect = True
+    ParentFont = False
+    TabOrder = 7
+    OnMouseDown = ListLinhaMouseDown
+  end
+  object ListColunas: TListBox
+    Left = 288
+    Top = 22
+    Width = 220
+    Height = 153
+    ItemHeight = 13
+    ParentFont = False
+    TabOrder = 1
+    OnMouseDown = ListLinhaMouseDown
+  end
+  object ListCategSel: TListBox
+    Left = 8
+    Top = 358
+    Width = 1089
+    Height = 147
+    IntegralHeight = True
+    ItemHeight = 13
+    MultiSelect = True
+    ParentFont = False
+    TabOrder = 5
+    OnExit = ListCategSelExit
+  end
+  object ListInicial: TListBox
+    Left = 8
+    Top = 226
+    Width = 220
+    Height = 95
+    ItemHeight = 13
+    ParentFont = False
+    TabOrder = 3
+    OnDblClick = ListInicialDblClick
+    OnMouseDown = ListLinhaMouseDown
+  end
+  object Execute: TBitBtn
+    Left = 999
+    Top = 91
+    Width = 93
+    Height = 27
+    Hint = 'Executar tabulação '
+    Caption = 'E&xecutar'
+    ParentFont = False
+    ParentShowHint = False
+    ShowHint = True
+    TabOrder = 8
+    OnClick = ExecuteClick
+    NumGlyphs = 2
+  end
+  object Sair: TBitBtn
+    Left = 999
+    Top = 159
+    Width = 93
+    Height = 27
+    Hint = 'Sair para a janela principal'
+    Caption = 'Sai&r'
+    ParentFont = False
+    ParentShowHint = False
+    ShowHint = True
+    TabOrder = 9
+    Kind = bkClose
+  end
+  object NaoClassificado: TRadioGroup
+    Left = 643
+    Top = 246
+    Width = 123
+    Height = 83
+    Hint = 'Como tratar os registros cujos códigos não estejam previstos na tabela de conversão'
+    Caption = 'Não classificados'
+    ItemIndex = 0
+    Items.Strings = ('&Ignorar' 'In&cluir' '&Discriminar')
+    ParentFont = False
+    ParentShowHint = False
+    ShowHint = True
+    TabOrder = 10
+    OnClick = NaoClassificadoClick
+  end
+  object Seleciona: TBitBtn
+    Left = 288
+    Top = 236
+    Width = 69
+    Height = 25
+    Hint = 'Inclui a seleção disponível marcada entre as seleções ativas'
+    Caption = '&Incluir'
+    ParentFont = False
+    ParentShowHint = False
+    ShowHint = True
+    TabOrder = 11
+    OnClick = SelecionaClick
+    NumGlyphs = 2
+  end
+  object DeSeleciona: TBitBtn
+    Left = 288
+    Top = 276
+    Width = 69
+    Height = 25
+    Hint = 'Exclui o item marcado das seleções ativas'
+    Caption = '&Excluir'
+    ParentFont = False
+    ParentShowHint = False
+    ShowHint = True
+    TabOrder = 12
+    OnClick = DeSelecionaClick
+    NumGlyphs = 2
+  end
+  object bCancelar: TBitBtn
+    Left = 999
+    Top = 125
+    Width = 93
+    Height = 27
+    Hint = 'Cancelar a tabulação ao fim deste arquivo'
+    Cancel = True
+    Caption = '&Cancelar'
+    Enabled = False
+    ParentFont = False
+    ParentShowHint = False
+    ShowHint = True
+    TabOrder = 13
+    OnClick = bCancelarClick
+    NumGlyphs = 2
+  end
+  object bAjuda: TBitBtn
+    Left = 999
+    Top = 193
+    Width = 93
+    Height = 27
+    Hint = 'Ajuda sobre o arquivo de definição'
+    Caption = '&Ajuda'
+    ParentFont = False
+    ParentShowHint = False
+    ShowHint = True
+    TabOrder = 14
+    OnClick = bAjudaClick
+    NumGlyphs = 2
+  end
+  object cbGrava: TCheckBox
+    Left = 647
+    Top = 210
+    Width = 124
+    Height = 17
+    Hint = 'Gravar DBF com os registros selecionados'
+    Caption = '&Salvar registros'
+    ParentFont = False
+    ParentShowHint = False
+    ShowHint = True
+    TabOrder = 15
+  end
+  object ckTestaCRC: TCheckBox
+    Left = 647
+    Top = 190
+    Width = 108
+    Height = 17
+    Hint = 'Testar integridade da compressão de cada arquivo'
+    Caption = '&Testar CRC'
+    ParentFont = False
+    ParentShowHint = False
+    ShowHint = True
+    TabOrder = 16
+  end
+  object bLocalizar: TBitBtn
+    Left = 27
+    Top = 329
+    Width = 180
+    Height = 24
+    Caption = '&Localizar categoria'
+    ParentFont = False
+    TabOrder = 17
+    OnClick = bLocalizarClick
+    NumGlyphs = 2
+  end
+  object cbSupLin: TCheckBox
+    Left = 14
+    Top = 182
+    Width = 179
+    Height = 17
+    Caption = 'Suprimir linhas zeradas'
+    ParentFont = False
+    TabOrder = 18
+  end
+  object cbSupCol: TCheckBox
+    Left = 198
+    Top = 182
+    Width = 185
+    Height = 17
+    Caption = 'Suprimir colunas zeradas'
+    Checked = True
+    ParentFont = False
+    State = cbChecked
+    TabOrder = 19
+  end
+  object bConsultaSQL: TBitBtn
+    Left = 848
+    Top = 51
+    Width = 136
+    Height = 25
+    Hint = 'Conecta-se ao banco de dados criando uma cópia atualizada para análise'
+    Caption = 'Importar dados'
+    ParentFont = False
+    ParentShowHint = False
+    ShowHint = True
+    TabOrder = 20
+    OnClick = bConsultaSQLClick
+    NumGlyphs = 2
+  end
+  object StatusBar1: TStatusBar
+    Left = 0
+    Top = 528
+    Width = 1107
+    Height = 19
+    Panels = <item{Text='NumReg'; Width=100} item{Text='Arquivo'; Width=800} item{Text='Tempo'; Width=100}>
+    SimplePanel = False
+  end
+  object Bot_AbrirArquivo: TBitBtn
+    Left = 1073
+    Top = 20
+    Width = 25
+    Height = 25
+    Hint = 'Abrir Diretório com Arquivos de Dados'
+    ParentShowHint = False
+    ShowHint = True
+    TabOrder = 22
+    OnClick = Bot_AbrirArquivoClick
+  end
+  object Timer1: TTimer
+    Enabled = False
+    Interval = 200
+    OnTimer = Timer1Timer
+    Left = 1048
+    Top = 288
+  end
+  object GravaDialog: TSaveDialog
+    DefaultExt = 'dbf'
+    Filter = 'dBase III plus|*.dbf'
+    Options = [ofOverwritePrompt, ofNoChangeDir]
+    Left = 1016
+    Top = 288
+  end
+  object FindDialog1: TFindDialog
+    Options = [frDown, frHideWholeWord]
+    OnFind = FindDialog1Find
+    Left = 984
+    Top = 288
+  end
+  object OD: TOpenDialog
+    Filter = 'Arquivo DBF|*.dbf|Arquivo DBC|*.dbc'
+    Left = 985
+    Top = 320
+  end
+end
