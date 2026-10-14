@@ -119,3 +119,9 @@ test('subtotal detail rows do not count twice in the headline', async () => {
   assert.equal(headline.total, 4315);
   assert.equal(headline.categories, 3);
 });
+
+test('quando nenhuma categoria chega a 1%, a manchete diz isso em vez de "0% 1225100350661"', () => {
+  const rows = Array.from({ length: 300 }, (_, index) => ({ key: String(index), label: `AIH ${index}` }));
+  const headline = summarizeTable({ rows, cells: rows.map(() => [1]) });
+  assert.equal(describeHeadline(headline, fmt), '300 categorias, nenhuma com 1% do total ou mais');
+});

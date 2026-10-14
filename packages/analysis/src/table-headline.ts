@@ -103,6 +103,13 @@ export function describeHeadline(
     return `${headline.categories} categoria(s), sem valor a destacar`;
   }
 
+  // Nenhuma categoria chega a 1%: destacar a "maior" com um 0% (como uma
+  // linha por número de AIH faria) não diz nada. Diz-se o que é verdade.
+  const maior = headline.top[0]?.share;
+  if (maior !== undefined && maior < .01) {
+    return `${format.integer(headline.categories)} categorias, nenhuma com 1% do total ou mais`;
+  }
+
   const partes = headline.top
     .filter((item, index) => index === 0 || (item.share ?? 0) >= .1)
     .slice(0, 2)

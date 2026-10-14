@@ -19,3 +19,9 @@ test('nome do arquivo do DATASUS vira uma descrição legível', () => {
   assert.match(describeAuxiliaryFile('RD2008.DEF'), /Linhas, Colunas/);
   assert.match(describeAuxiliaryFile('SEXO.CNV'), /código pelo nome/);
 });
+
+test('o prefixo do tipo de arquivo vai junto, para escolher o layout no dicionário', () => {
+  assert.equal(describeDatasusFile('RDAC2401.dbc')?.prefix, 'RD');
+  assert.equal(describeDatasusFile('STAC2501.dbc')?.prefix, 'ST');
+  assert.equal(describeDatasusFile('PAAC2501.dbc')?.prefix, 'PA');
+});

@@ -14,6 +14,8 @@ export interface DatasusFileDescription {
   system: string;
   /** O que o arquivo traz, em português ("Internações (AIH reduzida)"). */
   kind: string;
+  /** Prefixo do tipo de arquivo no FTP (RD, PA, ST, DO…): escolhe o layout no dicionário. */
+  prefix?: string;
   /** Estado por extenso, ou "Brasil". */
   place?: string;
   /** Período por extenso ("janeiro de 2024", "2023"). */
@@ -69,13 +71,14 @@ const SINAN: Record<string, string> = {
   TUBE: 'Tuberculose', VARC: 'Varicela', VIOL: 'Violência interpessoal/autoprovocada', ZIKA: 'Zika',
 };
 
-function build(system: string, kind: string, uf: string | undefined, year: number | undefined, month?: number): DatasusFileDescription {
+function build(system: string, kind: string, uf: string | undefined, year: number | undefined, month?: number, prefix?: string): DatasusFileDescription {
   const place = uf ? UF_NAMES[uf] : undefined;
   const period = year === undefined ? undefined : month ? `${MONTHS[month - 1]} de ${year}` : String(year);
   const periodShort = year === undefined ? undefined : month ? `${MONTHS[month - 1]!.slice(0, 3)}/${year}` : String(year);
   const summary = [kind, system, place, periodShort].filter(Boolean).join(' · ');
   return {
     system, kind,
+    ...(prefix ? { prefix } : {}),
     ...(place ? { place } : {}),
     ...(period ? { period } : {}),
     ...(periodShort ? { periodShort } : {}),
@@ -103,9 +106,9 @@ export function describeDatasusFile(fileName: string): DatasusFileDescription | 
     const month = Number(digits.slice(2));
     if (UF_NAMES[uf] && month >= 1 && month <= 12) {
       const year = fullYear(digits.slice(0, 2));
-      if (SIH[prefix]) return build('SIH', SIH[prefix]!, uf, year, month);
-      if (SIA[prefix]) return build('SIA', SIA[prefix]!, uf, year, month);
-      if (CNES[prefix]) return build('CNES', CNES[prefix]!, uf, year, month);
+      if (SIH[prefix]) return build('SIH', SIH[prefix]!, uf, year, month, prefix);
+      if (SIA[prefix]) return build('SIA', SIA[prefix]!, uf, year, month, prefix);
+      if (CNES[prefix]) return build('CNES', CNES[prefix]!, uf, year, month, prefix);
     }
     // SIM: DO + UF + AAAA? (4 dígitos = ano completo)
   }
