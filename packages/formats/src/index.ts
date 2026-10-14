@@ -14,3 +14,4 @@ export * from './delimited.js';
 export * from './legacy-tab.js';
 export * from './datasus-field-labels.js';
 export * from './tab-file.js';
+export * from './tabwin-log.js';
