@@ -110,20 +110,36 @@ export interface ResolvedorDeRecursos {
   lookup(arquivo: string): string | undefined;
 }
 
+/** Só o nome do arquivo, sem a pasta do DEF: `DBF\TCNESAC.DBF` → `TCNESAC.DBF`. */
+function nomeDoArquivo(path: string): string {
+  return path.replace(/\\/g, '/').split('/').pop() ?? path;
+}
+
 /** File name only, lower-case: `CNV\br_uf.cnv` and `BR_UF.CNV` are the same table. */
 export function nomeBaseDoRecurso(path: string): string {
   return path.replace(/\\/g, '/').split('/').pop()?.toLowerCase() ?? path.toLowerCase();
 }
 
+/**
+ * Linha-título de seção, que o TabWin lista mas não é variável: sem campo, ou
+ * com TITULO/COMENTARIO no lugar dele ("X* DADOS GERAIS *, TITULO,
+ * LINHA_COMENTARIO_…" e "X* EQUIPES_AC *,    , TITULO , …" nos DEFs do CNES).
+ */
+function ehTitulo(option: DefOption): boolean {
+  const recurso = option.kind === 'conversion' ? option.conversionFile : option.kind === 'dbf-lookup' ? option.lookupFile : option.resourceFile;
+  return !option.field || /^(TITULO|COMENTARIO)$/i.test(option.field) || /^LINHA_COMENTARIO/i.test(recurso);
+}
+
 function eixoDoDef(option: DefOption, papel: string, recursos: ResolvedorDeRecursos, campos?: ReadonlySet<string>): PainelEixo {
   const id = `def:${option.sourceLine}:${papel}`;
   const base = { id, label: option.label, field: option.field };
+  if (ehTitulo(option)) return { ...base, disponivel: false, motivo: 'título de seção do DEF, não é uma variável' };
   const faltaCampo = campos && !campos.has(option.field.toUpperCase());
   if (option.kind === 'conversion') {
     const conversionId = recursos.conversao(option.conversionFile);
     const motivo = faltaCampo
-      ? `o arquivo aberto não tem o campo ${option.field}`
-      : conversionId ? undefined : `falta a tabela ${option.conversionFile}`;
+      ? `não existe neste arquivo (campo ${option.field})`
+      : conversionId ? undefined : `falta a tabela ${nomeDoArquivo(option.conversionFile)}`;
     return {
       ...base,
       startPosition: option.startPosition,
@@ -136,8 +152,8 @@ function eixoDoDef(option: DefOption, papel: string, recursos: ResolvedorDeRecur
   if (option.kind === 'dbf-lookup') {
     const lookupId = recursos.lookup(option.lookupFile);
     const motivo = faltaCampo
-      ? `o arquivo aberto não tem o campo ${option.field}`
-      : lookupId ? undefined : `falta a tabela ${option.lookupFile}`;
+      ? `não existe neste arquivo (campo ${option.field})`
+      : lookupId ? undefined : `falta a tabela ${nomeDoArquivo(option.lookupFile)}`;
     return {
       ...base,
       resourceFile: option.lookupFile,
@@ -150,7 +166,7 @@ function eixoDoDef(option: DefOption, papel: string, recursos: ResolvedorDeRecur
     ...base,
     resourceFile: option.resourceFile,
     disponivel: false,
-    motivo: `usa ${option.resourceFile} de um jeito que o TabSis ainda não executa`,
+    motivo: `ainda não funciona no TabSis (usa ${nomeDoArquivo(option.resourceFile)} de um jeito especial)`,
   };
 }
 

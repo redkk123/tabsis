@@ -303,14 +303,14 @@ function resetCnvEditorToBlank(): void {
 function loadCnvIntoEditor(name: string): void {
   const definition = deps.conversoes().get(name);
   if (!definition) return;
-  setCnvEditorReadOnly(definition.mode === 'new-format');
+  setCnvEditorReadOnly(definition.mode === 'new-format' || Boolean(definition.newFormat));
   cnvEditorRows = rowsFromDefinition(definition);
   cnvEditorMode = definition.mode;
   cnvEditorCodeLength = definition.codeLength;
   cnvEditorFilename.value = name;
   cnvEditorModeSelect.value = cnvEditorMode;
   cnvEditorCodeLengthInput.value = String(cnvEditorCodeLength);
-  if (definition.mode === 'new-format') {
+  if (definition.mode === 'new-format' || definition.newFormat) {
     showToast(`${name}: formato N é executável, mas o editor não regrava esse layout — use como somente leitura`, true);
   }
   renderCnvEditorTable();

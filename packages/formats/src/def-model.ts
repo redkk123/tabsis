@@ -43,6 +43,12 @@ export interface DefConversionOption extends DefOptionBase {
   /** 1-based initial character position inside the DBF field. */
   startPosition: number;
   conversionFile: string;
+  /**
+   * Texto que estava no lugar da posição inicial ("DS_TPFIN" em
+   * `FAEC_TP,DS_TPFIN,CNV\TP_FINAN.CNV`). O TabWin 4.15 o ignora e lê a CNV a
+   * partir da posição 1 (RE-004); fica guardado só para auditoria.
+   */
+  ignoredThirdField?: string;
 }
 
 /** Legacy option that relates the source field to another DBF lookup table. */

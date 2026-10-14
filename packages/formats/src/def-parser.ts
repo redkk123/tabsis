@@ -109,7 +109,15 @@ function parseOption(
   const [label = '', field = '', third = '', fourth = '', ...trailingFields] = fields;
   const retainedTrailingFields = trailingFields.length ? { trailingFields } : {};
   if (strict && !label) throw new DefParseError(`${directive} directive has no display label`, sourceLine);
-  if (strict && !field) throw new DefParseError(`${directive} directive has no DBF field`, sourceLine);
+  // Linha-título sem campo ("X* EQUIPES_AC *,    , TITULO , TITULO_…" no
+  // Equipes.def do CNES): o TabWin abre o DEF e lista a linha como opção
+  // (RE-004). Fica guardada, sem campo — o painel a mostra em cinza.
+  if (!field) {
+    return {
+      kind: 'external-lookup', directive, label, field: '', roles: rolesForDirective(directive),
+      lookupLabelField: third, resourceFile: fourth, sourceLine, ...retainedTrailingFields,
+    };
+  }
   if (strict && !third) throw new DefParseError(`${directive} directive has an empty third field`, sourceLine);
   if (strict && !fourth) throw new DefParseError(`${directive} directive has no conversion/lookup file`, sourceLine);
 
@@ -147,10 +155,26 @@ function parseOption(
     return option;
   }
 
-  // Contemporary real-world DEF files also pair a textual third field with a
-  // CNV resource (for example DS_TPFIN + TP_FINAN.CNV). That is observably not
-  // the documented DBF lookup form. Preserve it as unsupported executable
-  // metadata instead of rejecting it or guessing that it is an ordinary CNV.
+  // Texto no terceiro campo com uma CNV no quarto (DS_TPFIN + TP_FINAN.CNV no
+  // RD2008.DEF; NM_AGRAVO + agravsurt.cnv no SINAN). Medido no TabWin 4.15
+  // (RE-004, 2026-10-14): a tabela sai idêntica à da mesma linha com "1" no
+  // terceiro campo — o texto é ignorado e a CNV é lida da posição 1.
+  if (/\.cnv$/i.test(fourth)) {
+    return {
+      kind: 'conversion',
+      directive,
+      label,
+      field,
+      roles,
+      startPosition: 1,
+      conversionFile: fourth,
+      ignoredThirdField: third,
+      sourceLine,
+      ...retainedTrailingFields,
+    };
+  }
+
+  // Outro recurso (sem caso real medido): guardado, sem fingir que executa.
   const option: DefExternalLookupOption = {
     kind: 'external-lookup',
     directive,
@@ -166,7 +190,11 @@ function parseOption(
 }
 
 function parseIncrement(rest: string, sourceLine: number, strict: boolean): DefIncrement {
+  // Vírgula sobrando no fim ("I* ATENDIMENTO PRESTADO *, ATEND_PR," no
+  // Estabelecimento.def do CNES): o TabWin abre o DEF e lista o incremento
+  // (RE-004). Campos vazios no fim não contam.
   const fields = splitCommaFields(rest);
+  while (fields.length > 2 && !fields[fields.length - 1]) fields.pop();
   if (strict && fields.length !== 2) {
     throw new DefParseError(`I directive expects label,field; got ${fields.length} fields`, sourceLine);
   }

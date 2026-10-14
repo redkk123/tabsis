@@ -8,7 +8,7 @@
  * this path before replacing it.
  */
 
-import type { ConversionRegistry } from './execute.js';
+import type { ConversionRegistry, TabulationOptions } from './execute.js';
 import { executeInMemory } from './execute.js';
 import type { DataRecord, QueryPlan, TabulationResult } from './model.js';
 import { fieldsUsedByPlan } from './plan-fields.js';
@@ -250,12 +250,13 @@ export function executeColumnarProjection(
   projection: ColumnarProjection,
   plan: QueryPlan,
   conversions: ConversionRegistry = {},
+  options: TabulationOptions = {},
 ): TabulationResult {
   const required = fieldsUsedByPlan(plan);
   const available = new Set(projection.fields);
   const missing = required.filter((field) => !available.has(field));
   if (missing.length) throw new Error(`columnar projection is missing plan field(s): ${missing.join(', ')}`);
-  return executeInMemory(projection.select(required).records(), plan, conversions);
+  return executeInMemory(projection.select(required).records(), plan, conversions, options);
 }
 
 function fieldKey(fields: readonly string[]): string {

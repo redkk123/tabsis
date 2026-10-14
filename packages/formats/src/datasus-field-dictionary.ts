@@ -1,0 +1,188 @@
+/**
+ * O que cada campo do SIM e do SINASC significa, transcrito dos dicionários
+ * oficiais do DATASUS — para o painel explicar "STDONOVA" ou "DIFDATA" a quem
+ * nunca viu essas siglas, sem que ninguém precise adivinhar.
+ *
+ * Fontes (ftp.datasus.gov.br/dissemin/publicos):
+ * - SIM: `SIM/CID10/DOCS/Estrutura_do_SIM_2025.pdf` (atualizado em 07/2025);
+ * - SINASC: `SINASC/NOV/DOCS/Estrutura_SINASC_para_CD.pdf`.
+ *
+ * Só entra o que está escrito nesses documentos. Campo que eles não descrevem
+ * (no SIM, `NUDIASOBIN`; no SINASC, os campos da DN nova, como `KOTELCHUCK`)
+ * fica de fora: o painel mostra então só as categorias da CNV, que é o que se
+ * sabe. Como em `datasus-field-labels.ts`, isto é apresentação: nunca muda um
+ * número, um filtro ou uma exportação.
+ */
+
+export interface DatasusFieldEntry {
+  /** Nome curto, para mostrar no lugar da sigla. */
+  label: string;
+  /** O que o campo é, em uma ou duas frases. */
+  description: string;
+  /** Valores válidos, como o dicionário lista ("1 – Fetal; 2 – Não fetal"). */
+  values?: string;
+}
+
+export type DatasusDictionarySystem = 'SIM' | 'SINASC';
+
+export const DATASUS_DICTIONARY_SOURCES: Readonly<Record<DatasusDictionarySystem, string>> = Object.freeze({
+  SIM: 'Estrutura do SIM, DATASUS, 07/2025',
+  SINASC: 'Estrutura do SINASC, DATASUS',
+});
+
+const SIM_ANOS_DE_ESTUDO = '1 – Nenhuma; 2 – 1 a 3 anos; 3 – 4 a 7 anos; 4 – 8 a 11 anos; 5 – 12 anos e mais; 9 – Ignorado';
+const ESCOLARIDADE_2010 = '0 – Sem escolaridade; 1 – Fundamental I (1ª a 4ª série); 2 – Fundamental II (5ª a 8ª série); 3 – Médio; 4 – Superior incompleto; 5 – Superior completo; 9 – Ignorado';
+const ESCOLARIDADE_AGREGADA = '00 – Sem escolaridade; 01 – Fundamental I incompleto; 02 – Fundamental I completo; 03 – Fundamental II incompleto; 04 – Fundamental II completo; 05 – Médio incompleto; 06 – Médio completo; 07 – Superior incompleto; 08 – Superior completo; 09 – Ignorado; 10 a 12 – incompleto ou inespecífico';
+const SIM_NAO_IGNORADO = '1 – Sim; 2 – Não; 9 – Ignorado';
+const RACA_COR = '1 – Branca; 2 – Preta; 3 – Amarela; 4 – Parda; 5 – Indígena';
+const DATA = 'data no formato ddmmaaaa';
+
+const SIM: Readonly<Record<string, DatasusFieldEntry>> = {
+  TIPOBITO: { label: 'Tipo do óbito', description: 'Se o óbito é fetal (morte antes da expulsão ou extração completa do corpo da mãe) ou não fetal.', values: '1 – Fetal; 2 – Não fetal' },
+  DTOBITO: { label: 'Data do óbito', description: 'Data em que ocorreu o óbito.', values: DATA },
+  HORAOBITO: { label: 'Hora do óbito', description: 'Horário do óbito, no padrão de 24 horas.' },
+  NATURAL: { label: 'Naturalidade', description: 'Município e UF onde o falecido nasceu; se estrangeiro, o país.' },
+  CODMUNNATU: { label: 'Município de naturalidade', description: 'Código do município de naturalidade do falecido.' },
+  DTNASC: { label: 'Data de nascimento', description: 'Data de nascimento do falecido. No óbito fetal, igual à data do óbito.', values: DATA },
+  IDADE: { label: 'Idade', description: 'Idade do falecido em dois subcampos: o primeiro dígito é a unidade (1 = minutos, 2 = horas, 3 = meses, 4 = anos, 5 = mais de 100 anos) e os dois seguintes, a quantidade.' },
+  SEXO: { label: 'Sexo', description: 'Sexo do falecido. "Ignorado" é usado em casos especiais, como cadáver em decomposição ou genitália indefinida.', values: 'M ou 1 – Masculino; F ou 2 – Feminino; I, 0 ou 9 – Ignorado' },
+  RACACOR: { label: 'Raça/cor', description: 'Cor informada pelo responsável pelas informações do falecido.', values: RACA_COR },
+  ESTCIV: { label: 'Situação conjugal', description: 'Situação conjugal do falecido, informada pelos familiares.', values: '1 – Solteiro; 2 – Casado; 3 – Viúvo; 4 – Separado judicialmente/divorciado; 5 – União estável; 9 – Ignorado' },
+  ESC: { label: 'Escolaridade (anos)', description: 'Escolaridade do falecido em anos de estudo (formulário antigo).', values: SIM_ANOS_DE_ESTUDO },
+  ESC2010: { label: 'Escolaridade 2010 (nível)', description: 'Nível da última série concluída pelo falecido (formulário a partir de 2010).', values: ESCOLARIDADE_2010 },
+  SERIESCFAL: { label: 'Última série concluída', description: 'Última série escolar concluída pelo falecido (1 a 8).' },
+  ESCFALAGR1: { label: 'Escolaridade agregada', description: 'Escolaridade do falecido agregada (formulário a partir de 2010).', values: ESCOLARIDADE_AGREGADA },
+  OCUP: { label: 'Ocupação (CBO 2002)', description: 'Tipo de trabalho que o falecido desenvolveu na maior parte da vida produtiva, pela Classificação Brasileira de Ocupações.' },
+  CODMUNRES: { label: 'Município de residência', description: 'Código do município de residência. No óbito fetal, o município de residência da mãe.' },
+  LOCOCOR: { label: 'Local de ocorrência', description: 'Onde o óbito ocorreu.', values: '1 – Hospital; 2 – Outro estabelecimento de saúde; 3 – Domicílio; 4 – Via pública; 5 – Outros; 6 – Aldeia indígena; 9 – Ignorado' },
+  CODESTAB: { label: 'Estabelecimento (CNES)', description: 'Código do estabelecimento de saúde no Cadastro Nacional de Estabelecimentos de Saúde.' },
+  CODMUNOCOR: { label: 'Município de ocorrência', description: 'Código do município onde ocorreu o óbito.' },
+  IDADEMAE: { label: 'Idade da mãe', description: 'Idade da mãe, em anos.' },
+  ESCMAE: { label: 'Escolaridade da mãe (anos)', description: 'Escolaridade da mãe em anos de estudo (formulário antigo).', values: SIM_ANOS_DE_ESTUDO },
+  ESCMAE2010: { label: 'Escolaridade da mãe 2010 (nível)', description: 'Nível da última série concluída pela mãe (formulário a partir de 2010).', values: ESCOLARIDADE_2010 },
+  SERIESCMAE: { label: 'Última série concluída pela mãe', description: 'Última série escolar concluída pela mãe (1 a 8).' },
+  ESCMAEAGR1: { label: 'Escolaridade da mãe agregada', description: 'Escolaridade da mãe agregada (formulário a partir de 2010).', values: ESCOLARIDADE_AGREGADA },
+  OCUPMAE: { label: 'Ocupação da mãe (CBO 2002)', description: 'Trabalho exercido habitualmente pela mãe, pela Classificação Brasileira de Ocupações.' },
+  QTDFILVIVO: { label: 'Filhos nascidos vivos', description: 'Número de filhos vivos da mãe.' },
+  QTDFILMORT: { label: 'Perdas fetais/abortos', description: 'Número de filhos mortos, sem contar a criança cujo óbito está sendo notificado.' },
+  SEMAGESTAC: { label: 'Semanas de gestação', description: 'Semanas de gestação, com dois algarismos.' },
+  GESTACAO: { label: 'Faixa de semanas de gestação', description: 'Semanas de gestação em faixas (formulário antigo).', values: '1 – Menos de 22; 2 – 22 a 27; 3 – 28 a 31; 4 – 32 a 36; 5 – 37 a 41; 6 – 42 e mais semanas' },
+  GRAVIDEZ: { label: 'Tipo de gravidez', description: 'Se a gravidez foi única ou múltipla.', values: '1 – Única; 2 – Dupla; 3 – Tripla e mais; 9 – Ignorada' },
+  PARTO: { label: 'Tipo de parto', description: 'Tipo de parto.', values: '1 – Vaginal; 2 – Cesáreo; 9 – Ignorado' },
+  OBITOPARTO: { label: 'Morte em relação ao parto', description: 'Momento do óbito em relação ao parto.', values: '1 – Antes; 2 – Durante; 3 – Depois; 9 – Ignorado' },
+  MORTEPARTO: { label: 'Morte em relação ao parto (após investigação)', description: 'Momento do óbito em relação ao parto, depois da investigação.', values: '1 – Antes; 2 – Durante; 3 – Após; 9 – Ignorado' },
+  PESO: { label: 'Peso ao nascer', description: 'Peso ao nascer, em gramas.' },
+  TPMORTEOCO: { label: 'Quando a morte ocorreu (mulher em idade fértil)', description: 'Situação gestacional ou pós-gestacional em que ocorreu o óbito.', values: '1 – Na gravidez; 2 – No parto; 3 – No abortamento; 4 – Até 42 dias após o parto; 5 – De 43 dias a 1 ano após; 8 – Não ocorreu nesses períodos; 9 – Ignorado' },
+  OBITOGRAV: { label: 'Óbito na gravidez', description: 'Se o óbito ocorreu na gravidez.', values: SIM_NAO_IGNORADO },
+  OBITOPUERP: { label: 'Óbito no puerpério', description: 'Se o óbito ocorreu no puerpério.', values: '1 – Sim, até 42 dias após o parto; 2 – Sim, de 43 dias a 1 ano; 3 – Não; 9 – Ignorado' },
+  TPOBITOCOR: { label: 'Momento do óbito (investigação)', description: 'Momento do óbito apontado pela investigação; em branco, não investigado.', values: '1 – Na gestação; 2 – No abortamento; 3 – Após o abortamento; 4 – No parto ou até 1 hora após; 5 – No puerpério (até 42 dias); 6 – De 43 dias a 1 ano após o parto; 7 – Investigação não identificou; 8 – Mais de um ano após o parto; 9 – Nenhuma dessas' },
+  ASSISTMED: { label: 'Recebeu assistência médica', description: 'Se o paciente recebeu atendimento médico continuado durante a doença que causou a morte.', values: SIM_NAO_IGNORADO },
+  EXAME: { label: 'Exame', description: 'Se foi realizado exame.', values: SIM_NAO_IGNORADO },
+  CIRURGIA: { label: 'Cirurgia', description: 'Se foi realizada cirurgia.', values: SIM_NAO_IGNORADO },
+  NECROPSIA: { label: 'Necropsia', description: 'Se foi feita necropsia para confirmar o diagnóstico.', values: SIM_NAO_IGNORADO },
+  LINHAA: { label: 'Causa — linha A', description: 'CIDs da linha A da DO: a causa terminal, doença ou estado que causou diretamente a morte.' },
+  LINHAB: { label: 'Causa — linha B', description: 'CIDs da linha B da DO: causa antecedente, que produziu a causa da linha A.' },
+  LINHAC: { label: 'Causa — linha C', description: 'CIDs da linha C da DO: causa antecedente, que produziu a causa da linha B.' },
+  LINHAD: { label: 'Causa — linha D', description: 'CIDs da linha D da DO: causa básica, o estado mórbido que produziu a causa direta da morte registrada na linha A.' },
+  LINHAII: { label: 'Causa — parte II', description: 'CIDs informados na parte II da DO.' },
+  CAUSABAS: { label: 'Causa básica (CID-10)', description: 'Causa básica do óbito, em CID-10.' },
+  CAUSABAS_O: { label: 'Causa básica original', description: 'Causa básica informada antes da resseleção.' },
+  CAUSAMAT: { label: 'Causa externa associada à materna', description: 'CID da causa externa associada a uma causa materna.' },
+  ATESTANTE: { label: 'Médico atestante', description: 'Condição do médico que atestou o óbito.', values: '1 – Assistente; 2 – Substituto; 3 – IML; 4 – SVO; 5 – Outro' },
+  COMUNSVOIM: { label: 'Município do SVO/IML', description: 'Código do município do SVO ou do IML, quando o óbito foi atestado por um deles.' },
+  DTATESTADO: { label: 'Data do atestado', description: 'Data em que o atestado foi assinado.', values: DATA },
+  CIRCOBITO: { label: 'Tipo de morte violenta', description: 'Circunstância da morte não natural.', values: '1 – Acidente; 2 – Suicídio; 3 – Homicídio; 4 – Outros; 9 – Ignorado' },
+  ACIDTRAB: { label: 'Acidente de trabalho', description: 'Se o evento que causou o óbito está relacionado ao trabalho.', values: SIM_NAO_IGNORADO },
+  FONTE: { label: 'Fonte da informação', description: 'Fonte usada para preencher o tipo de morte violenta e o acidente de trabalho.', values: '1 – Ocorrência policial; 2 – Hospital; 3 – Família; 4 – Outra; 9 – Ignorado' },
+  ORIGEM: { label: 'Origem do registro', description: 'De que banco de dados o registro veio.', values: '1 – Oracle; 2 – Banco estadual via FTP; 3 – Banco SEADE; 9 – Ignorado' },
+  NUMEROLOTE: { label: 'Número do lote', description: 'Número do lote de digitação.' },
+  DTINVESTIG: { label: 'Data da investigação', description: 'Data da investigação do óbito.', values: DATA },
+  DTCADASTRO: { label: 'Data do cadastro', description: 'Data do cadastro do óbito no sistema.', values: DATA },
+  DTRECEBIM: { label: 'Data do recebimento', description: 'Data do recebimento da DO.', values: DATA },
+  DTRECORIGA: { label: 'Data do recebimento original', description: 'Data do recebimento original, criada no tratamento dos dados.', values: DATA },
+  STCODIFICA: { label: 'Instalação codificadora', description: 'Se a instalação é codificadora (S) ou não (N).' },
+  CODIFICADO: { label: 'Formulário codificado', description: 'Se o formulário foi codificado (S) ou não (N).' },
+  VERSAOSIST: { label: 'Versão do sistema', description: 'Versão do sistema que gerou o registro.' },
+  VERSAOSCB: { label: 'Versão do seletor de causa básica', description: 'Versão do programa que seleciona a causa básica.' },
+  FONTEINV: { label: 'Fonte da investigação', description: 'Fonte usada na investigação do óbito.', values: '1 – Comitê de morte materna e/ou infantil; 2 – Visita domiciliar/entrevista com a família; 3 – Estabelecimento de saúde/prontuário; 4 – Outros bancos de dados; 5 – SVO; 6 – IML; 7 – Outra; 8 – Múltiplas fontes; 9 – Ignorado' },
+  FONTES: { label: 'Fontes da investigação (combinado)', description: 'Combinação das fontes da investigação (entrevista, ambulatório, prontuário, SVO, IML, profissional): S onde a fonte foi usada, X onde não.' },
+  ATESTADO: { label: 'CIDs do atestado', description: 'CIDs informados no atestado.' },
+  OPOR_DO: { label: 'Oportunidade da DO', description: 'Campo criado no tratamento dos dados para calcular oportunidades.' },
+  STDOEPIDEM: { label: 'DO epidemiológica', description: 'Se a declaração de óbito é epidemiológica.', values: '1 – Sim; 0 – Não' },
+  STDONOVA: { label: 'DO nova', description: 'Se a declaração de óbito é do modelo novo.', values: '1 – Sim; 0 – Não' },
+  DIFDATA: { label: 'Dias até o recebimento', description: 'Diferença, em dias, entre a data do óbito e a data do recebimento original da DO.' },
+  NUDIASOBCO: { label: 'Dias até a conclusão da investigação', description: 'Diferença, em dias, entre a data do óbito e a conclusão da investigação.' },
+  DTCADINV: { label: 'Data do cadastro da investigação', description: 'Data do cadastro da investigação.', values: DATA },
+  DTCONINV: { label: 'Data da conclusão da investigação', description: 'Data da conclusão da investigação.', values: DATA },
+  DTCADINF: { label: 'Investigação realizada', description: 'Quando preenchido, indica que a investigação foi realizada.', values: DATA },
+  DTCONCASO: { label: 'Data de conclusão do caso', description: 'Data de conclusão do caso.', values: DATA },
+  TPRESGINFO: { label: 'Resgate de informação', description: 'Se a investigação trouxe uma causa de óbito não informada ou corrigiu uma informada.', values: '01 – Não acrescentou nem corrigiu; 02 – Sim, resgatou novas informações; 03 – Sim, corrigiu alguma causa informada' },
+  TPNIVELINV: { label: 'Nível investigador', description: 'Nível que fez a investigação.', values: 'E – Estadual; R – Regional; M – Municipal' },
+  ALTCAUSA: { label: 'Alterou a causa após investigação', description: 'Se a causa do óbito foi corrigida ou alterada depois da investigação.', values: '1 – Sim; 2 – Não' },
+  TPPOS: { label: 'Óbito investigado', description: 'Se o óbito foi investigado.', values: '1 – Sim; 2 – Não' },
+  TP_ALTERA: { label: 'Motivo de alteração da causa', description: 'Tipo de crítica que levou à alteração da causa básica (em branco, ausência do 4º caractere, causa asterisco, inválida para o sexo, implausível…).' },
+  CB_ALT: { label: 'Variável de sistema', description: 'Variável de uso interno do sistema.' },
+};
+
+const SINASC: Readonly<Record<string, DatasusFieldEntry>> = {
+  NUMERODN: { label: 'Número da DN', description: 'Número da declaração de nascido vivo, sequencial por UF informante e por ano.' },
+  LOCNASC: { label: 'Local do nascimento', description: 'Onde o nascimento ocorreu.', values: '1 – Hospital; 2 – Outro estabelecimento de saúde; 3 – Domicílio; 4 – Outros; 9 – Ignorado' },
+  CODESTAB: { label: 'Estabelecimento (CNES)', description: 'Código do estabelecimento de saúde.' },
+  CODBAINASC: { label: 'Bairro do nascimento', description: 'Código do bairro do nascimento.' },
+  CODMUNNASC: { label: 'Município do nascimento', description: 'Código do município de ocorrência do nascimento.' },
+  IDADEMAE: { label: 'Idade da mãe', description: 'Idade da mãe, em anos.' },
+  ESTCIVMAE: { label: 'Estado civil da mãe', description: 'Estado civil da mãe.', values: '1 – Solteira; 2 – Casada; 3 – Viúva; 4 – Separada judicialmente/divorciada; 9 – Ignorado' },
+  ESCMAE: { label: 'Escolaridade da mãe (anos)', description: 'Anos de estudo concluídos pela mãe.', values: '1 – Nenhuma; 2 – 1 a 3 anos; 3 – 4 a 7 anos; 4 – 8 a 11 anos; 5 – 12 e mais; 9 – Ignorado' },
+  CODOCUPMAE: { label: 'Ocupação da mãe (CBO 2002)', description: 'Ocupação da mãe, pela Classificação Brasileira de Ocupações.' },
+  QTDFILVIVO: { label: 'Filhos vivos', description: 'Número de filhos vivos.' },
+  QTDFILMORT: { label: 'Filhos mortos', description: 'Número de filhos mortos.' },
+  CODBAIRES: { label: 'Bairro de residência', description: 'Código do bairro de residência.' },
+  CODMUNRES: { label: 'Município de residência da mãe', description: 'Código do município de residência da mãe.' },
+  GESTACAO: { label: 'Semanas de gestação (faixa)', description: 'Semanas de gestação, em faixas.', values: '1 – Menos de 22; 2 – 22 a 27; 3 – 28 a 31; 4 – 32 a 36; 5 – 37 a 41; 6 – 42 e mais semanas; 9 – Ignorado' },
+  GRAVIDEZ: { label: 'Tipo de gravidez', description: 'Se a gravidez foi única ou múltipla.', values: '1 – Única; 2 – Dupla; 3 – Tripla e mais; 9 – Ignorado' },
+  PARTO: { label: 'Tipo de parto', description: 'Tipo de parto.', values: '1 – Vaginal; 2 – Cesáreo; 9 – Ignorado' },
+  CONSULTAS: { label: 'Consultas de pré-natal', description: 'Número de consultas de pré-natal, em faixas.', values: '1 – Nenhuma; 2 – 1 a 3; 3 – 4 a 6; 4 – 7 e mais; 9 – Ignorado' },
+  DTNASC: { label: 'Data do nascimento', description: 'Data do nascimento.', values: DATA },
+  HORANASC: { label: 'Hora do nascimento', description: 'Hora do nascimento.' },
+  SEXO: { label: 'Sexo', description: 'Sexo do recém-nascido.', values: '0 – Ignorado; 1 – Masculino; 2 – Feminino' },
+  APGAR1: { label: 'Apgar no 1º minuto', description: 'Índice de Apgar no primeiro minuto de vida (0 a 10).' },
+  APGAR5: { label: 'Apgar no 5º minuto', description: 'Índice de Apgar no quinto minuto de vida (0 a 10).' },
+  RACACOR: { label: 'Raça/cor', description: 'Raça/cor do recém-nascido.', values: RACA_COR },
+  PESO: { label: 'Peso ao nascer', description: 'Peso ao nascer, em gramas.' },
+  IDANOMAL: { label: 'Anomalia congênita', description: 'Se foi detectada anomalia congênita.', values: '1 – Sim; 2 – Não; 9 – Ignorado' },
+  CODANOMAL: { label: 'Código da anomalia (CID-10)', description: 'Código da malformação congênita ou anomalia cromossômica, pela CID-10.' },
+  DTCADASTRO: { label: 'Data do cadastro', description: 'Data de cadastramento no sistema.', values: DATA },
+  DTRECEBIM: { label: 'Data do recebimento', description: 'Data de recebimento no nível central (última atualização do registro).', values: DATA },
+  CODINST: { label: 'Instalação', description: 'Código da instalação que gerou o registro.' },
+  UFINFORM: { label: 'UF informante', description: 'Código da UF que informou o registro.' },
+};
+
+const DICTIONARIES: Readonly<Record<DatasusDictionarySystem, Readonly<Record<string, DatasusFieldEntry>>>> = { SIM, SINASC };
+
+/**
+ * O que o dicionário oficial diz de um campo. Com o sistema (do nome do
+ * arquivo: `DOINF23.dbc` é SIM), usa o dicionário dele — `SEXO` tem códigos
+ * diferentes no SIM e no SINASC. Sem o sistema, só responde se os dois
+ * dicionários não discordam.
+ */
+export function datasusFieldEntry(
+  fieldName: string,
+  system?: string,
+): { entry: DatasusFieldEntry; source: string } | undefined {
+  const field = fieldName.trim().toUpperCase();
+  if (system === 'SIM' || system === 'SINASC') {
+    const entry = DICTIONARIES[system][field];
+    return entry ? { entry, source: DATASUS_DICTIONARY_SOURCES[system] } : undefined;
+  }
+  const sim = SIM[field];
+  const sinasc = SINASC[field];
+  if (sim && sinasc && (sim.values ?? '') !== (sinasc.values ?? '')) return undefined;
+  if (sim) return { entry: sim, source: DATASUS_DICTIONARY_SOURCES.SIM };
+  if (sinasc) return { entry: sinasc, source: DATASUS_DICTIONARY_SOURCES.SINASC };
+  return undefined;
+}
+
+/** Quantos campos cada dicionário cobre, para a interface dizer o alcance. */
+export function datasusDictionaryCount(system: DatasusDictionarySystem): number {
+  return Object.keys(DICTIONARIES[system]).length;
+}

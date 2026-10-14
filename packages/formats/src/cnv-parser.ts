@@ -28,6 +28,7 @@ interface ParsedHeader {
   categoryCount: number;
   codeLength: number;
   mode: CnvMode;
+  newFormat: boolean;
 }
 
 function splitComment(line: string): { body: string; comment?: string } {
@@ -60,13 +61,15 @@ function parseHeader(body: string, lineNumber: number): ParsedHeader | null {
     throw new CnvParseError('code length must be a positive integer', lineNumber);
   }
 
+  // O N só alarga as colunas; a comparação segue a mesma regra (RE-004: o
+  // TP_FINAN.CNV, "N 101 6 L", é literal no TabWin — o branco listado na linha
+  // 101 pega os registros sem FAEC_TP).
   let mode: CnvMode;
-  if (isNew) mode = 'new-format';
-  else if (modifier === 'L') mode = 'literal';
+  if (modifier === 'L') mode = 'literal';
   else if (modifier === 'F' || modifier === 'FAIXAS') mode = 'numeric-ranges';
   else mode = codeLength > 4 ? 'literal' : 'short';
 
-  return { categoryCount, codeLength, mode };
+  return { categoryCount, codeLength, mode, newFormat: isNew };
 }
 
 function parseRuleLine(
@@ -74,6 +77,7 @@ function parseRuleLine(
   sourceLine: number,
   mode: CnvMode,
   sourceOrder: number,
+  isNew: boolean,
 ): { category: CnvCategory; rule: CnvRuleLine; invalidSubtotal?: string } {
   // Legacy columns (1-based): subtotal 1-3, sequence 4-7,
   // description 10-59, codes 61+. The N layout widens sequence, description
@@ -94,7 +98,6 @@ function parseRuleLine(
   // "110-4 Autarquia Federal" (sequence 10 = "  10"), which only the 4-column
   // reading predicts; the 104-0 row disappeared and the total stayed 4,315.
   // Evidence in docs/handoffs/R10_6_G012_SUBTOTAL_WIDTH_RESOLVED.md.
-  const isNew = mode === 'new-format';
   const subtotalRaw = body.slice(0, isNew ? 4 : 3).trim();
   const sequenceRaw = body.slice(isNew ? 5 : 3, isNew ? 9 : 7).trim();
   // Só o fim é aparado: o recuo do começo é a hierarquia que o TabWin mostra
@@ -112,7 +115,8 @@ function parseRuleLine(
   // (" 1- 5" pega " 1".." 5"; "01-05" não pega o número 1, que é " 1";
   // RE-003, testes T5–T7). Só o fim da linha é aparado.
   const literal = mode === 'literal';
-  const codesList = literal ? codesArea.replace(/\s+$/, '') : codesRaw;
+  // Na curta os espaços do começo também importam: "    -zzzz" é faixa (RE-004).
+  const codesList = literal || mode === 'short' ? codesArea.replace(/\s+$/, '') : codesRaw;
 
   if (!/^\d+$/.test(sequenceRaw)) {
     throw new CnvParseError(
@@ -166,7 +170,20 @@ function parseRuleLine(
   } else if (codesRaw || blankCode) {
     if (blankCode) { exactCodes.push(' '); if (literal) literalTokens.push(' '); }
     for (const rawToken of codesList.split(',')) {
+      // CNV curta: espaços e depois o hífen ("    -zzzz" na NATJUR.CNV, "  -99"
+      // na TP_ESTAB.CNV) são uma faixa que começa no branco — pega o que as
+      // outras linhas não pegam. Medido no TabWin (RE-004, H5–H8): "   -500"
+      // dá o mesmo que "000-500". Sem os espaços ("-500") é outra coisa, que
+      // não está entendida e fica de fora.
+      if (mode === 'short' && /^ +-\S/.test(rawToken)) {
+        ranges.push({ from: ' ', to: rawToken.trim().slice(1).trim() });
+        continue;
+      }
       const token = literal ? rawToken : rawToken.trim();
+      // No literal, espaços entre vírgulas são o código em branco
+      // ("000000-999999,      ," no TP_FINAN.CNV: 3.642 registros sem FAEC_TP
+      // caem na linha 101 no TabWin; RE-004).
+      if (literal && token.length && !token.trim()) { if (!exactCodes.includes(' ')) { exactCodes.push(' '); literalTokens.push(' '); } continue; }
       if (!token.trim()) continue;
       // Faixa só com hífen depois do primeiro caractere do código: "----" (as
       // linhas-título) continua não sendo faixa nem código.
@@ -247,15 +264,15 @@ export function parseCnv(text: string, options: ParseCnvOptions = {}): CnvDefini
     // Fixed-column CNV rows need enough width to reach the code field. A short
     // line may still be valid if it contains no codes, but that is not useful as
     // a conversion rule, so strict compatibility mode rejects it.
-    const minimumLength = header.mode === 'new-format' ? 113 : 61;
+    const minimumLength = header.newFormat ? 113 : 61;
     if (strict && body.length < minimumLength) {
       throw new CnvParseError(
-        `${header.mode === 'new-format' ? 'new-format' : 'legacy fixed-column'} row is ${body.length} chars; expected at least ${minimumLength}`,
+        `${header.newFormat ? 'new-format' : 'legacy fixed-column'} row is ${body.length} chars; expected at least ${minimumLength}`,
         i + 1,
       );
     }
 
-    const parsed = parseRuleLine(body.padEnd(minimumLength), i + 1, header.mode, sourceOrder++);
+    const parsed = parseRuleLine(body.padEnd(minimumLength), i + 1, header.mode, sourceOrder++, header.newFormat);
     if (parsed.invalidSubtotal !== undefined) {
       warnings.push(`linha ${i + 1}: subtotal "${parsed.invalidSubtotal}" não é número; a categoria ${parsed.category.sequence} fica sem subtotal`);
     }
@@ -308,7 +325,7 @@ export function parseCnv(text: string, options: ParseCnvOptions = {}): CnvDefini
       previous = upper;
     }
   }
-  if (header.mode === 'new-format') {
+  if (header.newFormat) {
     warnings.push(
       'new-format N layout: fixed columns and the 4-wide subtotal indicator are proven by G012; writing this layout back out is still refused',
     );
@@ -318,6 +335,7 @@ export function parseCnv(text: string, options: ParseCnvOptions = {}): CnvDefini
     categoryCount: header.categoryCount,
     codeLength: header.codeLength,
     mode: header.mode,
+    ...(header.newFormat ? { newFormat: true } : {}),
     // Documented short-code example says a later row overrides an earlier broad
     // range. The supplied documentation separately notes first-index behavior for
     // long/literal codes. We preserve that distinction explicitly.

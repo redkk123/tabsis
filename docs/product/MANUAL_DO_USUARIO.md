@@ -36,21 +36,32 @@ está aberto.
 
 ---
 
-## 2. Primeiro uso, em quatro passos
+## 2. Primeiro uso
 
-![Tela inicial do TabSis, com a área para abrir arquivo e o painel de configuração à esquerda](./manual/01-inicio.png "A tela inicial. A tarja **Seus dados ficam neste aparelho** não é slogan: não existe servidor de dados neste programa.")
+![Tela inicial do TabSis: à esquerda, a área para abrir arquivo e a busca; ao centro, os caminhos "Nunca usei o TabWin" e "Já uso o TabWin"](./manual/01-inicio.png "A tela inicial fala com os dois públicos: quem nunca usou o TabWin e quem usa há anos. A tarja **Seus dados ficam neste aparelho** não é slogan: não existe servidor de dados neste programa.")
 
-1. **Abra um arquivo.** Arraste um `.DBC` para a área tracejada, ou clique nela
-   para escolher. Se você não tem um arquivo ainda, use **Buscar no DATASUS**
-   (seção 3).
-2. **A primeira tabela aparece sozinha.** É uma frequência simples, para você
-   ver que o arquivo abriu e que os números fazem sentido.
-3. **Escolha linhas e colunas.** Nos campos **LINHAS** e **COLUNAS**, à
-   esquerda. O campo **Buscar variável** encontra por nome técnico (`CS_SEXO`)
-   ou pelo rótulo legível.
-4. **Troque a medida** se precisar: frequência, soma de um campo, e outras.
+A tela inicial tem dois caminhos, e os dois chegam à mesma tabela.
 
-Pronto — daí em diante é refinar.
+**Nunca usei o TabWin.** O TabSis transforma os arquivos do DATASUS
+(internações, óbitos, nascimentos…) em tabelas.
+
+1. Escreva o que procura no campo à esquerda — *óbitos infantis 2023* — ou
+   clique em **Buscar no DATASUS** (seção 3).
+2. **A primeira tabela aparece sozinha**, para você ver que o arquivo abriu e
+   que os números fazem sentido.
+3. Troque o que vai nas **Linhas** e nas **Colunas** do Painel de tabulação e
+   clique em **Executar** (seção 4). Cada bloco e cada opção do painel tem uma
+   frase curta dizendo o que faz.
+
+**Já uso o TabWin.** É o mesmo jeito de trabalhar: abra o `.DBC` junto com o
+`.DEF` e as `.CNV` de sempre (pode selecionar a pasta inteira de uma vez) e use
+o painel com **Linhas**, **Colunas**, **Incremento** e **Seleções**. Os nomes
+são os do DEF, na ordem do DEF; os números são os mesmos do TabWin 4.15; e a
+tabela sai em `.TAB` para abrir no TabWin.
+
+Em qualquer dos dois, os arquivos aparecem na barra lateral pelo **nome
+original** — é por ele que as pessoas se entendem — e, logo embaixo, o que cada
+um é: `DOINF23.dbc` → *Óbitos infantis · SIM · Brasil · 2023*.
 
 ---
 
@@ -141,6 +152,14 @@ Os `.DEF` e `.CNV` são o que transforma código em nome legível: `1` vira
 - **Abrir todos** carrega de uma vez todos os DEF e CNV do pacote. Se algum
   arquivo falhar, os outros continuam, e o resultado diz quantos entraram e
   quantos não.
+- O mesmo vale quando você seleciona a pasta de CNV inteira na área "Abra seu
+  arquivo": um arquivo com defeito (a `MUNICDF.CNV` do SIM, que nem o TabWin
+  abre) é nomeado num aviso, e os outros entram.
+
+![Arquivos na barra lateral: DOINF23.dbc com a descrição, o DEF, e as 337 tabelas de conversão resumidas numa linha](./manual/17-arquivos-carregados.png "Na barra lateral, os dados com o nome original e o que são; o DEF; e as CNV resumidas numa linha só — 337 nomes de arquivo não diriam nada.")
+
+Uma opção do DEF que o TabWin lista mas não é variável — as linhas-título como
+`* DADOS GERAIS *` dos DEFs do CNES — aparece em cinza, com a explicação.
 
 Se um arquivo do pacote for grande demais para caber na memória da aba junto
 com os dados, ele fica de fora — **com aviso, nomeando o arquivo e o tamanho**
@@ -174,6 +193,8 @@ Instalação, endereços que ele pode acessar e modelo de ameaça estão em
 O **Painel de tabulação**, no topo da área principal, é o mesmo painel do
 TabWin, em quatro blocos numerados:
 
+![Painel de tabulação com o DEF de óbitos do SIM: Linhas em Fx.Etar.Infant.1 (5 linhas: < 7d, 07-27, 28d-<1, Ign <1, Ign), Colunas em Sexo (M, F, I), Incremento Frequência e as opções com uma frase cada](./manual/15-painel.png "O painel com o `Obito_1996_CID10.def` oficial e o DOINF23. Embaixo de Linhas e Colunas, as categorias que a escolha vai virar; embaixo de cada opção, o que ela faz; e, antes de executar, a frase dizendo o que vai ser tabulado.")
+
 | Bloco | O que faz | Padrão (igual ao TabWin) |
 | --- | --- | --- |
 | **1 · Linhas** | a variável cujas categorias viram as linhas | a primeira do DEF |
@@ -183,12 +204,73 @@ TabWin, em quatro blocos numerados:
 
 As listas vêm do **DEF**, com os nomes exatamente como ele escreve e na ordem
 do arquivo. Escolha o DEF no seletor do alto do painel (cada um aparece com a
-sua descrição). Sem DEF, as listas mostram os campos do arquivo. Uma opção cuja
-CNV não foi carregada aparece em cinza, dizendo qual arquivo falta.
+sua descrição). Sem DEF, as listas mostram os campos do arquivo.
+
+Embaixo de **Linhas** e de **Colunas**, o painel mostra o que a escolha vai
+virar — *5 linhas: < 7d · 07-27 · 28d-<1 · Ign <1 · Ign*, do campo `IDADE`,
+tabela `FXINFAN1.CNV`. Um nome do DEF como *Fx.Etar.Infant.1* não diz nada a
+quem nunca o viu; as categorias dizem.
+
+As opções que não dá para usar com os arquivos abertos (o campo não existe
+neles, ou a CNV não foi aberta) ficam fora das listas. O link **+ N que não dá
+para usar com estes arquivos**, embaixo de cada lista, mostra quais são e por
+quê.
+
+### O que querem dizer os nomes do DEF
+
+Os nomes das listas são os que o **DEF oficial** escreve — os mesmos do
+TabWin, e por isso o TabSis não os troca. Muitos são abreviações do próprio
+DATASUS (*Fx.Etar.Infant.1*, *Oport invetig (120d)* — com o erro de digitação
+do original). Para quem não os conhece, o painel explica cada um de três
+jeitos:
+
+1. **As categorias**, embaixo da lista: o que a escolha vai virar na tabela.
+2. **O dicionário oficial**, logo abaixo, no SIM e no SINASC: o que o campo do
+   arquivo significa, transcrito da *Estrutura do SIM* (DATASUS, 07/2025) e da
+   *Estrutura do SINASC*. Passe o mouse para ver os valores válidos e a fonte.
+3. **A dica** ao passar o mouse sobre qualquer opção da lista, com os dois.
+
+Alguns exemplos do DEF de óbitos:
+
+| Nome no DEF | Campo | O que é |
+| --- | --- | --- |
+| Faixa Etaria pad(5-5) | `IDADE` | faixas de 5 em 5 anos: 00-04a, 05-09a… |
+| \*DO novo modelo | `STDONOVA` | se a declaração de óbito é do modelo novo (Sim/Não) |
+| \*DO epidemiologica | `STDOEPIDEM` | se a declaração de óbito é epidemiológica (Sim/Não) |
+| Oport notif (30d) | `DIFDATA` | dias entre o óbito e o recebimento da DO, em faixas: até 30 dias (oportuna), 31–60… |
+| Oport invetig (120d) | `NUDIASOBIN` | dias até a investigação, em faixas: até 120 dias (oportuna), 121–150… |
+
+O dicionário só diz o que os documentos oficiais dizem. O `NUDIASOBIN`, por
+exemplo, não está na *Estrutura do SIM*: para ele, o painel mostra só as
+categorias da CNV. Os campos do SIM e do SINASC também ganham nome legível em
+**Tabular por campos** e em **Ver registros do arquivo**; nas exportações
+continua indo o nome técnico do campo, para não quebrar planilhas e scripts.
 
 Embaixo dos blocos, uma frase diz o que vai ser tabulado — *Frequência por
-Caráter atendimento segundo Sexo · UF internação: Acre* — antes de você clicar
-em **Executar**.
+Sexo segundo Fx.Etar.Infant.1* — antes de você clicar em **Executar**.
+
+As caixas de opção têm o nome do TabWin e, embaixo, o que fazem: **Suprimir
+linhas zeradas** (esconde as linhas com 0), **Salvar registros** (baixa os
+registros usados na tabela, em DBF), **Testar CRC** (confere se o DBC não está
+corrompido) e os três modos de **Não classificados**.
+
+![Resultado do painel: o arquivo descrito no topo, os botões "Baixar a tabela como", os números do arquivo, a manchete com o total e a tabela de faixa etária infantil por sexo](./manual/16-resultado-painel.png "O resultado. No topo, o arquivo pelo nome e pelo que ele é; a manchete resume a tabela numa frase (metade dos óbitos infantis de 2023 foi antes dos 7 dias); os rótulos M, F e I são os da `SEXO.CNV` oficial, como no TabWin.")
+
+Acima da tabela:
+
+- **Baixar a tabela como** — CSV (planilha), XLSX (Excel), JSON e XML (para
+  programas), e os formatos do TabWin: **TAB** (abre em *Arquivo → Abrir
+  tabela* do TabWin 4.15), **PRN** e **SQL**. Passe o mouse em cada botão para
+  ver para que serve.
+- Os números do arquivo: **registros** (cada um é um caso — um óbito, uma
+  internação), **variáveis** (as colunas do arquivo), **tamanho** e
+  **impressão digital** (o SHA-256, que confere se outra pessoa usou
+  exatamente o mesmo arquivo).
+- A **manchete**: o total e as categorias que mais pesam, em português.
+
+Se o `.DBC` foi aberto antes do `.DEF`, a primeira tabela sai pelos campos
+crus; quando o DEF e as CNV chegam, o painel a refaz sozinho com os nomes do
+DEF.
 
 Duas combinações o TabWin recusa, e o TabSis recusa com as mesmas palavras:
 coluna ativa com mais de um incremento (*Múltiplas colunas é incompatível com
@@ -198,7 +280,7 @@ categoria selecionada em …*).
 Os controles campo a campo, os filtros por intervalo numérico e as ferramentas
 de limpeza continuam na barra lateral, em **Tabular por campos**.
 
-![Aplicativo com o arquivo DOINF23 aberto, mostrando registros, campos, tamanho e SHA-256](./manual/02-arquivo-aberto.png "DOINF23 aberto: 32.017 registros, 87 campos, e o SHA-256 do arquivo. Esse código identifica exatamente o que você abriu, e vai junto na exportação.")
+![Os números do arquivo DOINF23 aberto: registros, variáveis, tamanho e impressão digital](./manual/02-arquivo-aberto.png "DOINF23 aberto: 32.017 registros, 87 variáveis, e a impressão digital (SHA-256) do arquivo. Esse código identifica exatamente o que você abriu, e vai junto na exportação.")
 
 ![Tabela cruzada de sexo por raça e cor, com totais por coluna](./manual/03-tabela-cruzada.png "Sexo cruzado com raça/cor. Os códigos aparecem como estão no arquivo porque nenhum CNV foi carregado — o programa não adivinha que `1` significa “masculino”.")
 
@@ -211,9 +293,11 @@ Quando a CNV não cobre todos os códigos do dado, as três opções do TabWin:
 - **Ignorar** (padrão): esses registros saem da tabela;
 - **Incluir**: entram numa linha (ou coluna) **Não classificados**;
 - **Discriminar**: cada código vira uma linha, rotulada com o próprio código,
-  na ordem em que aparece no arquivo — **só em CNV literal** (cabeçalho com `L`,
-  ou código com mais de 4 posições). Em CNV curta age como Ignorar, e nas
-  colunas age como Incluir. É exatamente o que o TabWin faz.
+  na ordem em que o TabWin o encontra — **só em CNV literal** (cabeçalho com
+  `L`, ou código com mais de 4 posições). Em CNV curta age como Ignorar, e nas
+  colunas age como Incluir. É exatamente o que o TabWin faz, inclusive na
+  ordem: num `.DBC` o TabWin lê em pedaços de 4.096 bytes e não exatamente na
+  ordem do arquivo, e o TabSis reproduz isso.
 
 O total de registros lidos e aceitos fica sempre visível, então a diferença é
 auditável.
@@ -335,7 +419,7 @@ Duas coisas importantes:
 
 ![Aba de consulta SQL antes de carregar dados, com a lista de campos disponíveis](./manual/10-consulta-vazia.png "A aba Consulta antes de carregar. Num arquivo de 87 campos, a tela diz quantos cabem — carregar todos raramente é o que se quer.")
 
-![Consulta SQL agrupando por causa básica, com o resultado em tabela](./manual/11-consulta-resultado.png "As oito causas básicas mais frequentes entre os óbitos infantis de 2023, em 135 ms. P369 é sepse bacteriana do recém-nascido.")
+![Consulta SQL agrupando por causa básica, com o resultado em tabela](./manual/11-consulta-resultado.png "As oito causas básicas mais frequentes entre os óbitos infantis de 2023, em milissegundos. P369 é sepse bacteriana do recém-nascido.")
 
 ![Aba de auditoria com o registro de procedência e operações](./manual/12-auditoria.png "De onde vieram os dados e o que foi feito com eles — para reproduzir o resultado depois e explicar como foi obtido.")
 
@@ -358,7 +442,7 @@ manual do curso TabWin de fev/2011):
 | Quadro → Decimais | Casas decimais da coluna (Editar) ou da tabela inteira (Quadro). |
 | Quadro → Suprimir/agregar linhas | Mesmo critério (igual, maior, menor, diferente) e linha "Outras". |
 | Quadro → Fixar comprimento da chave | Quadro → Comprimento da chave, usado ao Incluir tabela. |
-| Editar → Editar arquivo DEF ou CNV → Gera DEF | Metadados → **Gerar DEF**: marque os campos; baixe ou use no painel. |
+| Editar → Editar arquivo DEF ou CNV → Gera DEF | Definições e conversões → **Gerar DEF**: marque os campos; baixe ou use no painel. |
 | … → Gera CNV / Numera CNV | Editor de CNV → **Gerar do campo** / **Numerar**. |
 | Estatísticas → Regressão linear (coluna estimada) | Estatística → Regressão → "Inserir coluna com os valores estimados". |
 | Estatísticas → Histograma → Igual freqüência | Estatística → Histograma → Tipo de classe. |
@@ -469,9 +553,9 @@ suficientes para provar quais campos são estáveis.
 Para a barra lateral não ser uma pilha de botões de peso igual, as ações que
 não fazem parte do fluxo principal ficam em seções recolhíveis:
 
-- **Exportar o arquivo** — extrair o DBF original, salvar a seleção em DBF,
-  CSV para o `microdatasus`;
-- **Metadados** — Editor de CNV e Inspetor de DEF;
+- **Baixar os dados abertos** — extrair o DBF original, salvar a seleção em
+  DBF, CSV para o `microdatasus`;
+- **Definições e conversões** — Editor de CNV, Inspetor de DEF e Gerar DEF;
 - **Análises e tabelas salvas** — abrir e salvar receitas e tabelas.
 
 Nada foi removido; tudo está a um clique no cabeçalho da seção.
@@ -496,7 +580,9 @@ O projeto separa três coisas, e a interface também:
 
 - **Compatível** — o comportamento foi verificado contra o **TabWin 4.15 real**,
   com arquivo real, resultado capturado do programa original e comparação com
-  tolerância zero. Hoje são 16 desses casos.
+  tolerância zero. Hoje cobrem SIH, SIA, SIM, SINASC, SINAN e CNES: os goldens
+  do projeto mais as tabelas salvas pelo próprio TabWin com os DEF e CNV
+  oficiais (`docs/reverse-engineering/`, RE-002 a RE-004).
 - **Moderno** — funcionalidade nova, que o TabWin 4.15 não tinha. Não afirma
   equivalência com nada.
 - **Não verificado** — existe, funciona, mas ninguém conferiu contra o programa
@@ -524,8 +610,10 @@ memória da aba. O resto do pacote abre normalmente; use **Baixar arquivo** para
 salvar aquele item e usá-lo fora do navegador.
 
 **Rótulo aparecendo como código** — falta a CNV correspondente, ou ela ficou de
-fora do pacote. Verifique em **Definição (DEF) ativa** qual DEF está mandando,
-e se as conversões dele foram abertas.
+fora do pacote. Veja no seletor **Definição (DEF)**, no alto do painel, qual
+DEF está mandando, e se as conversões dele foram abertas: a opção mostra embaixo
+da lista qual tabela usa, e as que faltam aparecem em **+ N que não dá para usar
+com estes arquivos**.
 
 **Números diferentes do TabNet** — o TabNet aplica filtros próprios (por
 exemplo, só casos confirmados) que não estão no microdado cru. Compare o que

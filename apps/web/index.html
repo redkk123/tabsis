@@ -74,7 +74,7 @@
             <span class="eyebrow">Área de trabalho</span>
             <h1>Nova análise</h1>
           </div>
-          <span class="compatibility-badge">Compatível com TabWin 4.15</span>
+          <span class="compatibility-badge" title="Lê os mesmos DBC, DEF e CNV e dá os mesmos números do TabWin 4.15, conferido com o programa original">Faz o que o TabWin 4.15 faz</span>
         </div>
 
         <label class="drop-zone" id="drop-zone" for="file-input">
@@ -109,11 +109,11 @@
         <button class="secondary-button danger-button" id="decode-cancel-button" type="button" hidden>Cancelar leitura</button>
         <label class="check-label source-combine">
           <input id="combine-compatible-files" type="checkbox" />
-          <span>Combinar próximos DBC/DBF somente quando o esquema for compatível</span>
+          <span>Juntar os próximos arquivos num só <small class="source-combine-ajuda">ex.: vários meses ou estados, quando têm as mesmas colunas</small></span>
         </label>
 
         <details class="sidebar-group needs-dataset" id="group-export">
-          <summary>Exportar o arquivo <span>DBF, CSV</span></summary>
+          <summary>Baixar os dados abertos <span>DBF, CSV</span></summary>
           <div class="source-actions">
             <button class="secondary-button" id="source-dbf-button" type="button" disabled>Extrair DBF original</button>
             <button class="secondary-button" id="selected-dbf-button" type="button" disabled>Salvar seleção em DBF</button>
@@ -130,7 +130,7 @@
         </details>
 
         <details class="sidebar-group" id="group-metadata">
-          <summary>Metadados <span>DEF e CNV</span></summary>
+          <summary>Definições e conversões <span>DEF e CNV</span></summary>
           <div class="source-actions">
             <button class="secondary-button" id="cnv-editor-button" type="button">Editor de CNV</button>
             <button class="secondary-button" id="def-inspector-button" type="button" disabled>Inspetor de DEF</button>
@@ -558,11 +558,12 @@
               <span class="eyebrow" id="result-kicker">Pronto para começar</span>
               <h2 id="result-title">Abra um arquivo para explorar</h2>
             </div>
-            <div class="export-actions" aria-label="Exportar resultado">
-              <button class="secondary-button" id="export-csv-button" type="button" disabled>CSV</button>
-              <button class="secondary-button" id="export-json-button" type="button" disabled>JSON</button>
-              <button class="secondary-button" id="export-xlsx-button" type="button" disabled>XLSX</button>
-              <button class="secondary-button" id="export-xml-button" type="button" disabled>XML</button>
+            <div class="export-actions" aria-label="Baixar a tabela">
+              <span class="export-label">Baixar a tabela como</span>
+              <button class="secondary-button" id="export-csv-button" type="button" disabled title="Planilha simples: abre no Excel, LibreOffice ou Google Planilhas">CSV</button>
+              <button class="secondary-button" id="export-json-button" type="button" disabled title="Para programas e scripts (Python, R, JavaScript)">JSON</button>
+              <button class="secondary-button" id="export-xlsx-button" type="button" disabled title="Arquivo do Excel, com a formatação da tabela">XLSX</button>
+              <button class="secondary-button" id="export-xml-button" type="button" disabled title="Para sistemas que importam XML">XML</button>
               <button class="secondary-button" id="export-tab-button" type="button" disabled title="Tabela do TabWin: abre em Arquivo → Abrir tabela do TabWin 4.15, com o log da consulta">TAB</button>
               <button class="secondary-button" id="export-prn-button" type="button" disabled title="Texto separado por vírgulas, como o .PRN do TabWin">PRN</button>
               <button class="secondary-button" id="export-sql-button" type="button" disabled title="SQL script, como o do TabWin: CREATE TABLE e um INSERT por linha">SQL</button>
@@ -585,11 +586,28 @@
             <button data-view="query" type="button" title="Consulta SQL sobre os dados abertos, para perguntas que a tabulação não expressa">Consulta</button>
             <button data-view="audit" type="button" title="De onde vieram os dados e o que foi feito com eles">Auditoria</button>
           </nav>
+          <p class="view-hint" id="view-hint">O resultado da tabulação, mais totais, percentuais e formatação</p>
 
           <div class="view-panel active" id="table-view" data-panel="table">
             <div class="empty-state" id="empty-state">
               <span class="empty-orbit" aria-hidden="true"><i></i></span>
               <h3>Comece abrindo os arquivos</h3>
+              <div class="empty-paths">
+                <section class="empty-path">
+                  <h4>Nunca usei o TabWin</h4>
+                  <p>O TabSis transforma os arquivos do DATASUS (internações, óbitos, nascimentos…) em tabelas.
+                    Escreva o que procura no campo à esquerda, por exemplo <i>óbitos infantis 2023</i>, ou
+                    clique em <b>Buscar no DATASUS</b>. A primeira tabela aparece sozinha; depois é só trocar
+                    o que vai nas <b>Linhas</b> e nas <b>Colunas</b>.</p>
+                </section>
+                <section class="empty-path">
+                  <h4>Já uso o TabWin</h4>
+                  <p>É o mesmo jeito de trabalhar: abra o <code>.DBC</code> junto com o <code>.DEF</code> e as
+                    <code>.CNV</code> de sempre e use o painel com <b>Linhas</b>, <b>Colunas</b>, <b>Incremento</b>
+                    e <b>Seleções</b>. Os números são os mesmos do TabWin 4.15, e a tabela sai em <code>.TAB</code>
+                    para abrir no TabWin.</p>
+                </section>
+              </div>
               <ol class="empty-steps">
                 <li><b>Abra o arquivo de dados</b> (<code>.DBC</code> ou <code>.DBF</code>) à esquerda, ou use <b>Buscar no DATASUS</b>.</li>
                 <li><b>Junte o <code>.DEF</code> e as <code>.CNV</code></b> do sistema, se tiver: elas dão às variáveis os nomes do TabWin.</li>

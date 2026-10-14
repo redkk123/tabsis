@@ -19,6 +19,8 @@ import {
   parseTabwinLog,
   serializeTabwinLog,
 } from '../../../packages/formats/src/tabwin-log.ts';
+import { describeDatasusFile } from '../../../packages/formats/src/datasus-file-names.ts';
+import { datasusFieldEntry } from '../../../packages/formats/src/datasus-field-dictionary.ts';
 import type {
   CompatibilityProfile,
   DimensionLookupDefinition,
@@ -129,6 +131,15 @@ export interface Painel {
   logAtual(): string;
 }
 
+/** "DADOS\\RD*.DBC" → "Feito para arquivos RD… (ex.: RDAC2401.dbc)". */
+function padraoEmPortugues(padrao: string): string {
+  const nome = padrao.replace(/\\/g, '/').split('/').pop() ?? padrao;
+  const prefixo = nome.split('*')[0] ?? '';
+  return prefixo
+    ? `Este DEF é feito para os arquivos que começam com ${prefixo} (${nome})`
+    : `Este DEF é feito para os arquivos ${nome}`;
+}
+
 export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
   let catalogo: PainelCatalogo | null = null;
   let estado: PainelEstado | null = null;
@@ -156,6 +167,21 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
   const colunasBusca = el('input', { type: 'search', className: 'painel-busca', placeholder: 'Procurar…', ariaLabel: 'Procurar nas colunas' });
   const colunasLista = el('select', { id: 'painel-colunas', size: 9, ariaLabel: 'Colunas' });
   const incrementosLista = el('div', { id: 'painel-incrementos', className: 'painel-checklist', role: 'group', ariaLabel: 'Incremento' });
+  // Embaixo de Linhas e Colunas: o que a escolha vai virar ("5 linhas: < 7d ·
+  // 07-27 · …"). Um nome do DEF como "Fx.Etar.Infant.1" não diz nada a quem
+  // nunca o viu; as categorias dizem.
+  const previaLinhas = el('p', { className: 'painel-previa', id: 'painel-previa-linhas', ariaLive: 'polite' });
+  const previaColunas = el('p', { className: 'painel-previa', id: 'painel-previa-colunas', ariaLive: 'polite' });
+  /**
+   * Opções que não dá para usar com estes arquivos (campo que não existe, CNV
+   * que não foi aberta) ficam fora das listas até a pessoa pedir: misturadas,
+   * em cinza e com o motivo cortado, só confundiam.
+   */
+  let mostrarIndisponiveis = false;
+  const botaoIndisponiveis = (): HTMLButtonElement => el('button', { type: 'button', className: 'text-button painel-indisponiveis' });
+  const indisponiveisLinhas = botaoIndisponiveis();
+  const indisponiveisColunas = botaoIndisponiveis();
+  const indisponiveisSelecoes = botaoIndisponiveis();
 
   const disponiveisLista = el('select', { id: 'painel-selecoes-disponiveis', size: 6, ariaLabel: 'Seleções disponíveis' });
   const ativasLista = el('select', { id: 'painel-selecoes-ativas', size: 6, ariaLabel: 'Seleções ativas' });
@@ -204,16 +230,16 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
     el('div', { className: 'painel-log-acoes' }, logCopiar, logAbrir, logRestaurar, logArquivo),
   );
 
-  const linhas = bloco('1', 'Linhas', 'Cada categoria vira uma linha da tabela.', 'linhas');
-  linhas.corpo.append(linhasBusca, linhasLista);
-  const colunas = bloco('2', 'Colunas', 'Opcional: abre cada linha em colunas.', 'colunas');
-  colunas.corpo.append(colunasBusca, colunasLista);
-  const incremento = bloco('3', 'Incremento', 'O que se soma em cada célula.', 'incremento');
+  const linhas = bloco('1', 'Linhas', 'O que vira cada linha da tabela: município, sexo, faixa etária…', 'linhas');
+  linhas.corpo.append(linhasBusca, linhasLista, previaLinhas, indisponiveisLinhas);
+  const colunas = bloco('2', 'Colunas', 'Opcional. Abre cada linha em colunas (ex.: por sexo). "Não ativa" = uma coluna só.', 'colunas');
+  colunas.corpo.append(colunasBusca, colunasLista, previaColunas, indisponiveisColunas);
+  const incremento = bloco('3', 'Incremento', 'O número de cada célula: Frequência conta os registros; os outros somam um valor.', 'incremento');
   incremento.corpo.append(incrementosLista);
-  const selecoes = bloco('4', 'Seleções', 'Filtros: só entram os registros das categorias marcadas. Duplo clique inclui ou exclui.', 'selecoes');
+  const selecoes = bloco('4', 'Seleções', 'Filtros (opcional). Escolha uma variável, clique em Incluir e marque as categorias que entram — ex.: só um município. Duplo clique também inclui ou exclui.', 'selecoes');
   selecoes.corpo.append(
     el('div', { className: 'painel-selecoes-grade' },
-      el('label', { className: 'painel-sublista' }, el('span', {}, 'Disponíveis'), disponiveisLista),
+      el('div', { className: 'painel-sublista' }, el('label', { htmlFor: 'painel-selecoes-disponiveis' }, 'Disponíveis'), disponiveisLista, indisponiveisSelecoes),
       el('div', { className: 'painel-selecoes-botoes' }, incluirBotao, excluirBotao),
       el('label', { className: 'painel-sublista' }, el('span', {}, 'Ativas'), ativasLista),
     ),
@@ -225,16 +251,24 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
     ),
   );
 
+  // Cada opção diz em poucas palavras o que faz: quem vem do TabWin reconhece
+  // o nome, quem nunca usou entende sem abrir o manual.
+  const opcao = (caixa: HTMLElement, nome: string, oQueFaz: string, titulo?: string): HTMLElement =>
+    el('label', { className: 'check-label painel-opcao', ...(titulo ? { title: titulo } : {}) }, caixa,
+      el('span', {}, nome, el('small', { className: 'painel-opcao-ajuda' }, oQueFaz)));
   const opcoes = el('div', { className: 'painel-opcoes' },
-    el('label', { className: 'check-label' }, suprimirLinhas, el('span', {}, 'Suprimir linhas zeradas')),
-    el('label', { className: 'check-label' }, suprimirColunas, el('span', {}, 'Suprimir colunas zeradas')),
-    el('label', { className: 'check-label', title: 'Depois de tabular, grava num DBF os registros que passaram pelas Seleções, como a caixa do TabWin' }, salvarRegistros, el('span', {}, 'Salvar registros')),
-    el('label', { className: 'check-label', title: 'Antes de tabular, confere se cada DBC descomprime exatamente no DBF original (CRC-32 gravado no arquivo), como a caixa do TabWin' }, testarCrc, el('span', {}, 'Testar CRC')),
-    el('fieldset', { className: 'painel-nao-classificados', title: 'Como tratar os registros cujos códigos não estão previstos na tabela de conversão (CNV)' },
-      el('legend', {}, 'Não classificados'),
-      el('label', { className: 'check-label' }, naoClassIgnorar, el('span', {}, 'Ignorar')),
-      el('label', { className: 'check-label', title: 'Junta os códigos sem correspondência numa linha "Não classificados"' }, naoClassIncluir, el('span', {}, 'Incluir')),
-      el('label', { className: 'check-label', title: 'Uma linha para cada código sem correspondência (só em CNV literal, como no TabWin)' }, naoClassDiscriminar, el('span', {}, 'Discriminar')),
+    opcao(suprimirLinhas, 'Suprimir linhas zeradas', 'esconde as linhas com 0'),
+    opcao(suprimirColunas, 'Suprimir colunas zeradas', 'esconde as colunas com 0'),
+    opcao(salvarRegistros, 'Salvar registros', 'baixa os registros usados na tabela (DBF)',
+      'Depois de tabular, grava num DBF os registros que passaram pelas Seleções, como a caixa do TabWin'),
+    opcao(testarCrc, 'Testar CRC', 'confere se o arquivo DBC não está corrompido',
+      'Antes de tabular, confere se cada DBC descomprime exatamente no DBF original (CRC-32 gravado no arquivo), como a caixa do TabWin'),
+    el('fieldset', { className: 'painel-nao-classificados', title: 'Registros cujo código não está na tabela de conversão (CNV)' },
+      el('legend', {}, 'Não classificados ', el('small', { className: 'painel-opcao-ajuda' }, 'códigos que a tabela de conversão não reconhece')),
+      opcao(naoClassIgnorar, 'Ignorar', 'ficam fora da tabela'),
+      opcao(naoClassIncluir, 'Incluir', 'somados numa linha "Não classificados"'),
+      opcao(naoClassDiscriminar, 'Discriminar', 'uma linha para cada código',
+        'Uma linha para cada código sem correspondência (só em CNV literal, como no TabWin)'),
     ),
   );
 
@@ -244,8 +278,9 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
         el('span', { className: 'eyebrow' }, 'Painel de tabulação'),
         el('h2', {}, 'Monte a tabela'),
       ),
-      el('label', { className: 'painel-def-campo' }, el('span', {}, 'Arquivo de definição (DEF)'), defSelect, defNota),
-      el('div', { className: 'painel-arquivos-campo' }, el('span', {}, 'Arquivos'), arquivosLista, padraoNota, verRegistros),
+      el('label', { className: 'painel-def-campo', title: 'O DEF é o "cardápio" do sistema: diz o que pode ir em Linhas, Colunas, Incremento e Seleções, com os nomes do TabWin' },
+        el('span', {}, 'Definição (DEF) ', el('small', { className: 'painel-opcao-ajuda' }, 'o "cardápio" de variáveis')), defSelect, defNota),
+      el('div', { className: 'painel-arquivos-campo' }, el('span', {}, 'Arquivos de dados'), arquivosLista, padraoNota, verRegistros),
     ),
     el('div', { className: 'painel-grade' }, linhas.raiz, colunas.raiz, incremento.raiz, selecoes.raiz),
     opcoes,
@@ -281,17 +316,106 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
     return eixo.disponivel ? eixo.label : `${eixo.label} — ${eixo.motivo ?? 'indisponível'}`;
   }
 
-  function preencherLista(lista: HTMLSelectElement, eixos: readonly PainelEixo[], escolhido: string | null, filtro: string, naoAtiva = false): void {
+  /** O botão que mostra ou esconde as indisponíveis de uma lista. */
+  function rotularIndisponiveis(botao: HTMLButtonElement, quantas: number): void {
+    botao.hidden = quantas === 0;
+    botao.textContent = mostrarIndisponiveis
+      ? 'Esconder as que não dá para usar'
+      : `+ ${quantas} que não dá para usar com estes arquivos`;
+    botao.title = 'Variáveis do DEF cujo campo não existe nestes arquivos, ou cuja tabela de conversão (CNV) não foi aberta';
+  }
+
+  function preencherLista(lista: HTMLSelectElement, eixos: readonly PainelEixo[], escolhido: string | null, filtro: string, naoAtiva = false, botao?: HTMLButtonElement): void {
     const termo = semAcento(filtro.trim());
     lista.replaceChildren();
     if (naoAtiva) lista.add(new Option('Não ativa', '', false, escolhido === null));
+    const fora: PainelEixo[] = [];
     for (const eixo of eixos) {
       const visivel = !termo || semAcento(`${eixo.label} ${eixo.field}`).includes(termo) || eixo.id === escolhido;
       if (!visivel) continue;
-      const option = new Option(rotuloOpcao(eixo), eixo.id, false, eixo.id === escolhido);
-      option.disabled = !eixo.disponivel;
-      option.title = [eixo.field, eixo.resourceFile, eixo.motivo].filter(Boolean).join(' · ');
+      if (!eixo.disponivel) { fora.push(eixo); continue; }
+      const option = new Option(eixo.label, eixo.id, false, eixo.id === escolhido);
+      // Passar o mouse diz o que a opção é: as categorias que ela gera
+      // ("Oport invetig (120d)" → "Até 120 dias (invest oportuna) · 121 a 150 dias…").
+      option.title = dicaDaOpcao(eixo);
       lista.add(option);
+    }
+    // As indisponíveis, quando pedidas, vão juntas no fim, num grupo com nome.
+    if (mostrarIndisponiveis && fora.length) {
+      const grupo = document.createElement('optgroup');
+      grupo.label = 'Não dá para usar com estes arquivos';
+      for (const eixo of fora) {
+        const option = new Option(rotuloOpcao(eixo), eixo.id);
+        option.disabled = true;
+        option.title = eixo.motivo ?? '';
+        grupo.append(option);
+      }
+      lista.append(grupo);
+    }
+    if (botao) rotularIndisponiveis(botao, fora.length);
+  }
+
+  /** O sistema dos arquivos abertos, pelo nome (`DOINF23.dbc` → SIM): escolhe o dicionário. */
+  function sistemaDosArquivos(): string | undefined {
+    return deps.arquivos().map((arquivo) => describeDatasusFile(arquivo.name)?.system).find(Boolean);
+  }
+
+  /** O que o dicionário oficial do DATASUS diz do campo, quando diz. */
+  function explicacao(campo: string): ReturnType<typeof datasusFieldEntry> {
+    return campo ? datasusFieldEntry(campo, sistemaDosArquivos()) : undefined;
+  }
+
+  /** Amostra de categorias por tabela (CNV ou DBF já lido), feita uma vez só. */
+  const amostras = new WeakMap<object, string>();
+
+  function dicaDaOpcao(eixo: PainelEixo): string {
+    const recurso = eixo.conversionId ? deps.conversoes().get(eixo.conversionId)
+      : eixo.lookupId ? deps.lookups().get(eixo.lookupId) : undefined;
+    let amostra = recurso ? amostras.get(recurso) : undefined;
+    if (amostra === undefined) {
+      amostra = amostraDe(eixo);
+      if (recurso) amostras.set(recurso, amostra);
+    }
+    const origem = [eixo.field && `campo ${eixo.field}`, eixo.resourceFile && `tabela ${eixo.resourceFile.replace(/\\/g, '/').split('/').pop()}`].filter(Boolean).join(', ');
+    const oficial = explicacao(eixo.field);
+    return [
+      `${eixo.label}: ${amostra}`,
+      oficial ? `${oficial.entry.label} — ${oficial.entry.description}` : '',
+      origem,
+    ].filter(Boolean).join('\n');
+  }
+
+  function amostraDe(eixo: PainelEixo): string {
+    const categorias = categoriasDe(eixo);
+    return categorias?.length
+      ? `${categorias.slice(0, 5).map((categoria) => categoria.label.trim()).join(' · ')}${categorias.length > 5 ? ` … (${categorias.length.toLocaleString('pt-BR')} ao todo)` : ''}`
+      : 'um item para cada valor do campo';
+  }
+
+  /** "5 linhas: < 7d · 07-27 · 28d-<1 · Ign <1 · Ign", e de onde vêm. */
+  function renderPrevia(destino: HTMLElement, eixo: PainelEixo | undefined, papel: 'linhas' | 'colunas'): void {
+    destino.replaceChildren();
+    if (!eixo) {
+      destino.append(papel === 'colunas' ? 'Sem colunas: uma coluna só, com o total de cada linha.' : '');
+      return;
+    }
+    const categorias = categoriasDe(eixo);
+    const origem = [eixo.field && `campo ${eixo.field}`, eixo.resourceFile && `tabela ${eixo.resourceFile.replace(/\\/g, '/').split('/').pop()}`].filter(Boolean).join(', ');
+    if (categorias?.length) {
+      const amostra = categorias.slice(0, 6).map((categoria) => categoria.label.trim()).join(' · ');
+      destino.append(el('b', {}, `${categorias.length.toLocaleString('pt-BR')} ${papel}: `), amostra, categorias.length > 6 ? ' …' : '');
+    } else {
+      destino.append(el('b', {}, `Uma ${papel === 'linhas' ? 'linha' : 'coluna'} para cada valor`), ' que aparecer no arquivo');
+    }
+    if (origem) destino.append(el('small', {}, origem));
+    // A explicação oficial do campo, quando o dicionário do DATASUS a tem:
+    // "STDONOVA" vira "DO nova — Se a declaração de óbito é do modelo novo".
+    const oficial = explicacao(eixo.field);
+    if (oficial) {
+      destino.append(el('span', {
+        className: 'painel-previa-dicionario',
+        title: [oficial.entry.values && `Valores: ${oficial.entry.values}`, `Fonte: ${oficial.source}`].filter(Boolean).join('\n'),
+      }, el('b', {}, `${oficial.entry.label}: `), oficial.entry.description));
     }
   }
 
@@ -306,7 +430,7 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
     defSelect.value = defs.has(ativo) ? ativo : '';
     const def = defs.get(ativo);
     defNota.textContent = def
-      ? `${def.options.length} opções, ${def.increments.length} incremento(s)${def.helpFile ? ` · ajuda original: ${def.helpFile}` : ''}`
+      ? `${new Set(def.options.map((option) => option.label)).size} variáveis para cruzar${def.increments.length ? ` e ${def.increments.length} ${def.increments.length === 1 ? 'valor' : 'valores'} para somar` : ''}`
       : defs.size
         ? 'Escolha o DEF para ver as variáveis com os nomes do TabWin.'
         : 'Sem DEF, as listas mostram os campos do arquivo. Abra o .DEF e as .CNV do sistema para ver os nomes do TabWin.';
@@ -331,13 +455,17 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
               },
             })]
             : [];
+          // O nome original primeiro (é por ele que as pessoas se entendem), e
+          // logo abaixo o que ele é, para quem não decorou as siglas.
+          const descricao = describeDatasusFile(arquivo.name)?.summary;
           return el('li', { title: `${arquivo.name} · ${formatarBytes(arquivo.size)}`, className: [crc === false ? 'painel-crc-falhou' : '', marcado ? '' : 'painel-arquivo-fora'].join(' ').trim() },
             el('label', { className: 'painel-arquivo' }, ...caixa, el('b', {}, arquivo.name)), el('small', {}, formatarBytes(arquivo.size)),
+            ...(descricao ? [el('small', { className: 'painel-arquivo-descricao' }, descricao)] : []),
             ...(crc === undefined ? [] : [el('small', { className: crc ? 'painel-crc-ok' : 'painel-crc-erro' }, crc ? 'CRC ok' : 'CRC não confere')]));
         })
         : [el('li', { className: 'painel-vazio' }, 'Nenhum arquivo de dados aberto')]),
     );
-    padraoNota.textContent = catalogo?.padraoArquivos ? `O DEF espera arquivos como ${catalogo.padraoArquivos}` : '';
+    padraoNota.textContent = catalogo?.padraoArquivos ? padraoEmPortugues(catalogo.padraoArquivos) : '';
     padraoNota.hidden = !catalogo?.padraoArquivos;
     verRegistros.hidden = !arquivos.length || !deps.primeirosRegistros;
   }
@@ -355,7 +483,9 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
         estado.incrementos = catalogo!.incrementos.map((item) => item.id).filter((id) => marcados.has(id));
         renderResumo();
       });
-      const detalhe = incremento.measure.kind === 'sum' ? incremento.measure.field ?? '' : (incremento.measure.weightField ? `peso ${incremento.measure.weightField}` : 'conta registros');
+      const detalhe = incremento.measure.kind === 'sum'
+        ? `soma o campo ${incremento.measure.field ?? ''}`
+        : (incremento.measure.weightField ? `conta pelo campo ${incremento.measure.weightField}` : 'conta os registros');
       incrementosLista.append(el('label', { className: 'check-label' }, caixa, el('span', {}, incremento.label, el('small', {}, detalhe))));
     }
   }
@@ -367,14 +497,7 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
   function renderSelecoes(): void {
     if (!catalogo || !estado) return;
     const ativas = new Set(estado.selecoes.map((selecao) => selecao.eixo));
-    disponiveisLista.replaceChildren();
-    for (const eixo of catalogo.selecoes) {
-      if (ativas.has(eixo.id)) continue;
-      const option = new Option(rotuloOpcao(eixo), eixo.id);
-      option.disabled = !eixo.disponivel;
-      option.title = [eixo.field, eixo.resourceFile, eixo.motivo].filter(Boolean).join(' · ');
-      disponiveisLista.add(option);
-    }
+    preencherLista(disponiveisLista, catalogo.selecoes.filter((eixo) => !ativas.has(eixo.id)), null, '', false, indisponiveisSelecoes);
     ativasLista.replaceChildren();
     for (const selecao of estado.selecoes) {
       const eixo = catalogo.selecoes.find((item) => item.id === selecao.eixo);
@@ -470,8 +593,9 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
       renderResumo();
       return;
     }
-    preencherLista(linhasLista, catalogo.linhas, estado.linha, linhasBusca.value);
-    preencherLista(colunasLista, catalogo.colunas, estado.coluna, colunasBusca.value, true);
+    preencherLista(linhasLista, catalogo.linhas, estado.linha, linhasBusca.value, false, indisponiveisLinhas);
+    preencherLista(colunasLista, catalogo.colunas, estado.coluna, colunasBusca.value, true, indisponiveisColunas);
+    renderPrevias();
     renderIncrementos();
     renderSelecoes();
     suprimirLinhas.checked = estado.suprimirLinhasZeradas;
@@ -480,6 +604,12 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
     naoClassIncluir.checked = estado.naoClassificados === 'incluir';
     naoClassDiscriminar.checked = estado.naoClassificados === 'discriminar';
     renderResumo();
+  }
+
+  function renderPrevias(): void {
+    if (!catalogo || !estado) return;
+    renderPrevia(previaLinhas, catalogo.linhas.find((eixo) => eixo.id === estado!.linha), 'linhas');
+    renderPrevia(previaColunas, catalogo.colunas.find((eixo) => eixo.id === estado!.coluna), 'colunas');
   }
 
   function existe(lista: readonly PainelEixo[], id: string | null): boolean {
@@ -519,16 +649,24 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
     if ((evento.target as HTMLElement).closest('.painel-selecoes-botoes, .painel-categorias-acoes')) tocado = true;
   });
   defSelect.addEventListener('change', () => { tocado = false; deps.escolherDef(defSelect.value); });
-  linhasBusca.addEventListener('input', () => catalogo && estado && preencherLista(linhasLista, catalogo.linhas, estado.linha, linhasBusca.value));
-  colunasBusca.addEventListener('input', () => catalogo && estado && preencherLista(colunasLista, catalogo.colunas, estado.coluna, colunasBusca.value, true));
+  linhasBusca.addEventListener('input', () => catalogo && estado && preencherLista(linhasLista, catalogo.linhas, estado.linha, linhasBusca.value, false, indisponiveisLinhas));
+  colunasBusca.addEventListener('input', () => catalogo && estado && preencherLista(colunasLista, catalogo.colunas, estado.coluna, colunasBusca.value, true, indisponiveisColunas));
+  for (const botao of [indisponiveisLinhas, indisponiveisColunas, indisponiveisSelecoes]) {
+    botao.addEventListener('click', () => {
+      mostrarIndisponiveis = !mostrarIndisponiveis;
+      renderTudo();
+    });
+  }
   linhasLista.addEventListener('change', () => {
     if (!estado || !linhasLista.value) return;
     estado.linha = linhasLista.value;
+    renderPrevias();
     renderResumo();
   });
   colunasLista.addEventListener('change', () => {
     if (!estado) return;
     estado.coluna = colunasLista.value || null;
+    renderPrevias();
     renderResumo();
   });
 
@@ -730,7 +868,7 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
       el('header', { className: 'painel-registros-topo' },
         el('div', {}, el('h2', {}, 'Registros do arquivo'),
           el('p', {}, `${deps.arquivos().map((arquivo) => arquivo.name).join(' + ')} · ${campos.length} campos · primeiras ${LIMITE} linhas. `,
-            'Cada linha é um registro (uma internação, um óbito…); cada coluna, um campo do DBF. O nome em cima é o do arquivo; embaixo, o nome que o DEF dá.')),
+            'Cada linha é um registro (uma internação, um óbito…); cada coluna, um campo do DBF. O nome em cima é o do arquivo; embaixo, o nome que o DEF dá e, no SIM e no SINASC, o que o dicionário oficial diz (passe o mouse para a explicação completa).')),
         el('button', { type: 'button', className: 'secondary-button', onclick: () => registrosDialogo.close() }, 'Fechar'),
       ),
       el('p', { className: 'painel-vazio' }, 'Lendo…'),
@@ -743,10 +881,15 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
       cabeca.append(el('th', { scope: 'col' }, '#'));
       for (const campo of campos) {
         const rotulos = usados.get(campo.name.toUpperCase());
-        cabeca.append(el('th', { scope: 'col', title: rotulos?.join(' · ') ?? '' },
+        const oficial = explicacao(campo.name);
+        cabeca.append(el('th', {
+          scope: 'col',
+          title: [rotulos?.join(' · '), oficial && `${oficial.entry.label}: ${oficial.entry.description}`, oficial?.entry.values && `Valores: ${oficial.entry.values}`].filter(Boolean).join('\n'),
+        },
           el('b', {}, campo.name),
           el('small', {}, tipoDoCampo(campo)),
-          ...(rotulos ? [el('em', {}, rotulos[0]!)] : [])));
+          ...(rotulos ? [el('em', {}, rotulos[0]!)] : []),
+          ...(oficial ? [el('small', { className: 'painel-registros-oque' }, oficial.entry.label)] : [])));
       }
       const corpo = el('tbody');
       linhas.forEach((linha, indice) => {

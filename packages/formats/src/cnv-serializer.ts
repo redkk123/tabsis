@@ -85,7 +85,7 @@ function headerLine(definition: CnvDefinition): string {
  * a file that quietly misclassifies codes the next time TabWin reads it.
  */
 export function serializeCnv(definition: CnvDefinition): string {
-  if (definition.mode === 'new-format') {
+  if (definition.mode === 'new-format' || definition.newFormat) {
     throw new CnvSerializeError('new-format (N) CNV layout is not specified well enough to write; see cnv-parser.ts');
   }
 

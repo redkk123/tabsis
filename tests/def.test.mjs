@@ -83,12 +83,19 @@ test('other first-position letters stay as audited unknown lines', () => {
   assert.equal(def.options.length, 1);
 });
 
-test('retains contemporary textual-field CNV lookups without pretending they are DBF lookups', () => {
+test('texto no terceiro campo com CNV: o TabWin ignora o texto e lê a CNV da posição 1 (RE-004)', () => {
   const def = parseDef(`; contemporary\nA*.DBC\nLSubTp FAEC,FAEC_TP,DS_TPFIN,CNV\\TP_FINAN.CNV`);
   const option = def.options[0];
-  assert.equal(option?.kind, 'external-lookup');
-  assert.equal(option?.lookupLabelField, 'DS_TPFIN');
-  assert.equal(option?.resourceFile, 'CNV\\TP_FINAN.CNV');
+  assert.equal(option?.kind, 'conversion');
+  assert.equal(option?.startPosition, 1);
+  assert.equal(option?.conversionFile, 'CNV\\TP_FINAN.CNV');
+  assert.equal(option?.ignoredThirdField, 'DS_TPFIN');
+});
+
+test('recurso que não é CNV nem DBF continua guardado, sem executar', () => {
+  const def = parseDef(`A*.DBC\nLAlgo,CAMPO,DS_X,TABELA.XYZ`);
+  assert.equal(def.options[0]?.kind, 'external-lookup');
+  assert.equal(def.options[0]?.resourceFile, 'TABELA.XYZ');
 });
 
 test('retains unresolved trailing lookup fields from contemporary real DEF records', () => {
@@ -97,4 +104,17 @@ test('retains unresolved trailing lookup fields from contemporary real DEF recor
   assert.equal(option?.kind, 'dbf-lookup');
   assert.deepEqual(option?.trailingFields, ['CD_DESCR', 'DBF\\CID10.DBF']);
   assert.match(def.warnings.join('\n'), /2 retained trailing field/);
+});
+
+test('linhas-título do CNES não derrubam o DEF: X sem campo e I com vírgula sobrando (RE-004)', () => {
+  const def = parseDef([
+    'AESTABEL\\ST*.DB?',
+    'X* EQUIPES_AC *,    , TITULO , TITULO_REFERENTES_A_EQUIPES_DO_UF',
+    'I* ATENDIMIMENTO PRESTADO *, ATEND_PR,',
+    'IINTERNAÇÃO/SUS,     AP01CV01',
+    'XTipo de Gestão,     TPGESTAO,   1, CNV\\TPGESTAO.CNV',
+  ].join('\n'));
+  assert.equal(def.options.length, 2);
+  assert.equal(def.options[0]?.field, '');
+  assert.deepEqual(def.increments.map((increment) => [increment.label, increment.field]), [['* ATENDIMIMENTO PRESTADO *', 'ATEND_PR'], ['INTERNAÇÃO/SUS', 'AP01CV01']]);
 });

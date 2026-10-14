@@ -55,12 +55,14 @@ function shortTable(definition: CnvDefinition): { table: Int32Array; categories:
   for (const rule of rules) {
     const position = categories.get(rule.categorySequence);
     if (position === undefined) continue;
-    // "----" (e "-zz") é o marcador das linhas-título, sem código: para o
-    // TabWin o hífen separa faixa, então isso não é código nenhum. Lido como
-    // código, viraria 13000 (o "-" vale 13) e pegaria o CID M000 (RE-003).
+    // "----" é o marcador das linhas-título, sem código: para o TabWin o hífen
+    // separa faixa, então isso não é código (RE-003). Com espaços antes
+    // ("    -zzzz") o parser já fez dele uma faixa a partir do branco (RE-004);
+    // o hífen colado só pegaria o registro em branco, o que fica de fora.
     for (const code of rule.exactCodes) if (!code.startsWith('-')) table[shortCodeIndex(code, length)] = position;
     for (const range of rule.ranges) {
-      if (!range.from.trim() || !range.to.trim()) continue;
+      // Início " " é o branco ("    -zzzz"; RE-004); ponta vazia não é faixa.
+      if ((!range.from.trim() && range.from !== ' ') || !range.to.trim()) continue;
       const from = shortCodeIndex(range.from, length);
       const to = shortCodeIndex(range.to, length);
       for (let index = from; index <= to; index++) table[index] = position;

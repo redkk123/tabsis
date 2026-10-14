@@ -2,9 +2,10 @@
  * Confere o TabSis contra o TabWin 4.15 real no SIM (DOAC2024) e no SINASC
  * (DNAC2022), com os DEF e CNV oficiais (captura de 2026-10-14).
  *
- * Também SIA (PAAC2501, com G e Valor Aprovado) e SINAN (HANSBR23).
+ * Também SIA (PAAC2501, com G e Valor Aprovado), SINAN (HANSBR23) e CNES
+ * (STAC2501 e LTAC2501, com G QT_EXIST; RE-004).
  *
- * Uso: node scripts/verify-sim-sinasc.mjs SIM=<pasta> SINASC=<pasta> [SIA=<pasta>] [SINAN=<pasta>]
+ * Uso: node scripts/verify-sim-sinasc.mjs SIM=<pasta> SINASC=<pasta> [SIA=<pasta>] [SINAN=<pasta>] [CNES=<pasta>]
  * (cada pasta com o .dbc e as CNV, nela ou em CNV\, DADOS\). Sistema sem pasta fica de fora.
  */
 import { readFile, readdir } from 'node:fs/promises';
@@ -15,7 +16,7 @@ import { compileQueryPlan, executeInMemory, withRecordLayout } from '../dist/pac
 import { calculateColumnTotal } from '../dist/packages/analysis/src/table-operations.js';
 
 const dirs = Object.fromEntries(process.argv.slice(2).map((arg) => arg.split(/=(.*)/s).slice(0, 2)));
-if (!Object.keys(dirs).length) throw new Error('uso: node scripts/verify-sim-sinasc.mjs SIM=<pasta> SINASC=<pasta> [SIA=<pasta>] [SINAN=<pasta>]');
+if (!Object.keys(dirs).length) throw new Error('uso: node scripts/verify-sim-sinasc.mjs SIM=<pasta> SINASC=<pasta> [SIA=<pasta>] [SINAN=<pasta>] [CNES=<pasta>]');
 const expected = JSON.parse(await readFile(new URL('../fixtures/oracle/re003-sim-sinasc/expected.json', import.meta.url), 'utf8'));
 const cp1252 = new TextDecoder('windows-1252');
 let failures = 0; let count = 0; let known = 0;
@@ -23,7 +24,9 @@ for (const source of expected.sources) {
   const dir = dirs[source.name];
   if (!dir) { console.log(`(sem pasta para ${source.name})`); continue; }
   const files = new Map();
-  for (const folder of [dir, path.join(dir, 'CNV'), path.join(dir, 'DADOS')]) {
+  // A pasta e as subpastas diretas (CNV, DADOS; no CNES, ESTABEL e LEITO).
+  const subfolders = (await readdir(dir, { withFileTypes: true })).filter((entry) => entry.isDirectory()).map((entry) => path.join(dir, entry.name));
+  for (const folder of [dir, ...subfolders]) {
     try { for (const name of await readdir(folder)) files.set(name.toUpperCase(), path.join(folder, name)); } catch { /* opcional */ }
   }
   const def = parseDef(source.defText);

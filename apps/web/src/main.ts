@@ -110,6 +110,8 @@ import {
   type TabwinFormatContext,
 } from '../../../packages/export/src/tabwin-formats.ts';
 import { encodeWindows1252 } from '../../../packages/formats/src/windows-1252.ts';
+import { describeAuxiliaryFile, describeDatasusFile } from '../../../packages/formats/src/datasus-file-names.ts';
+import { datasusFieldEntry } from '../../../packages/formats/src/datasus-field-dictionary.ts';
 import { criarGerarDef } from './gerar-def.ts';
 import { criarEditorCnv } from './editor-cnv.ts';
 import {
@@ -885,23 +887,46 @@ function rememberSource(source: LoadedSource): void {
 }
 
 function renderFileList(): void {
+  // Dados primeiro, cada um com o nome original e o que ele é ("Internações ·
+  // SIH · Acre · jan/2024"); DEF e CNV viram um resumo, porque 126 nomes de
+  // tabela de conversão não dizem nada a ninguém.
   fileList.replaceChildren();
-  const visible = loadedSources.slice(-8);
-  for (const source of visible) {
-    const chip = document.createElement('div');
-    chip.className = 'file-chip ok';
+  const isAuxiliary = (source: LoadedSource) => ['DEF', 'CNV', 'MAP'].includes(source.extension.toUpperCase());
+  const data = loadedSources.filter((source) => !isAuxiliary(source));
+  const defs = loadedSources.filter((source) => source.extension.toUpperCase() === 'DEF');
+  const others = loadedSources.filter((source) => isAuxiliary(source) && source.extension.toUpperCase() !== 'DEF');
+  const chip = (title: string, detail: string, tooltip: string, ok = true): HTMLElement => {
+    const element = document.createElement('div');
+    element.className = ok ? 'file-chip ok' : 'file-chip';
+    element.title = tooltip;
+    const text = document.createElement('div');
+    text.className = 'file-chip-texto';
     const name = document.createElement('b');
-    name.textContent = source.name;
+    name.textContent = title;
     const meta = document.createElement('span');
-    meta.textContent = `${source.extension} · ${formatBytes(source.size)}`;
-    chip.append(name, meta);
-    fileList.append(chip);
+    meta.textContent = detail;
+    text.append(name, meta);
+    element.append(text);
+    return element;
+  };
+  const visible = data.slice(-8);
+  if (data.length > visible.length) {
+    fileList.append(chip(`+ ${integerFormat.format(data.length - visible.length)} arquivos de dados`, 'carregados antes', '', false));
   }
-  if (loadedSources.length > visible.length) {
-    const summary = document.createElement('div');
-    summary.className = 'file-chip';
-    summary.textContent = `+ ${integerFormat.format(loadedSources.length - visible.length)} auxiliares carregados`;
-    fileList.prepend(summary);
+  for (const source of visible) {
+    const description = describeDatasusFile(source.name)?.summary;
+    fileList.append(chip(source.name, description ? `${description} · ${formatBytes(source.size)}` : `${source.extension} · ${formatBytes(source.size)}`,
+      `${source.name} · ${formatBytes(source.size)}`));
+  }
+  for (const source of defs) {
+    fileList.append(chip(source.name, 'definição: diz o que dá para tabular', describeAuxiliaryFile(source.name) ?? source.name));
+  }
+  if (others.length) {
+    const cnvs = others.filter((source) => source.extension.toUpperCase() === 'CNV').length;
+    const title = cnvs === others.length
+      ? `${integerFormat.format(cnvs)} ${cnvs === 1 ? 'tabela' : 'tabelas'} de conversão (CNV)`
+      : `${integerFormat.format(others.length)} arquivos auxiliares`;
+    fileList.append(chip(title, 'trocam códigos por nomes (1 → Masculino)', others.map((source) => source.name).join(', ')));
   }
 }
 
@@ -976,7 +1001,10 @@ function setControlsEnabled(enabled: boolean): void {
  * official layout still needs to see the real name.
  */
 function labelledFieldName(fieldName: string, defLabel?: string): string {
-  const label = defLabel ?? datasusFieldLabel(fieldName);
+  // Sem DEF: o rótulo curto conhecido, ou o do dicionário oficial do SIM/SINASC
+  // quando o arquivo é de um deles (STDONOVA → "DO nova").
+  const sistema = activeDatasetSources.map((source) => describeDatasusFile(source.name)?.system).find(Boolean);
+  const label = defLabel ?? datasusFieldLabel(fieldName) ?? datasusFieldEntry(fieldName, sistema)?.entry.label;
   if (!label) return fieldName;
   // A label that is the field name in prettier case ("Sexo" for SEXO) adds
   // nothing, and "Sexo · SEXO" reads as noise. Collapse to the technical name
@@ -1005,8 +1033,14 @@ function fieldLabel(fieldName: string, role: 'row' | 'column' = 'row'): string {
   return labelledFieldName(fieldName, defFieldLabel(fieldName, role));
 }
 
+/** "Gestante · CS_GESTANT" → "Gestante": o nome técnico fica para a dica. */
+function friendlyFieldLabel(fieldName: string, role: 'row' | 'column' = 'row'): string {
+  const label = fieldLabel(fieldName, role);
+  return label.endsWith(` · ${fieldName}`) ? label.slice(0, -(fieldName.length + 3)) : label;
+}
+
 function activeRowLabel(): string {
-  return currentRowLabel || fieldLabel(rowField.value) || currentPlan?.spec.rows.field || 'Linha';
+  return currentRowLabel || (rowField.value ? friendlyFieldLabel(rowField.value) : '') || currentPlan?.spec.rows.field || 'Linha';
 }
 
 /**
@@ -2568,15 +2602,19 @@ function applyDefDefaults(): void {
 function updateDatasetStats(): void {
   if (!dbfHeader || !activeDatasetSources.length) return;
   const sourceBytes = activeDatasetSources.reduce((total, source) => total + source.size, 0);
-  const values: Array<readonly [string, string]> = [
-    [integerFormat.format(datasetRecordCount), 'registros ativos'],
-    [integerFormat.format(dbfHeader.fields.length), 'campos'],
-    [formatBytes(sourceBytes), activeDatasetSources.length === 1 ? 'arquivo original' : `${activeDatasetSources.length} arquivos-fonte`],
-    [datasetFingerprint?.sha256.slice(0, 10) ?? `${activeDatasetSources.length} fontes`, datasetFingerprint ? 'sha-256' : 'proveniências auditáveis'],
+  // Cada número diz o que é: "registros" para quem vem do TabWin, "(linhas do
+  // arquivo)" para quem nunca abriu um DBF.
+  const values: Array<readonly [string, string, string]> = [
+    [integerFormat.format(datasetRecordCount), 'registros (linhas do arquivo)', 'Cada registro é um caso: uma internação, um óbito, um nascimento…'],
+    [integerFormat.format(dbfHeader.fields.length), 'variáveis (campos)', 'Colunas do arquivo original, como SEXO ou MUNIC_RES'],
+    [formatBytes(sourceBytes), activeDatasetSources.length === 1 ? 'tamanho do arquivo' : `${activeDatasetSources.length} arquivos somados`, 'Tamanho dos arquivos como vieram do DATASUS'],
+    [datasetFingerprint?.sha256.slice(0, 10) ?? `${activeDatasetSources.length} fontes`, datasetFingerprint ? 'impressão digital' : 'origens registradas',
+      datasetFingerprint ? `SHA-256 ${datasetFingerprint.sha256}: confere se outra pessoa usou exatamente o mesmo arquivo` : 'A origem de cada arquivo fica registrada na aba de procedência'],
   ];
   datasetStats.replaceChildren();
-  for (const [value, label] of values) {
+  for (const [value, label, tooltip] of values) {
     const item = document.createElement('div');
+    item.title = tooltip;
     const strong = document.createElement('b');
     const caption = document.createElement('span');
     strong.textContent = value;
@@ -3324,7 +3362,7 @@ async function downloadSourceDbf(): Promise<void> {
 function loadedResourceForDefOption(option: DefDefinition['options'][number]): { id: string; kind: 'cnv' | 'lookup' } | undefined {
   if (option.kind === 'conversion') {
     const entry = [...cnvByName.entries()].find(([name, definition]) =>
-      definition.mode !== 'new-format' && baseName(name) === baseName(option.conversionFile));
+      definition.mode !== 'new-format' && !definition.newFormat && baseName(name) === baseName(option.conversionFile));
     return entry ? { id: entry[0], kind: 'cnv' } : undefined;
   }
   if (option.kind === 'dbf-lookup') {
@@ -3483,7 +3521,22 @@ async function loadFiles(files: File[]): Promise<void> {
       const rank = (file: File) => ({ DEF: 0, CNV: 1, MAP: 2, DBC: 3, DBF: 3, PARQUET: 3, CSV: 3, TSV: 3 } as Record<string, number>)[extensionOf(file.name)] ?? 9;
       return rank(a) - rank(b);
     });
-    for (const file of ordered) await loadFile(file);
+    // Um DEF ou CNV com defeito não pode deixar o resto da pasta de fora: a
+    // pasta de CNV do SIM tem a MUNICDF.CNV, que nem o TabWin abre, e antes
+    // ela interrompia a leitura de todas as que vinham depois.
+    const recusados: string[] = [];
+    for (const file of ordered) {
+      if (!['DEF', 'CNV', 'MAP'].includes(extensionOf(file.name))) { await loadFile(file); continue; }
+      try { await loadFile(file); }
+      catch (error) { recusados.push(error instanceof Error ? error.message : `${file.name}: ${String(error)}`); }
+    }
+    if (recusados.length) {
+      showToast(recusados.length === 1
+        ? `Não abriu: ${recusados[0]}. Os outros arquivos foram carregados.`
+        : `${recusados.length} arquivos auxiliares não abriram (${recusados.slice(0, 3).map((motivo) => motivo.split(':')[0]).join(', ')}${recusados.length > 3 ? '…' : ''}). Os outros foram carregados.`, true);
+    }
+    const soAuxiliares = ordered.every((file) => ['DEF', 'CNV', 'MAP'].includes(extensionOf(file.name)));
+    if (soAuxiliares && tabelaSemDef && dbfHeader && painel) await painel.executarAgora();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     resultKicker.textContent = 'Não foi possível abrir';
@@ -3621,11 +3674,13 @@ async function runAnalysis(measureOverride?: MeasureSpec, planOverride?: QueryPl
     baseResult = result;
     currentResult = result;
     tableOperations = [];
-    currentRowLabel = fieldLabel(rowField.value);
+    // Só o nome do DEF fica guardado (vai para a exportação); sem DEF a tela
+    // mostra o rótulo do dicionário e a exportação, o nome técnico.
+    currentRowLabel = defFieldLabel(rowField.value, 'row') ? friendlyFieldLabel(rowField.value) : '';
     resultKicker.textContent = measureKind.value === 'sum'
       ? `${datasetName} · soma de ${measureField.value}`
-      : `${datasetName} · frequência`;
-    resultTitle.textContent = fieldLabel(rowField.value).replace(` · ${rowField.value}`, '');
+      : `${datasetName} · contagem de registros`;
+    resultTitle.textContent = friendlyFieldLabel(rowField.value);
     tableTitle.value = resultTitle.textContent;
     tableSubtitle.value = '';
     tableFooter.value = '';
@@ -4183,7 +4238,9 @@ function bindTableScrollOnce(): void {
  */
 function renderTableHeadline(result: TabulationResult): void {
   const headline = summarizeTable({
-    rows: result.rows,
+    // Os mesmos nomes que a tabela mostra (município pelo nome, não pelo código),
+    // sem os ".." de recuo dos subtotais do TabWin, que numa frase viram ruído.
+    rows: result.rows.map((row) => ({ ...row, label: displayRowLabel(row).replace(/^[.\s]+/, '') })),
     cells: result.cells,
     // Uma coluna só: o rótulo dela nomeia a medida. Várias colunas, o total
     // é de tudo somado e nenhum rótulo isolado o descreveria.
@@ -4230,6 +4287,8 @@ function renderTable(result: TabulationResult): void {
     const dimension = document.createElement('th');
     dimension.scope = 'col';
     dimension.textContent = activeRowLabel();
+    const rawField = currentPlan?.spec.rows.field;
+    if (rawField && rawField !== dimension.textContent) dimension.title = `campo ${rawField} do arquivo`;
     headerRow.append(dimension);
   }
   for (const column of result.columns) {
@@ -8570,6 +8629,8 @@ function showView(view: ViewName): void {
   currentView = view;
   for (const button of document.querySelectorAll<HTMLButtonElement>('[data-view]')) {
     button.classList.toggle('active', button.dataset.view === view);
+    // A dica de cada aba, sempre à vista: passar o mouse não existe no celular.
+    if (button.dataset.view === view) element<HTMLElement>('#view-hint').textContent = button.title;
   }
   for (const panel of document.querySelectorAll<HTMLElement>('[data-panel]')) {
     const active = panel.dataset.panel === view;
@@ -10016,13 +10077,22 @@ function sincronizarControlesComPainel(spec: TabulationSpec): void {
  * Frequência, como o TabWin abre. Sem DEF que sirva ao arquivo, cai no caminho
  * antigo, que escolhe um campo plausível sozinho.
  */
+/**
+ * A primeira tabela saiu sem DEF (o arquivo chegou antes dele). Quando o DEF e
+ * as CNV chegarem depois, ela é refeita pelo painel; senão a tela continuaria
+ * mostrando códigos crus enquanto o painel já fala em "Sexo" e "Faixa Etária".
+ */
+let tabelaSemDef = false;
+
 async function primeiraTabulacao(): Promise<void> {
   if (painel && await painel.executarAgora()) return;
   await runAnalysis();
+  tabelaSemDef = Boolean(currentResult);
 }
 
 async function executarDoPainel(spec: TabulationSpec, info: { titulo?: string; subtitulo: string; linha: string; arquivos: string[] }): Promise<TabulationResult | null> {
   if (!dbfHeader) return null;
+  tabelaSemDef = false;
   arquivosDoPainel = info.arquivos.length < activeDatasetSources.length ? [...info.arquivos] : null;
   const extras = configuredFilters.filter((filter) => !filtrosDoPainel.has(filter));
   sincronizarControlesComPainel(spec);
@@ -10032,7 +10102,10 @@ async function executarDoPainel(spec: TabulationSpec, info: { titulo?: string; s
   const ok = await runAnalysis(undefined, plan);
   if (!ok || !currentResult) return null;
   const nomes = arquivosDoPainel ? arquivosDoPainel.join(' + ') : datasetName;
-  resultKicker.textContent = info.titulo ? `${nomes} · ${info.titulo}` : nomes;
+  // Um arquivo só: o nome original e, logo depois, o que ele é.
+  const descricao = !nomes.includes(' + ') ? describeDatasusFile(nomes)?.summary : undefined;
+  const nomesComDescricao = descricao ? `${nomes} — ${descricao}` : nomes;
+  resultKicker.textContent = info.titulo ? `${nomesComDescricao} · ${info.titulo}` : nomesComDescricao;
   resultTitle.textContent = info.subtitulo;
   // O canto da tabela leva o nome da Linha como o DEF escreve, igual ao TabWin.
   currentRowLabel = info.linha;
