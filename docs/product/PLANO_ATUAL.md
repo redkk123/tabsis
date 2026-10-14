@@ -82,6 +82,10 @@ Do Help do TabWin v2 (versão impressa, Vigilância em Saúde de MG):
       000 — medido com quatro testes no TabWin 4.15
       ([RE-003](../reverse-engineering/RE_003_CNV_CODIGO_CURTO.md)); goldens e
       painel sem diferença.
+- [x] **Faixa etária do SIH corrigida** (dado real, RDAC2401 + RD2008.DEF):
+      o código da CNV atravessa para o campo vizinho (COD_IDADE + IDADE);
+      antes 4.128 de 4.315 caíam em "Ign". Sensíveis AB também iguais.
+      `npm run verify:re003` 7/7 contra tabelas salvas pelo TabWin.
 - [x] **Gera DEF** (Metadados → Gerar DEF): campos do arquivo aberto, todos
       marcados, "Inverter seleção"; texto vira `X` com a CNV do campo, número
       vira `I`; baixar ou usar no painel na hora.
