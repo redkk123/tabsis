@@ -19,3 +19,4 @@ export * from './worklist.js';
 export * from './tabnet-preview.js';
 export * from './mirror-manifest.js';
 export * from './partial-download.js';
+export * from './official-docs.js';

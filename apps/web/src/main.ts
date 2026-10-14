@@ -86,6 +86,7 @@ import {
 } from '../../../packages/export/src/lab-package.ts';
 import { extractSourceDbf } from '../../../packages/export/src/dbf-source.ts';
 import { describeDownloadStrategy } from '../../../packages/acquisition/src/ranged-download.ts';
+import { officialDocumentsFor, type OfficialDocument } from '../../../packages/acquisition/src/official-docs.ts';
 import {
   adviseNationalFile,
   describeSelectionCost,
@@ -174,6 +175,7 @@ import {
 import { retryAttempts, retryCause } from '../../../packages/acquisition/src/retry-policy.ts';
 import {
   chooseVerifiedAuxiliaryBundle,
+  extractArchiveEntryByBaseName,
   extractOneArchiveEntry,
   listArchiveDocuments,
   extractSupportedArchive,
@@ -894,16 +896,44 @@ function rememberSource(source: LoadedSource): void {
  */
 const documentosOficiais = new Map<string, { cacheKey: string; entry: string }>();
 
+function mostrarPdf(bytes: Uint8Array, nome: string): void {
+  const blob = new Blob([bytes as BlobPart], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  // Sem 'noopener': com ele o navegador devolve null mesmo quando abre, e o
+  // PDF ia também para Downloads. É um blob deste próprio site.
+  if (!window.open(url, '_blank')) downloadBlob(blob, nome);
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
 async function abrirDocumentoOficial(nome: string): Promise<void> {
   const documento = documentosOficiais.get(nome);
   if (!documento) return;
   try {
     const cached = await readCachedArchive(documento.cacheKey, Number.POSITIVE_INFINITY);
     if (!cached) throw new Error('O pacote não está mais no cache deste aparelho; busque os auxiliares de novo.');
-    const bytes = extractOneArchiveEntry(cached.bytes, documento.entry);
-    const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'application/pdf' }));
-    if (!window.open(url, '_blank', 'noopener')) downloadBlob(new Blob([bytes as BlobPart], { type: 'application/pdf' }), nome);
-    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    mostrarPdf(extractOneArchiveEntry(cached.bytes, documento.entry), nome);
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), true);
+  }
+}
+
+/**
+ * A documentação oficial do tipo de arquivo aberto, buscada no DATASUS no
+ * primeiro toque (o mesmo caminho dos dados, com cache de 30 dias). No SINAN
+ * ela vem num pacote de 65 MB: pergunta antes.
+ */
+async function buscarDocumentoOficial(documento: OfficialDocument): Promise<void> {
+  if (documento.downloadBytes && documento.downloadBytes > 10 * 1024 * 1024
+    && !window.confirm(`${documento.title}: o DATASUS só publica este documento dentro de um pacote de ${formatBytes(documento.downloadBytes)}. Baixar agora? Depois fica guardado neste aparelho.`)) {
+    return;
+  }
+  showToast(`Buscando ${documento.name} no DATASUS…`);
+  try {
+    const remoto: DatasusRemoteFile = { source: 'DATASUS', modality: 'Documentação', name: documento.remoteName, address: documento.address };
+    const baixado = await downloadCatalogEntries([remoto], undefined, 30 * 24 * 60 * 60 * 1000, 'auxiliary');
+    const cached = await readCachedArchive(baixado.provenance.cacheKey, Number.POSITIVE_INFINITY);
+    if (!cached) throw new Error('Não foi possível guardar o documento neste aparelho.');
+    mostrarPdf(extractArchiveEntryByBaseName(cached.bytes, documento.name), documento.name);
   } catch (error) {
     showToast(error instanceof Error ? error.message : String(error), true);
   }
@@ -950,6 +980,20 @@ function renderFileList(): void {
       ? `${integerFormat.format(cnvs)} ${cnvs === 1 ? 'tabela' : 'tabelas'} de conversão (CNV)`
       : `${integerFormat.format(others.length)} arquivos auxiliares`;
     fileList.append(chip(title, 'trocam códigos por nomes (1 → Masculino)', others.map((source) => source.name).join(', ')));
+  }
+  // A documentação oficial do tipo de arquivo aberto (SIM, SINASC, SIH, SIA,
+  // CNES; no SINAN, o dicionário do agravo e o da ficha de notificação).
+  const tipo = data.map((source) => describeDatasusFile(source.name)).find(Boolean);
+  const oficiais = officialDocumentsFor(tipo?.system, tipo?.prefix).filter((documento) => !documentosOficiais.has(documento.name));
+  for (const documento of oficiais) {
+    const aviso = documento.downloadBytes ? ` · baixa ${formatBytes(documento.downloadBytes)} na 1ª vez` : '';
+    const botao = chip(documento.name, `${documento.title} · abrir${aviso}`, 'Documentação oficial do DATASUS, buscada no FTP oficial');
+    botao.classList.add('file-chip-documento');
+    botao.setAttribute('role', 'button');
+    botao.tabIndex = 0;
+    botao.addEventListener('click', () => void buscarDocumentoOficial(documento));
+    botao.addEventListener('keydown', (evento) => { if (evento.key === 'Enter' || evento.key === ' ') { evento.preventDefault(); void buscarDocumentoOficial(documento); } });
+    fileList.append(botao);
   }
   // O dicionário oficial do sistema, que veio junto no pacote auxiliar.
   for (const nome of documentosOficiais.keys()) {

@@ -38,3 +38,13 @@ test('SIH, SIA e CNES: o layout do Informe Técnico de cada arquivo, pelo prefix
   assert.equal(datasusFieldEntry('SEQUENCIA', 'SIH'), undefined);
   assert.ok(datasusFieldEntry('SEQUENCIA', 'SIH', 'SP'));
 });
+
+test('SINAN: campos da ficha de notificação, comuns a todos os agravos', () => {
+  const sexo = datasusFieldEntry('CS_SEXO', 'SINAN');
+  assert.equal(sexo?.entry.values, 'M – Masculino; F – Feminino; I – Ignorado');
+  assert.match(sexo?.source ?? '', /SINAN NET/);
+  assert.equal(datasusFieldEntry('TP_NOT', 'SINAN')?.entry.label, 'Tipo de notificação');
+  assert.match(datasusFieldEntry('NU_IDADE_N', 'SINAN')?.entry.description ?? '', /4018 = dezoito anos/);
+  // Campo do agravo (hanseníase) não está na ficha: fica para o PDF do agravo.
+  assert.equal(datasusFieldEntry('FORMACLINI', 'SINAN'), undefined);
+});
