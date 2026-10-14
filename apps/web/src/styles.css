@@ -867,3 +867,4 @@ dialog p { color: #676d74; font-size: 13px; line-height: 1.6; }
 .table-tool > :not(summary) { margin: 0 12px 12px; }
 /* Sem resultado, o grupo some junto com o que ele guarda. */
 .table-tool:has(> [hidden]) { display: none; }
+.question-result b code { margin-right: 2px; padding: 1px 5px; border-radius: 3px; background: var(--brand-soft); color: var(--brand-ink); font: 600 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }

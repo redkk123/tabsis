@@ -1,0 +1,8 @@
+;Casos do painel e2e
+APAINEL*.CSV
+ICasos,CASOS
+LUF de residência,UF,1,uf-e2e.cnv
+CUF de residência,UF,1,uf-e2e.cnv
+SUF de residência,UF,1,uf-e2e.cnv
+XSexo,SEXO,1,sexo-e2e.cnv
+LRaça,RACA,1,raca-e2e.cnv

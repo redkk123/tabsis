@@ -2022,3 +2022,81 @@ test('o manual publicado abre com as figuras que ele cita', async ({ page }) => 
     .filter((m) => !m[1].trim()).length;
   expect(semAlt, 'há figura sem texto alternativo').toBe(0);
 });
+
+test('o painel de tabulação monta a tabela como o TabWin: Linhas, Colunas, Incremento e Seleções', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#file-input').setInputFiles([
+    'e2e/fixtures/painel-e2e.def',
+    'e2e/fixtures/uf-e2e.cnv',
+    'e2e/fixtures/sexo-e2e.cnv',
+    'e2e/fixtures/raca-e2e.cnv',
+    'e2e/fixtures/painel-e2e.csv',
+  ]);
+  const painel = page.locator('#painel');
+  await expect(painel).toBeVisible();
+
+  // As listas vêm do DEF, na ordem do arquivo; X entra nas três.
+  const textos = (id: string) => page.locator(`#${id} option`).allTextContents();
+  await expect.poll(() => textos('painel-linhas')).toEqual(['UF de residência', 'Sexo', 'Raça']);
+  expect(await textos('painel-colunas')).toEqual(['Não ativa', 'UF de residência', 'Sexo']);
+  expect(await textos('painel-selecoes-disponiveis')).toEqual(['UF de residência', 'Sexo']);
+
+  // A tabela que abre sozinha é a do TabWin: primeira Linha, Frequência.
+  await expect(page.locator('#result-title')).toContainText('segundo UF de residência');
+  const corpo = page.locator('#result-table tbody');
+  await expect(corpo).toContainText('Acre');
+
+  // Sexo × UF.
+  await page.locator('#painel-linhas').selectOption({ label: 'Sexo' });
+  await page.locator('#painel-colunas').selectOption({ label: 'UF de residência' });
+  await expect(page.locator('#painel-resumo')).toContainText('por UF de residência segundo Sexo');
+  await page.locator('#painel-executar').click();
+  await expect(page.locator('#result-table thead')).toContainText('Total');
+  await expect(corpo.locator('tr').first()).toContainText('Masculino');
+  await expect(corpo.locator('tr').first()).toContainText('3');
+
+  // Coluna com dois incrementos: o TabWin recusa, com estas palavras.
+  await page.locator('#painel-incrementos input[value^="inc:"]').check();
+  await page.locator('#painel-executar').click();
+  await expect(page.locator('#painel-erro')).toHaveText('Múltiplas colunas é incompatível com múltiplos incrementos');
+
+  // Só Casos, sem coluna, e só o Acre.
+  await page.locator('#painel-incrementos input[value="freq"]').uncheck();
+  await page.locator('#painel-colunas').selectOption({ label: 'Não ativa' });
+  await page.locator('#painel-selecoes-disponiveis').selectOption({ label: 'UF de residência' });
+  await page.locator('#painel-incluir').click();
+  await page.locator('#painel-executar').click();
+  await expect(page.locator('#painel-erro')).toHaveText('Nenhuma categoria selecionada em UF de residência');
+  await page.locator('#painel-categorias label', { hasText: 'Acre' }).locator('input').check();
+  await page.locator('#painel-executar').click();
+  await expect(page.locator('#painel-erro')).toBeHidden();
+  await expect(corpo.locator('tr', { hasText: 'Masculino' })).toContainText('2');
+  await expect(corpo.locator('tr', { hasText: 'Feminino' })).toContainText('6');
+
+  // O log sai no formato do TabWin.
+  await page.locator('#painel-log-detalhes > summary').click();
+  const log = page.locator('#painel-log');
+  await expect(log).toHaveValue(/Linha=Sexo/);
+  await expect(log).toHaveValue(/Incremento=Casos/);
+  await expect(log).toHaveValue(/UF de residência: Acre/);
+
+  // Discriminar em CNV literal: um código por linha, na ordem em que aparecem.
+  await page.locator('#painel-selecoes-ativas').selectOption({ label: 'UF de residência (1)' });
+  await page.locator('#painel-excluir').click();
+  await page.locator('#painel-incrementos input[value="freq"]').check();
+  await page.locator('#painel-incrementos input[value^="inc:"]').uncheck();
+  await page.locator('#painel-linhas').selectOption({ label: 'Raça' });
+  await page.locator('#painel-nc-discriminar').check();
+  await page.locator('#painel-executar').click();
+  await expect.poll(() => corpo.locator('tr th').allTextContents()).toEqual(['Branca', 'Parda', '04', '99']);
+
+  // Restaurar consulta a partir de um log colado.
+  await log.fill([
+    '[Opções]', 'Linha=Sexo', 'Coluna=UF de residência', 'Incremento=Freqüência',
+    'Suprime_Linhas_Zeradas=true', 'Suprime_Colunas_Zeradas=true', 'Não_Classificados=0',
+  ].join('\n'));
+  await page.locator('#painel-restaurar').click();
+  await expect(page.locator('#painel-linhas')).toHaveValue(/def:/);
+  expect(await page.locator('#painel-linhas option:checked').textContent()).toBe('Sexo');
+  expect(await page.locator('#painel-colunas option:checked').textContent()).toBe('UF de residência');
+});

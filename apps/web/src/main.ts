@@ -3035,7 +3035,7 @@ async function decodeDelimitedFile(bytes: Uint8Array, file: File, source: Loaded
   datasetFingerprint = source;
   populateControls(chooseDefaultField(fields));
   updateDatasetStats();
-  await runAnalysis();
+  await primeiraTabulacao();
   showToast(`${file.name}: ${integerFormat.format(datasetRecordCount)} linhas CSV carregadas`);
 }
 
@@ -10189,7 +10189,11 @@ function renderQuestionResults(): void {
     botao.className = 'question-result';
     botao.setAttribute('role', 'option');
     const titulo = document.createElement('b');
-    titulo.textContent = match.label;
+    // O nome do arquivo do DATASUS vem primeiro: é por ele que quem usa o
+    // TabWin procura e reconhece o dado (DOINF23.dbc, RDAC2401.dbc).
+    const codigo = document.createElement('code');
+    codigo.textContent = `${match.fileType}*.dbc`;
+    titulo.append(codigo, ` — ${match.label}`);
     const detalhe = document.createElement('small');
     const partes = [match.year ?? 'ano a escolher', match.uf === 'BR' ? 'Brasil' : match.uf ?? 'UF a escolher'];
     detalhe.textContent = `${partes.join(' · ')} — ${match.because.join('; ')}`;
