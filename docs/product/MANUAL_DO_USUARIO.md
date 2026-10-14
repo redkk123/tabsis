@@ -36,21 +36,32 @@ está aberto.
 
 ---
 
-## 2. Primeiro uso, em quatro passos
+## 2. Primeiro uso
 
-![Tela inicial do TabSis, com a área para abrir arquivo e o painel de configuração à esquerda](./manual/01-inicio.png "A tela inicial. A tarja **Seus dados ficam neste aparelho** não é slogan: não existe servidor de dados neste programa.")
+![Tela inicial do TabSis: à esquerda, a área para abrir arquivo e a busca; ao centro, os caminhos "Nunca usei o TabWin" e "Já uso o TabWin"](./manual/01-inicio.png "A tela inicial fala com os dois públicos: quem nunca usou o TabWin e quem usa há anos. A tarja **Seus dados ficam neste aparelho** não é slogan: não existe servidor de dados neste programa.")
 
-1. **Abra um arquivo.** Arraste um `.DBC` para a área tracejada, ou clique nela
-   para escolher. Se você não tem um arquivo ainda, use **Buscar no DATASUS**
-   (seção 3).
-2. **A primeira tabela aparece sozinha.** É uma frequência simples, para você
-   ver que o arquivo abriu e que os números fazem sentido.
-3. **Escolha linhas e colunas.** Nos campos **LINHAS** e **COLUNAS**, à
-   esquerda. O campo **Buscar variável** encontra por nome técnico (`CS_SEXO`)
-   ou pelo rótulo legível.
-4. **Troque a medida** se precisar: frequência, soma de um campo, e outras.
+A tela inicial tem dois caminhos, e os dois chegam à mesma tabela.
 
-Pronto — daí em diante é refinar.
+**Nunca usei o TabWin.** O TabSis transforma os arquivos do DATASUS
+(internações, óbitos, nascimentos…) em tabelas.
+
+1. Escreva o que procura no campo à esquerda — *óbitos infantis 2023* — ou
+   clique em **Buscar no DATASUS** (seção 3).
+2. **A primeira tabela aparece sozinha**, para você ver que o arquivo abriu e
+   que os números fazem sentido.
+3. Troque o que vai nas **Linhas** e nas **Colunas** do Painel de tabulação e
+   clique em **Executar** (seção 4). Cada bloco e cada opção do painel tem uma
+   frase curta dizendo o que faz.
+
+**Já uso o TabWin.** É o mesmo jeito de trabalhar: abra o `.DBC` junto com o
+`.DEF` e as `.CNV` de sempre (pode selecionar a pasta inteira de uma vez) e use
+o painel com **Linhas**, **Colunas**, **Incremento** e **Seleções**. Os nomes
+são os do DEF, na ordem do DEF; os números são os mesmos do TabWin 4.15; e a
+tabela sai em `.TAB` para abrir no TabWin.
+
+Em qualquer dos dois, os arquivos aparecem na barra lateral pelo **nome
+original** — é por ele que as pessoas se entendem — e, logo embaixo, o que cada
+um é: `DOINF23.dbc` → *Óbitos infantis · SIM · Brasil · 2023*.
 
 ---
 
@@ -141,6 +152,14 @@ Os `.DEF` e `.CNV` são o que transforma código em nome legível: `1` vira
 - **Abrir todos** carrega de uma vez todos os DEF e CNV do pacote. Se algum
   arquivo falhar, os outros continuam, e o resultado diz quantos entraram e
   quantos não.
+- O mesmo vale quando você seleciona a pasta de CNV inteira na área "Abra seu
+  arquivo": um arquivo com defeito (a `MUNICDF.CNV` do SIM, que nem o TabWin
+  abre) é nomeado num aviso, e os outros entram.
+
+![Arquivos na barra lateral: DOINF23.dbc com a descrição, o DEF, e as 337 tabelas de conversão resumidas numa linha](./manual/17-arquivos-carregados.png "Na barra lateral, os dados com o nome original e o que são; o DEF; e as CNV resumidas numa linha só — 337 nomes de arquivo não diriam nada.")
+
+Uma opção do DEF que o TabWin lista mas não é variável — as linhas-título como
+`* DADOS GERAIS *` dos DEFs do CNES — aparece em cinza, com a explicação.
 
 Se um arquivo do pacote for grande demais para caber na memória da aba junto
 com os dados, ele fica de fora — **com aviso, nomeando o arquivo e o tamanho**
@@ -174,6 +193,8 @@ Instalação, endereços que ele pode acessar e modelo de ameaça estão em
 O **Painel de tabulação**, no topo da área principal, é o mesmo painel do
 TabWin, em quatro blocos numerados:
 
+![Painel de tabulação com o DEF de óbitos do SIM: Linhas em Fx.Etar.Infant.1, Colunas em Sexo, Incremento Frequência, Seleções vazias e as opções com uma frase cada](./manual/15-painel.png "O painel com o `Obito_1996_CID10.def` oficial e o DOINF23. Ao lado do arquivo, o que ele é; embaixo de cada opção, o que ela faz; e, antes de executar, a frase dizendo o que vai ser tabulado.")
+
 | Bloco | O que faz | Padrão (igual ao TabWin) |
 | --- | --- | --- |
 | **1 · Linhas** | a variável cujas categorias viram as linhas | a primeira do DEF |
@@ -187,8 +208,30 @@ sua descrição). Sem DEF, as listas mostram os campos do arquivo. Uma opção c
 CNV não foi carregada aparece em cinza, dizendo qual arquivo falta.
 
 Embaixo dos blocos, uma frase diz o que vai ser tabulado — *Frequência por
-Caráter atendimento segundo Sexo · UF internação: Acre* — antes de você clicar
-em **Executar**.
+Sexo segundo Fx.Etar.Infant.1* — antes de você clicar em **Executar**.
+
+As caixas de opção têm o nome do TabWin e, embaixo, o que fazem: **Suprimir
+linhas zeradas** (esconde as linhas com 0), **Salvar registros** (baixa os
+registros usados na tabela, em DBF), **Testar CRC** (confere se o DBC não está
+corrompido) e os três modos de **Não classificados**.
+
+![Resultado do painel: o arquivo descrito no topo, os botões "Baixar a tabela como", os números do arquivo, a manchete com o total e a tabela de faixa etária infantil por sexo](./manual/16-resultado-painel.png "O resultado. No topo, o arquivo pelo nome e pelo que ele é; a manchete resume a tabela numa frase (metade dos óbitos infantis de 2023 foi antes dos 7 dias); os rótulos M, F e I são os da `SEXO.CNV` oficial, como no TabWin.")
+
+Acima da tabela:
+
+- **Baixar a tabela como** — CSV (planilha), XLSX (Excel), JSON e XML (para
+  programas), e os formatos do TabWin: **TAB** (abre em *Arquivo → Abrir
+  tabela* do TabWin 4.15), **PRN** e **SQL**. Passe o mouse em cada botão para
+  ver para que serve.
+- Os números do arquivo: **registros** (cada um é um caso — um óbito, uma
+  internação), **variáveis** (as colunas do arquivo), **tamanho** e
+  **impressão digital** (o SHA-256, que confere se outra pessoa usou
+  exatamente o mesmo arquivo).
+- A **manchete**: o total e as categorias que mais pesam, em português.
+
+Se o `.DBC` foi aberto antes do `.DEF`, a primeira tabela sai pelos campos
+crus; quando o DEF e as CNV chegam, o painel a refaz sozinho com os nomes do
+DEF.
 
 Duas combinações o TabWin recusa, e o TabSis recusa com as mesmas palavras:
 coluna ativa com mais de um incremento (*Múltiplas colunas é incompatível com
@@ -198,7 +241,7 @@ categoria selecionada em …*).
 Os controles campo a campo, os filtros por intervalo numérico e as ferramentas
 de limpeza continuam na barra lateral, em **Tabular por campos**.
 
-![Aplicativo com o arquivo DOINF23 aberto, mostrando registros, campos, tamanho e SHA-256](./manual/02-arquivo-aberto.png "DOINF23 aberto: 32.017 registros, 87 campos, e o SHA-256 do arquivo. Esse código identifica exatamente o que você abriu, e vai junto na exportação.")
+![Os números do arquivo DOINF23 aberto: registros, variáveis, tamanho e impressão digital](./manual/02-arquivo-aberto.png "DOINF23 aberto: 32.017 registros, 87 variáveis, e a impressão digital (SHA-256) do arquivo. Esse código identifica exatamente o que você abriu, e vai junto na exportação.")
 
 ![Tabela cruzada de sexo por raça e cor, com totais por coluna](./manual/03-tabela-cruzada.png "Sexo cruzado com raça/cor. Os códigos aparecem como estão no arquivo porque nenhum CNV foi carregado — o programa não adivinha que `1` significa “masculino”.")
 
@@ -211,9 +254,11 @@ Quando a CNV não cobre todos os códigos do dado, as três opções do TabWin:
 - **Ignorar** (padrão): esses registros saem da tabela;
 - **Incluir**: entram numa linha (ou coluna) **Não classificados**;
 - **Discriminar**: cada código vira uma linha, rotulada com o próprio código,
-  na ordem em que aparece no arquivo — **só em CNV literal** (cabeçalho com `L`,
-  ou código com mais de 4 posições). Em CNV curta age como Ignorar, e nas
-  colunas age como Incluir. É exatamente o que o TabWin faz.
+  na ordem em que o TabWin o encontra — **só em CNV literal** (cabeçalho com
+  `L`, ou código com mais de 4 posições). Em CNV curta age como Ignorar, e nas
+  colunas age como Incluir. É exatamente o que o TabWin faz, inclusive na
+  ordem: num `.DBC` o TabWin lê em pedaços de 4.096 bytes e não exatamente na
+  ordem do arquivo, e o TabSis reproduz isso.
 
 O total de registros lidos e aceitos fica sempre visível, então a diferença é
 auditável.
@@ -496,7 +541,9 @@ O projeto separa três coisas, e a interface também:
 
 - **Compatível** — o comportamento foi verificado contra o **TabWin 4.15 real**,
   com arquivo real, resultado capturado do programa original e comparação com
-  tolerância zero. Hoje são 16 desses casos.
+  tolerância zero. Hoje cobrem SIH, SIA, SIM, SINASC, SINAN e CNES: os goldens
+  do projeto mais as tabelas salvas pelo próprio TabWin com os DEF e CNV
+  oficiais (`docs/reverse-engineering/`, RE-002 a RE-004).
 - **Moderno** — funcionalidade nova, que o TabWin 4.15 não tinha. Não afirma
   equivalência com nada.
 - **Não verificado** — existe, funciona, mas ninguém conferiu contra o programa

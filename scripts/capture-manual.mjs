@@ -7,9 +7,12 @@
  * existe mais. Rodar este script depois de mexer na interface é mais barato do
  * que descobrir a defasagem por reclamação.
  *
- * Uso: `npm run web:build && node scripts/capture-manual.mjs [arquivo.dbc]`
+ * Uso: `npm run web:build && node scripts/capture-manual.mjs [arquivo.dbc] [pasta-def-cnv]`
  * O arquivo padrão é o DOINF23 usado no manual; qualquer DBC serve, mas as
- * legendas do manual falam desse.
+ * legendas do manual falam desse. A pasta padrão (`.cache/manual/sim`) tem o
+ * `Obito_1996_CID10.def` e as CNVs do `OBITOS_CID10_TAB.zip` oficial: com
+ * elas saem as figuras do Painel de tabulação. Sem a pasta, essas ficam de
+ * fora (com aviso) e as outras saem normalmente.
  *
  * Cada passo é isolado: uma captura que falha não pode levar as outras junto,
  * porque aí o custo de uma tela quebrada vira o manual inteiro sem figuras.
@@ -23,6 +26,7 @@ import { chromium } from '@playwright/test';
 const RAIZ = path.resolve('dist-web');
 const DESTINO = path.resolve('docs/product/manual');
 const DADOS = process.argv[2] ?? path.resolve('.cache/manual/DOINF23.dbc');
+const AUXILIARES = process.argv[3] ?? path.resolve('.cache/manual/sim');
 
 const TIPOS = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css',
@@ -80,10 +84,14 @@ async function abrirSecao(seletor) {
 
 fs.mkdirSync(DESTINO, { recursive: true });
 await pagina.goto(`${BASE}/index.html`, { waitUntil: 'networkidle' });
+// Nas figuras, a barra do topo não fica grudada (cobria o que rolou para baixo
+// dela) e os avisos passageiros não aparecem.
+await pagina.addStyleTag({ content: '.topbar { position: static !important; } #toast { display: none !important; }' });
 
 console.log('capturando:');
-await capturar('01-inicio', 'tela inicial, antes de qualquer arquivo',
-  async () => pagina.locator('.workspace'));
+// A tela inteira: a barra lateral e, ao lado, os dois caminhos de boas-vindas
+// ("Nunca usei o TabWin" / "Já uso o TabWin").
+await capturar('01-inicio', 'tela inicial, antes de qualquer arquivo', async () => null);
 
 await capturar('13-busca-datasus', 'diálogo de busca no catálogo oficial', async () => {
   await pagina.locator('#catalog-button').click();
@@ -101,6 +109,8 @@ await capturar('02-arquivo-aberto', 'registros, campos e SHA-256 do arquivo',
   async () => pagina.locator('.dataset-stats'));
 
 await capturar('03-tabela-cruzada', 'sexo cruzado com raça/cor', async () => {
+  // Os controles campo a campo moraram para "Tabular por campos", recolhido.
+  await abrirSecao('#group-campos');
   await pagina.locator('#row-field').selectOption('SEXO');
   await pagina.locator('#column-field').selectOption('RACACOR');
   await pagina.locator('#run-button').click();
@@ -144,6 +154,41 @@ await capturar('10-consulta-vazia', 'aba de consulta antes de carregar', async (
   await pagina.waitForTimeout(400);
   return pagina.locator('.results');
 });
+
+// O Painel de tabulação com DEF e CNV de verdade: é o caminho principal, e o
+// que quem vem do TabWin procura primeiro.
+const auxiliares = fs.existsSync(AUXILIARES)
+  ? fs.readdirSync(AUXILIARES).filter((nome) => /\.(def|cnv)$/i.test(nome)).map((nome) => path.join(AUXILIARES, nome))
+  : [];
+if (!auxiliares.length) {
+  falhas.push(`painel: sem DEF/CNV em ${AUXILIARES} (figuras 15–17 não refeitas)`);
+} else {
+  await pagina.locator('.view-tabs button[data-view="table"]').click();
+  await pagina.locator('#file-input').setInputFiles(auxiliares);
+  // As CNVs entram uma a uma; a opção só fica disponível quando a dela chega.
+  await pagina.waitForFunction(() => [...document.querySelectorAll('#painel-linhas option')]
+    .some((option) => option.textContent === 'Fx.Etar.Infant.1' && !option.disabled), null, { timeout: 180_000 });
+  await pagina.waitForFunction(() => [...document.querySelectorAll('#painel-colunas option')]
+    .some((option) => option.textContent === 'Sexo' && !option.disabled), null, { timeout: 180_000 });
+  await pagina.waitForTimeout(1500);
+
+  await capturar('15-painel', 'Painel de tabulação com o DEF do SIM', async () => {
+    await pagina.locator('#painel-linhas').selectOption({ label: 'Fx.Etar.Infant.1' });
+    await pagina.locator('#painel-colunas').selectOption({ label: 'Sexo' });
+    await pagina.waitForTimeout(300);
+    return pagina.locator('#painel');
+  });
+
+  await capturar('16-resultado-painel', 'a tabela do painel, com o arquivo descrito e a manchete', async () => {
+    await pagina.locator('.painel-executar').click();
+    await pagina.waitForFunction(() => document.querySelector('#result-table thead')?.textContent?.includes('Fx.Etar'), null, { timeout: 60_000 });
+    await pagina.waitForTimeout(400);
+    return pagina.locator('#result-card');
+  });
+
+  await capturar('17-arquivos-carregados', 'arquivos na barra lateral, com o que cada um é',
+    async () => pagina.locator('#file-list'));
+}
 
 await navegador.close();
 servidor.close();

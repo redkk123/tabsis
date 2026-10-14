@@ -3517,7 +3517,20 @@ async function loadFiles(files: File[]): Promise<void> {
       const rank = (file: File) => ({ DEF: 0, CNV: 1, MAP: 2, DBC: 3, DBF: 3, PARQUET: 3, CSV: 3, TSV: 3 } as Record<string, number>)[extensionOf(file.name)] ?? 9;
       return rank(a) - rank(b);
     });
-    for (const file of ordered) await loadFile(file);
+    // Um DEF ou CNV com defeito não pode deixar o resto da pasta de fora: a
+    // pasta de CNV do SIM tem a MUNICDF.CNV, que nem o TabWin abre, e antes
+    // ela interrompia a leitura de todas as que vinham depois.
+    const recusados: string[] = [];
+    for (const file of ordered) {
+      if (!['DEF', 'CNV', 'MAP'].includes(extensionOf(file.name))) { await loadFile(file); continue; }
+      try { await loadFile(file); }
+      catch (error) { recusados.push(error instanceof Error ? error.message : `${file.name}: ${String(error)}`); }
+    }
+    if (recusados.length) {
+      showToast(recusados.length === 1
+        ? `Não abriu: ${recusados[0]}. Os outros arquivos foram carregados.`
+        : `${recusados.length} arquivos auxiliares não abriram (${recusados.slice(0, 3).map((motivo) => motivo.split(':')[0]).join(', ')}${recusados.length > 3 ? '…' : ''}). Os outros foram carregados.`, true);
+    }
     const soAuxiliares = ordered.every((file) => ['DEF', 'CNV', 'MAP'].includes(extensionOf(file.name)));
     if (soAuxiliares && tabelaSemDef && dbfHeader && painel) await painel.executarAgora();
   } catch (error) {

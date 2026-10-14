@@ -325,7 +325,7 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
     defSelect.value = defs.has(ativo) ? ativo : '';
     const def = defs.get(ativo);
     defNota.textContent = def
-      ? `${def.options.length} variáveis para cruzar e ${def.increments.length} ${def.increments.length === 1 ? 'valor' : 'valores'} para somar`
+      ? `${new Set(def.options.map((option) => option.label)).size} variáveis para cruzar${def.increments.length ? ` e ${def.increments.length} ${def.increments.length === 1 ? 'valor' : 'valores'} para somar` : ''}`
       : defs.size
         ? 'Escolha o DEF para ver as variáveis com os nomes do TabWin.'
         : 'Sem DEF, as listas mostram os campos do arquivo. Abra o .DEF e as .CNV do sistema para ver os nomes do TabWin.';
