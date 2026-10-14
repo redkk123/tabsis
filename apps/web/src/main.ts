@@ -26,6 +26,7 @@ import {
   type PortableTableV1,
   type TableOperation,
   type TabulationResult,
+  type TabulationSpec,
   type TotalPolicy,
   type RecipeTransformStep,
   createPhaseTimings,
@@ -33,6 +34,7 @@ import {
   watchPublishedVersion,
 } from '../../../packages/core/src/index.ts';
 import { diffTabulationResults, type TabulationDiff } from '../../../packages/core/src/tabulation-diff.ts';
+import { criarPainel, type Painel } from './painel-ui.ts';
 import {
   describeHeadline,
   describeRecordBasis,
@@ -812,6 +814,10 @@ let configuredFilters: FilterSpec[] = [];
 let configuredCrossFieldRules: CrossFieldRuleSpec[] = [];
 /** G017: extra increments laid out beside the primary measure, in add order. */
 let extraMeasures: MeasureSpec[] = [];
+/** O painel de tabulação (Linhas, Colunas, Incremento, Seleções); nasce depois do DOM. */
+let painel: Painel | null = null;
+/** Filtros que vieram das Seleções do painel, para trocá-los sem apagar os outros. */
+let filtrosDoPainel = new Set<FilterSpec>();
 let crossFieldRuleSequence = 0;
 let lastCombinationProfile: FieldCombinationProfile | null = null;
 /** Kept so "restaurar sinais descartados" can re-render without re-running the scan. */
@@ -1065,6 +1071,7 @@ function populateControls(preferredField?: string): void {
   populateCombinationFields();
   populateConversions();
   setControlsEnabled(true);
+  painel?.atualizar();
 }
 
 function searchDimensionFields(): void {
@@ -2482,7 +2489,10 @@ function populateDefPicker(select?: string): void {
   const wanted = select ?? previous;
   defActive.value = defByName.has(wanted) ? wanted : '';
   applyActiveDef();
-  defPicker.hidden = defByName.size === 0;
+  // O painel de tabulação tem o seu próprio seletor de DEF, ao lado das
+  // listas que ele governa; este fica só como estado interno.
+  defPicker.hidden = true;
+  painel?.atualizar();
 }
 
 /** Puts the picked DEF in force and refreshes everything that reads it. */
@@ -2519,6 +2529,7 @@ function populateConversions(): void {
   applyDefDefaults();
   updateColumnControls();
   if (filterField.value) void populateFilterValues();
+  painel?.atualizar();
 }
 
 function applyDefDefaults(): void {
@@ -2648,7 +2659,7 @@ async function decodeDbf(bytes: Uint8Array, file: File, isDbc: boolean, source: 
   datasetFingerprint = source;
   populateControls(chooseDefaultField(header.fields));
   updateDatasetStats();
-  await runAnalysis();
+  await primeiraTabulacao();
 }
 
 function schemaSignature(header: DbfHeader): string {
@@ -2708,7 +2719,7 @@ async function appendCompatibleDbf(
   datasetFingerprint = null;
   clearCombinationProfile();
   updateDatasetStats();
-  await runAnalysis();
+  await primeiraTabulacao();
 }
 
 type DatasetWorkerSource =
@@ -3932,7 +3943,7 @@ function clearAnalysisResult(message: string): void {
   resultTitle.textContent = message;
 }
 
-async function runAnalysis(measureOverride?: MeasureSpec): Promise<boolean> {
+async function runAnalysis(measureOverride?: MeasureSpec, planOverride?: QueryPlan): Promise<boolean> {
   if (!dbfHeader || !rowField.value) return false;
   if (!datasetRecordCount) {
     clearAnalysisResult('O conjunto atual não contém registros para tabular.');
@@ -3947,7 +3958,7 @@ async function runAnalysis(measureOverride?: MeasureSpec): Promise<boolean> {
   await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
   decodeCancelButton.hidden = false;
   try {
-    const plan = buildPlan(measureOverride);
+    const plan = planOverride ?? buildPlan(measureOverride);
     const conversions = conversionsForPlan(plan);
     const { result, cached } = await askDataset<{ result: TabulationResult; cached: boolean }>(
       { type: 'tabulate', plan, conversions },
@@ -4297,7 +4308,21 @@ let tableScrollBound = false;
 const TABLE_ROW_OVERSCAN = 8;
 
 function tableColumnCount(result: TabulationResult): number {
-  return result.columns.length + (tableKeyVisible.checked ? 1 : 0);
+  return result.columns.length + (tableKeyVisible.checked ? 1 : 0) + (showRowTotalColumn(result) ? 1 : 0);
+}
+
+/**
+ * Coluna "Total" à direita, como o TabWin desenha quando há variável de coluna.
+ *
+ * Só aparece sobre colunas que são categorias de UMA medida — somar colunas
+ * calculadas ou medidas diferentes (Frequência + Valor Total) daria um número
+ * sem significado.
+ */
+function showRowTotalColumn(result: TabulationResult): boolean {
+  return Boolean(currentPlan?.spec.columns)
+    && !currentPlan?.spec.measures?.length
+    && result.columns.length >= 2
+    && result.columns.every((column) => column.source !== 'derived' && (column.totalPolicy ?? 'sum') === 'sum');
 }
 
 /** A borderless spacer row: its only job is to hold the scrollbar to the table's true full height. */
@@ -4326,6 +4351,12 @@ function buildTableRow(result: TabulationResult, rowIndex: number): HTMLTableRow
   for (const value of result.cells[rowIndex] ?? []) {
     const td = document.createElement('td');
     td.textContent = tableNumber(value);
+    tr.append(td);
+  }
+  if (showRowTotalColumn(result)) {
+    const td = document.createElement('td');
+    td.className = 'row-total';
+    td.textContent = tableNumber((result.cells[rowIndex] ?? []).reduce((sum, value) => sum + value, 0));
     tr.append(td);
   }
   return tr;
@@ -4461,6 +4492,13 @@ function renderTable(result: TabulationResult): void {
     th.textContent = column.label;
     headerRow.append(th);
   }
+  if (showRowTotalColumn(result)) {
+    const th = document.createElement('th');
+    th.scope = 'col';
+    th.className = 'row-total';
+    th.textContent = 'Total';
+    headerRow.append(th);
+  }
   head.append(headerRow);
 
   virtualTable = { result, indexes: currentTableRowIndexes() };
@@ -4483,6 +4521,13 @@ function renderTable(result: TabulationResult): void {
     const policy = column.totalPolicy ?? 'sum';
     const total = policy === 'precalculated' ? undefined : calculateColumnTotal(result, column.key, policy);
     cell.textContent = total === undefined ? '—' : tableNumber(total);
+    totalRow.append(cell);
+  }
+  if (showRowTotalColumn(result)) {
+    const cell = document.createElement('td');
+    cell.className = 'row-total';
+    // Soma dos totais de coluna, que já pulam as linhas de detalhe de subtotal.
+    cell.textContent = tableNumber(result.columns.reduce((sum, column) => sum + (calculateColumnTotal(result, column.key, 'sum') ?? 0), 0));
     totalRow.append(cell);
   }
   foot.append(totalRow);
@@ -9948,8 +9993,108 @@ cnvEditorAddCategory.addEventListener('click', () => {
 cnvEditorPreviewButton.addEventListener('click', () => { void updateCnvEditorPreview(); });
 cnvEditorApply.addEventListener('click', applyCnvEditor);
 cnvEditorDownload.addEventListener('click', downloadCnvEditorFile);
+/**
+ * Leva a escolha do painel para os controles da barra lateral.
+ *
+ * O painel é o caminho principal, mas o resto do aplicativo — receita salva,
+ * mapa, auditoria, ferramentas avançadas — ainda lê aqueles controles. Mantê-los
+ * iguais ao que foi executado é o que impede a receita salva de descrever uma
+ * tabela diferente da que está na tela.
+ */
+function sincronizarControlesComPainel(spec: TabulationSpec): void {
+  if (![...rowField.options].some((option) => option.value === spec.rows.field)) populateControls(spec.rows.field);
+  rowField.value = spec.rows.field;
+  rowConversion.value = spec.rows.conversionId ?? spec.rows.lookupId ?? '';
+  startPosition.value = String(spec.rows.startPosition ?? 1);
+  discriminateUnclassified.checked = spec.rows.unclassifiedPolicy === 'discriminate';
+  columnField.value = spec.columns?.field ?? '';
+  columnConversion.value = spec.columns?.conversionId ?? spec.columns?.lookupId ?? '';
+  columnStartPosition.value = String(spec.columns?.startPosition ?? 1);
+  discriminateColumnUnclassified.checked = spec.columns?.unclassifiedPolicy === 'discriminate';
+  measureKind.value = spec.measure.kind;
+  updateMeasureControls();
+  if (spec.measure.kind === 'sum' && spec.measure.field) measureField.value = spec.measure.field;
+  extraMeasures = (spec.measures ?? []).slice(1).map((measure) => ({ ...measure }));
+  renderExtraMeasures();
+  configuredFilters = [...configuredFilters.filter((filter) => !filtrosDoPainel.has(filter)), ...spec.filters];
+  filtrosDoPainel = new Set(spec.filters);
+  renderConfiguredFilters();
+  updateFilterCount();
+  suppressZero.checked = spec.suppressZeroRows ?? false;
+  suppressZeroColumns.checked = spec.suppressZeroColumns ?? true;
+  updateColumnControls();
+}
+
+/**
+ * A tabela que aparece sozinha ao abrir um arquivo.
+ *
+ * Com o painel montado, ela sai dele — a primeira variável de Linhas do DEF,
+ * Frequência, como o TabWin abre. Sem DEF que sirva ao arquivo, cai no caminho
+ * antigo, que escolhe um campo plausível sozinho.
+ */
+async function primeiraTabulacao(): Promise<void> {
+  if (painel && await painel.executarAgora()) return;
+  await runAnalysis();
+}
+
+async function executarDoPainel(spec: TabulationSpec, info: { titulo?: string; subtitulo: string; linha: string }): Promise<TabulationResult | null> {
+  if (!dbfHeader) return null;
+  const extras = configuredFilters.filter((filter) => !filtrosDoPainel.has(filter));
+  sincronizarControlesComPainel(spec);
+  // Filtros de fora do painel (o recorte "Onde", limpeza assistida) continuam
+  // valendo, e entram no mesmo plano.
+  const plan = compileQueryPlan({ ...spec, filters: [...spec.filters, ...extras] });
+  const ok = await runAnalysis(undefined, plan);
+  if (!ok || !currentResult) return null;
+  resultKicker.textContent = info.titulo ? `${datasetName} · ${info.titulo}` : datasetName;
+  resultTitle.textContent = info.subtitulo;
+  // O canto da tabela leva o nome da Linha como o DEF escreve, igual ao TabWin.
+  currentRowLabel = info.linha;
+  tableTitle.value = info.titulo ?? info.subtitulo;
+  tableSubtitle.value = info.titulo ? info.subtitulo : '';
+  renderTable(currentResult);
+  renderChart(currentResult);
+  renderAudit();
+  return currentResult;
+}
+
+// Grupos recolhíveis marcados com data-lembrar ("Tabular por campos" e as
+// ferramentas da tabela) lembram se a pessoa os deixa abertos. É conveniência
+// de quem usa essas ferramentas sempre, guardada só neste navegador.
+for (const grupo of document.querySelectorAll<HTMLDetailsElement>('details[data-lembrar]')) {
+  const chave = `tabsis.aberto.${grupo.id}`;
+  try { grupo.open = localStorage.getItem(chave) === '1'; } catch { /* sem armazenamento: fica fechado */ }
+  grupo.addEventListener('toggle', () => {
+    try { localStorage.setItem(chave, grupo.open ? '1' : '0'); } catch { /* ignora */ }
+  });
+}
+
+painel = criarPainel(element<HTMLElement>('#painel'), {
+  defs: () => defByName,
+  defAtivo: () => defActive.value,
+  escolherDef: (nome) => {
+    defActive.value = defByName.has(nome) ? nome : '';
+    applyActiveDef();
+    painel?.atualizar();
+  },
+  conversoes: () => cnvByName,
+  lookups: () => lookupByName,
+  campos: () => (dbfHeader ? dbfHeader.fields.map((field) => ({ name: field.name, type: field.type })) : null),
+  rotuloDoCampo: (campo) => fieldLabel(campo),
+  campoInicial: () => rowField.value || undefined,
+  arquivos: () => activeDatasetSources.map((source) => ({ name: source.name, size: source.size })),
+  valoresDistintos: (campo) => askDataset<{ values: string[]; truncated: boolean }>(
+    { type: 'distinct', field: campo, limit: 2000 },
+    { label: 'Leitura de valores' },
+  ),
+  perfil: () => currentCompatibilityProfile,
+  executar: executarDoPainel,
+  aviso: showToast,
+});
+
 defActive.addEventListener('change', () => {
   applyActiveDef();
+  painel?.atualizar();
   showToast(activeDef ? `DEF ativo: ${defActive.value}` : 'Nenhum DEF ativo; os nomes técnicos do arquivo voltam a valer');
   if (currentResult) void runAnalysis();
 });

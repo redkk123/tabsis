@@ -167,6 +167,12 @@
         </p>
         </details>
 
+        <details class="sidebar-group needs-dataset" id="group-campos" data-lembrar>
+          <summary>Tabular por campos <span>modo avançado</span></summary>
+          <p class="group-hint">
+            O <b>Painel de tabulação</b>, à direita, é o caminho principal. Aqui ficam os
+            controles campo a campo, os filtros por intervalo e as ferramentas de limpeza.
+          </p>
         <form id="analysis-form" class="analysis-form needs-dataset">
           <label>
             <span>Buscar variável</span>
@@ -530,6 +536,7 @@
             <span>Tabular agora</span><span aria-hidden="true">→</span>
           </button>
         </form>
+        </details>
 
         <div class="local-note">
           <span aria-hidden="true">⌁</span>
@@ -538,17 +545,10 @@
       </aside>
 
       <main class="results">
-        <section class="hero" id="hero">
-          <div>
-            <span class="eyebrow">Dados públicos. Processamento local.</span>
-            <h2>Microdados públicos.<br /><em>Leitura simples.</em></h2>
-            <p>Abra um DBC do DATASUS e obtenha uma tabela imediatamente. Adicione DEF, CNV ou MAP para reproduzir classificações e mapas legados.</p>
-          </div>
-          <div class="hero-metric">
-            <span id="hero-metric-value">100%</span>
-            <small>no seu dispositivo</small>
-          </div>
-        </section>
+        <!-- O painel de tabulação no formato do TabWin: Linhas, Colunas,
+             Incremento e Seleções juntos, no topo, com os nomes do DEF. É o
+             caminho principal; o resto da tela trabalha sobre o resultado. -->
+        <section class="painel" id="painel" aria-label="Painel de tabulação" hidden></section>
 
         <section class="result-card" id="result-card">
           <div class="result-toolbar">
@@ -584,18 +584,66 @@
           <div class="view-panel active" id="table-view" data-panel="table">
             <div class="empty-state" id="empty-state">
               <span class="empty-orbit" aria-hidden="true"><i></i></span>
-              <h3>Abra um arquivo para começar</h3>
-              <p>
-                Arraste um <b>.DBC</b> para a área à esquerda, ou use <b>Buscar no DATASUS</b>
-                para baixar um do catálogo oficial. Assim que o arquivo abrir, uma frequência
-                simples é calculada sozinha — é só para você conferir que os números fazem
-                sentido; depois você escolhe linhas, colunas e conversões.
-              </p>
+              <h3>Comece abrindo os arquivos</h3>
+              <ol class="empty-steps">
+                <li><b>Abra o arquivo de dados</b> (<code>.DBC</code> ou <code>.DBF</code>) à esquerda, ou use <b>Buscar no DATASUS</b>.</li>
+                <li><b>Junte o <code>.DEF</code> e as <code>.CNV</code></b> do sistema, se tiver: elas dão às variáveis os nomes do TabWin.</li>
+                <li>No <b>Painel de tabulação</b>, escolha <b>Linhas</b>, <b>Colunas</b>, <b>Incremento</b> e <b>Seleções</b>, e clique em <b>Executar</b>.</li>
+              </ol>
+              <details class="empty-files">
+                <summary>O que é cada arquivo?</summary>
+                <dl>
+                  <dt><code>.DBF</code></dt><dd>A tabela de dados: um registro por internação, óbito, nascimento… Formato dBase, de 1980, que o DATASUS usa até hoje.</dd>
+                  <dt><code>.DBC</code></dt><dd>O mesmo <code>.DBF</code>, comprimido pelo DATASUS para baixar mais rápido. O TabSis descomprime aqui mesmo.</dd>
+                  <dt><code>.DEF</code></dt><dd>O "cardápio" da tabulação: diz quais variáveis aparecem em Linhas, Colunas, Incremento e Seleções, com que nome e com qual <code>.CNV</code>.</dd>
+                  <dt><code>.CNV</code></dt><dd>A tabela de conversão: transforma código em nome (<code>1</code> → Masculino) e agrupa códigos (CID → capítulo, município → região).</dd>
+                </dl>
+              </details>
               <p class="empty-state-note">
                 Os dados ficam neste aparelho: a leitura e o cálculo acontecem no navegador.
                 <a href="./manual.html" target="_blank" rel="noopener">Ler o manual</a>
               </p>
             </div>
+            <!-- A manchete vem antes do detalhe: uma tabela de contingência
+                 está certa e é ilegível de relance, e quem precisa do dado para
+                 uma frase quer o número, não a matriz. -->
+            <div class="table-headline" id="table-headline" hidden>
+              <div class="table-headline-number">
+                <strong id="table-headline-total">—</strong>
+                <span id="table-headline-measure">Total</span>
+              </div>
+              <p class="table-headline-share" id="table-headline-share"></p>
+              <p class="table-headline-basis" id="table-headline-basis" hidden></p>
+            </div>
+
+            <div class="table-wrap" id="table-wrap" hidden>
+              <table id="result-table">
+                <thead></thead>
+                <tbody></tbody>
+                <tfoot></tfoot>
+              </table>
+            </div>
+
+            <!-- Ferramentas sobre o resultado, DEPOIS da tabela e recolhidas: a
+                 tabela é o que a pessoa veio buscar, e no TabWin estas ações
+                 moram nos menus Quadro e Operações, não na frente do número. -->
+            <div class="table-tools">
+              <details class="table-tool" id="tool-quadro" data-lembrar>
+                <summary>Quadro <span>título, ordenar, casas decimais, localizar, copiar</span></summary>
+            <div class="table-presentation" id="table-presentation" hidden aria-label="Apresentação da tabela">
+              <label>Título<input id="table-title" type="text" maxlength="160" placeholder="Título da tabela"></label>
+              <label>Subtítulo<input id="table-subtitle" type="text" maxlength="240" placeholder="Subtítulo opcional"></label>
+              <label>Rodapé<input id="table-footer" type="text" maxlength="240" placeholder="Rodapé opcional"></label>
+              <label>Localizar<input id="table-locate" type="search" placeholder="Código ou categoria"></label>
+              <label>Ordenar por<select id="table-sort-column"><option value="__row_key__">Chave/linha</option></select></label>
+              <label>Ordem<select id="table-sort-direction"><option value="original">Original</option><option value="ascending">Crescente</option><option value="descending">Decrescente</option></select></label>
+              <label>Casas<select id="table-decimals"><option value="-1">Automático</option><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option></select></label>
+              <label class="table-key-toggle"><input id="table-key-visible" type="checkbox" checked> Mostrar chave</label>
+              <div class="table-presentation-actions"><button class="secondary-button" id="table-copy" type="button">Copiar</button><button class="secondary-button" id="table-print" type="button">Imprimir</button></div>
+            </div>
+              </details>
+              <details class="table-tool" id="tool-operacoes" data-lembrar>
+                <summary>Operações <span>somar, dividir, percentual, acumular, nova coluna</span></summary>
             <section class="table-operations" id="table-operations" hidden aria-label="Operações sobre a tabela">
               <div class="table-operation-heading">
                 <div><strong>Calcular nova coluna</strong><small>Operações reproduzíveis sobre o resultado atual</small></div>
@@ -637,17 +685,9 @@
               <ol class="table-operation-history" id="table-operation-history" hidden></ol>
               <p class="compatibility-note">Políticas modernas explícitas. A equivalência dessas transformações com o TabWin 4.15 será promovida operação por operação após casos-oráculo.</p>
             </section>
-            <div class="table-presentation" id="table-presentation" hidden aria-label="Apresentação da tabela">
-              <label>Título<input id="table-title" type="text" maxlength="160" placeholder="Título da tabela"></label>
-              <label>Subtítulo<input id="table-subtitle" type="text" maxlength="240" placeholder="Subtítulo opcional"></label>
-              <label>Rodapé<input id="table-footer" type="text" maxlength="240" placeholder="Rodapé opcional"></label>
-              <label>Localizar<input id="table-locate" type="search" placeholder="Código ou categoria"></label>
-              <label>Ordenar por<select id="table-sort-column"><option value="__row_key__">Chave/linha</option></select></label>
-              <label>Ordem<select id="table-sort-direction"><option value="original">Original</option><option value="ascending">Crescente</option><option value="descending">Decrescente</option></select></label>
-              <label>Casas<select id="table-decimals"><option value="-1">Automático</option><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option></select></label>
-              <label class="table-key-toggle"><input id="table-key-visible" type="checkbox" checked> Mostrar chave</label>
-              <div class="table-presentation-actions"><button class="secondary-button" id="table-copy" type="button">Copiar</button><button class="secondary-button" id="table-print" type="button">Imprimir</button></div>
-            </div>
+              </details>
+              <details class="table-tool" id="tool-editar" data-lembrar>
+                <summary>Editar linhas e colunas <span>renomear, mover, agregar, suprimir, transpor</span></summary>
             <section class="table-editing" id="table-editing" hidden aria-label="Editar linhas e colunas">
               <div class="table-column-edit">
                 <label>Coluna<select id="table-edit-column"></select></label>
@@ -670,24 +710,7 @@
               </div>
               <p class="compatibility-note">As ações de linha usam a busca “Localizar” acima e entram no mesmo histórico reversível das colunas calculadas.</p>
             </section>
-            <!-- A manchete vem antes do detalhe: uma tabela de contingência
-                 está certa e é ilegível de relance, e quem precisa do dado para
-                 uma frase quer o número, não a matriz. -->
-            <div class="table-headline" id="table-headline" hidden>
-              <div class="table-headline-number">
-                <strong id="table-headline-total">—</strong>
-                <span id="table-headline-measure">Total</span>
-              </div>
-              <p class="table-headline-share" id="table-headline-share"></p>
-              <p class="table-headline-basis" id="table-headline-basis" hidden></p>
-            </div>
-
-            <div class="table-wrap" id="table-wrap" hidden>
-              <table id="result-table">
-                <thead></thead>
-                <tbody></tbody>
-                <tfoot></tfoot>
-              </table>
+              </details>
             </div>
           </div>
 

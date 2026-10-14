@@ -1,5 +1,18 @@
 import { expect, test, type Page } from '@playwright/test';
 
+// Estes testes exercitam os controles campo a campo e as ferramentas da
+// tabela, que no TabSis ficam em grupos recolhíveis ("Tabular por campos",
+// "Quadro", "Operações", "Editar linhas e colunas"). O aplicativo lembra esses
+// grupos abertos por navegador; aqui eles começam abertos, como para quem usa
+// essas ferramentas sempre.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    for (const id of ['group-campos', 'tool-quadro', 'tool-operacoes', 'tool-editar']) {
+      try { localStorage.setItem(`tabsis.aberto.${id}`, '1'); } catch { /* ignora */ }
+    }
+  });
+});
+
 /** Loads the CSV fixture and runs a UF tabulation, the shortest path to a result. */
 async function tabulateFixture(page: Page): Promise<void> {
   await page.goto('/');
@@ -1209,8 +1222,8 @@ test('a raw DATASUS file reads as prose, without hiding the technical field name
 
 test('several DEFs can be loaded at once, and which one is in force is a visible choice', async ({ page }) => {
   await page.goto('/');
-  // The picker only exists once there is something to pick.
-  await expect(page.locator('#def-picker')).toBeHidden();
+  // The tabulation panel (and its DEF picker) only exists once there is something to pick.
+  await expect(page.locator('#painel')).toBeHidden();
   await openSidebarGroup(page, 'metadata');
   await expect(page.locator('#def-inspector-button')).toBeDisabled();
 
@@ -1219,28 +1232,32 @@ test('several DEFs can be loaded at once, and which one is in force is a visible
     'e2e/fixtures/casos-e2e.def',
     'e2e/fixtures/obitos-e2e.def',
   ]);
-  await expect(page.locator('#def-picker')).toBeVisible();
+  // In TabSis the DEF choice sits at the top of the tabulation panel, next to
+  // the Linhas/Colunas/Incremento/Seleções lists it governs, and each option
+  // carries the DEF's own description so the user picks by meaning.
+  const picker = page.locator('#painel-def');
+  await expect(picker).toBeVisible();
 
   // Both DEFs are held; loading the second no longer overwrites the first.
-  const picker = page.locator('#def-active');
-  await expect(picker).toContainText('casos-e2e.def');
-  await expect(picker).toContainText('obitos-e2e.def');
+  await expect(picker).toContainText('casos-e2e.def — Casos confirmados por local');
+  await expect(picker).toContainText('obitos-e2e.def — Obitos por local');
 
   // The active DEF names the measure: this is the difference between TabNet's
   // "Casos confirmados" and the bare "Freqüência" a raw file gets.
   await picker.selectOption('casos-e2e.def');
-  await expect(page.locator('#def-active-note')).toContainText('Casos confirmados por local');
+  await expect(page.locator('#painel-incrementos')).toContainText('Casos confirmados');
   await expect(page.locator('#measure-field')).toContainText('Casos confirmados');
 
   // Switching DEF re-labels the same underlying field.
   await picker.selectOption('obitos-e2e.def');
-  await expect(page.locator('#def-active-note')).toContainText('Obitos por local');
+  await expect(page.locator('#painel-incrementos')).toContainText('Obitos registrados');
   await expect(page.locator('#measure-field')).toContainText('Obitos registrados');
 
   // "Sem DEF" is a real choice, not just an absence: it puts the technical
   // names back and disables the inspector.
   await picker.selectOption('');
-  await expect(page.locator('#def-active-note')).toContainText('nomes técnicos');
+  await expect(picker).toHaveValue('');
+  await expect(page.locator('#painel-incrementos')).not.toContainText('Obitos registrados');
   await openSidebarGroup(page, 'metadata');
   await expect(page.locator('#def-inspector-button')).toBeDisabled();
   await expect(page.locator('#measure-field')).not.toContainText('Casos confirmados');
