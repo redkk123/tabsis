@@ -156,7 +156,7 @@ for (const arquivo of lista) {
         // Nome com conteúdo fixo: o hash muda quando o DATASUS republica, e o
         // manifesto (no git) é que diz qual vale. O objeto pode ficar em cache
         // por um dia sem risco, porque quem baixa confere o hash.
-        '--content-type', tipo, '--cache-control', 'public, max-age=86400'],
+        '--content-type', tipo, '--cache-control', 'public,max-age=86400'],
       { stdio: 'pipe', shell: true });
     };
     if (!ensaio) enviar(temporario, destino, 'application/octet-stream');
@@ -203,6 +203,14 @@ for (const entrada of entries) porNome.set(entrada.name.toLowerCase(), entrada);
 if (ensaio) {
   console.log(`\n${entries.length} conferido(s) · ensaio: manifesto NÃO regravado`);
   process.exit(falhas.length ? 1 : 0);
+}
+
+// Sem nenhum arquivo refeito, regravar só trocaria a data — e a data é o que
+// diz ao aplicativo que o espelho foi conferido há pouco.
+if (!entries.length) {
+  console.error(`\nnenhum arquivo espelhado; manifesto mantido como estava`);
+  for (const falha of falhas) console.error(`  ${falha}`);
+  process.exit(1);
 }
 
 fs.mkdirSync(path.dirname(MANIFESTO), { recursive: true });
