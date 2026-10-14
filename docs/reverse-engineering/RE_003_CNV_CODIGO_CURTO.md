@@ -230,3 +230,60 @@ E sobre o DEF:
 - **`MUNICDF.CNV`** começa com um `s` solto no cabeçalho: o TabWin recusa
   ("'s' is not a valid integer value", tela 18), como o TabSis. O arquivo
   oficial está quebrado.
+
+## SIA e SINAN (2026-10-14)
+
+`TAB_SIA.zip` + `PAAC2501.dbc` (produção ambulatorial do Acre, jan/2025, com
+`G` = quantidade aprovada) e `TAB_SINANNET.zip` + `HANSBR23.dbc`
+(hanseníase, Brasil, 2023), do FTP do DATASUS. Mesma varredura, mesmo
+verificador (`npm run verify:sim-sinasc -- SIM=… SINASC=… SIA=… SINAN=…`):
+**26 de 27 iguais ao TabWin**, mais uma diferença conhecida e documentada.
+
+**O DEF oficial do SIA não abria no TabSis.** A linha
+`L + NOME FANTASIA , TITULO , LINHA_COMENTARIO_…` tem 3 campos; o TabSis
+recusava o arquivo inteiro. O TabWin lista a opção e só reclama se alguém a
+usar, lendo o 3º campo como a tabela ("Tabela de conversão não encontrada",
+tela 19). Agora é igual: a opção aparece em cinza no painel, dizendo qual
+tabela falta.
+
+**Campo de data (DBF tipo D) não classificava nada.** "Ano da Alta" e "Mês da
+Alta" (`DTALTA_N`, data) comparavam o texto `2024-02-20T00:00…` com a CNV. Com
+a leitura de largura fixa a data vira `AAAAMMDD`, como o TabWin lê: iguais.
+
+**CNV literal: vale a última ocorrência, não a primeira.** O `CODOCO.CNV` do
+SIA (literal) repete no pai os códigos dos filhos (`1K,1R,1S` no pai, `1K` no
+filho). Com "a primeira vale" (do Help), tudo ia para o pai e os filhos
+ficavam com 0; o TabWin dá aos filhos. Testes T5/T6
+([`ferramentas/re003-cnv-literal.py`](./ferramentas/re003-cnv-literal.py)):
+
+| CNV | Resultado no TabWin |
+| --- | --- |
+| `LITDUP` (`3 2 L`): `AA` na 1ª e na 2ª linha | `AA` na 2ª |
+| `LITSUB`: pai `AA,BB`, filhos `AA` e `BB` | filhos com os registros, pai com a soma |
+| `LONGDUP` (`2 6`, sem L): `120040` na 1ª e na 2ª | na 2ª |
+| `l` minúsculo no cabeçalho | igual ao `L` |
+
+**Faixas no CNV literal são comparação de texto, com os espaços.** O número
+N(2) vem alinhado à direita (`" 7"`, `"10"`), e o TabWin não apara o código da
+CNV (T6):
+
+| Faixa | Pega (de 0 a 20) |
+| --- | --- |
+| `" 7-48"` | 7 a 20 |
+| `"07-48"` | 10 a 20 |
+| `"7 -48"` | nada |
+| `" 1- 5"` | 1 a 5 |
+| `"01-05"` | nada |
+| `"1 -5 "` | 10 a 20 |
+| `" 7- 9"`, `" 7-15"` | 7 a 9, 7 a 15 |
+
+E lista que começa com vírgula (`,00-99`) tem o código em branco também no
+literal.
+
+**A diferença que fica.** `nudosePB.cnv` (SINAN) é literal e tem, na mesma
+linha, três faixas que se sobrepõem (`07-48,7 -48, 7-48`). Sobrepostas, o
+resultado do TabWin depende da ordem (T7: `07-48` antes de `" 7-48"` deixa 8 a
+20 sem classificação; na ordem inversa, tudo classifica) — efeito da estrutura
+de busca dele, não uma regra documentável. O Help diz que CNV literal não
+aceita faixas. Reproduzir exigiria decompilar a rotina; está marcado no
+verificador como diferença conhecida (H1).

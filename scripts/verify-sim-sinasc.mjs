@@ -2,7 +2,10 @@
  * Confere o TabSis contra o TabWin 4.15 real no SIM (DOAC2024) e no SINASC
  * (DNAC2022), com os DEF e CNV oficiais (captura de 2026-10-14).
  *
- * Uso: node scripts/verify-sim-sinasc.mjs <pasta SIM: DOAC2024.dbc + CNVs> <pasta SINASC: DNAC2022.dbc + CNVs>
+ * Também SIA (PAAC2501, com G e Valor Aprovado) e SINAN (HANSBR23).
+ *
+ * Uso: node scripts/verify-sim-sinasc.mjs SIM=<pasta> SINASC=<pasta> [SIA=<pasta>] [SINAN=<pasta>]
+ * (cada pasta com o .dbc e as CNV, nela ou em CNV\, DADOS\). Sistema sem pasta fica de fora.
  */
 import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
@@ -11,14 +14,18 @@ import { parseCnv, parseDef } from '../dist/packages/formats/src/index.js';
 import { compileQueryPlan, executeInMemory, withRecordLayout } from '../dist/packages/core/src/index.js';
 import { calculateColumnTotal } from '../dist/packages/analysis/src/table-operations.js';
 
-const dirs = { SIM: process.argv[2], SINASC: process.argv[3] };
-if (!dirs.SIM || !dirs.SINASC) throw new Error('uso: node scripts/verify-sim-sinasc.mjs <pasta-SIM> <pasta-SINASC>');
+const dirs = Object.fromEntries(process.argv.slice(2).map((arg) => arg.split(/=(.*)/s).slice(0, 2)));
+if (!Object.keys(dirs).length) throw new Error('uso: node scripts/verify-sim-sinasc.mjs SIM=<pasta> SINASC=<pasta> [SIA=<pasta>] [SINAN=<pasta>]');
 const expected = JSON.parse(await readFile(new URL('../fixtures/oracle/re003-sim-sinasc/expected.json', import.meta.url), 'utf8'));
 const cp1252 = new TextDecoder('windows-1252');
-let failures = 0; let count = 0;
+let failures = 0; let count = 0; let known = 0;
 for (const source of expected.sources) {
   const dir = dirs[source.name];
-  const files = new Map(); for (const name of await readdir(dir)) files.set(name.toUpperCase(), path.join(dir, name));
+  if (!dir) { console.log(`(sem pasta para ${source.name})`); continue; }
+  const files = new Map();
+  for (const folder of [dir, path.join(dir, 'CNV'), path.join(dir, 'DADOS')]) {
+    try { for (const name of await readdir(folder)) files.set(name.toUpperCase(), path.join(folder, name)); } catch { /* opcional */ }
+  }
   const def = parseDef(source.defText);
   const dbf = dbcToDbf(new Uint8Array(await readFile(files.get(source.data.toUpperCase()))));
   const layout = readDbfHeader(dbf).fields.map((f) => ({ field: f.name, type: f.type, length: f.length, decimals: f.decimalCount }));
@@ -30,19 +37,31 @@ for (const source of expected.sources) {
     let conversions;
     try { conversions = { [base]: parseCnv(cp1252.decode(await readFile(files.get(base)))) }; }
     catch (error) { failures++; console.log(`FALHOU ${c.id} ${c.linha}: o TabSis não lê ${base} (${error.message})`); continue; }
+    // Freqüência (contagem, ou a soma do campo G) e os incrementos do log.
+    const frequency = { kind: 'count', ...(def.groupedCountField ? { weightField: def.groupedCountField.toUpperCase() } : {}) };
+    const measures = c.incrementos.map((label) => {
+      if (label === 'Freqüência') return frequency;
+      const increment = def.increments.find((candidate) => candidate.label === label);
+      return { kind: 'sum', field: increment.field.toUpperCase(), label };
+    });
     const spec = withRecordLayout({
       compatibilityProfile: 'tabwin-4.15',
       rows: { field: option.field.toUpperCase(), conversionId: base, startPosition: option.startPosition, unclassifiedPolicy: 'discriminate' },
-      measure: { kind: 'count' }, filters: [],
+      measure: measures[0], ...(measures.length > 1 ? { measures } : {}), filters: [],
     }, layout, conversions);
     const result = executeInMemory(records, compileQueryPlan(spec), conversions);
-    const got = result.rows.map((row, i) => [row.label, result.cells[i][0]]);
-    const total = calculateColumnTotal(result, result.columns[0].key, 'sum');
-    if (JSON.stringify(got) === JSON.stringify(c.rows) && total === c.total) console.log(`ok ${source.name} ${c.id} ${c.linha}${spec.rows.recordSpan ? ` (lê ${spec.rows.recordSpan.map((f) => f.field).join('+')})` : ''}`);
-    else {
+    const round = (value) => Math.round(value * 100) / 100;
+    const got = result.rows.map((row, i) => [row.label, ...result.cells[i].map(round)]);
+    const total = result.columns.map((column) => round(calculateColumnTotal(result, column.key, 'sum')));
+    if (JSON.stringify(got) === JSON.stringify(c.rows) && JSON.stringify(total) === JSON.stringify(c.total)) console.log(`ok ${source.name} ${c.id} ${c.linha}${spec.rows.recordSpan ? ` (lê ${spec.rows.recordSpan.map((f) => f.field).join('+')})` : ''}`);
+    else if (c.knownDifference) {
+      known++;
+      console.log(`DIFERENÇA CONHECIDA ${source.name} ${c.id} ${c.linha}: ${c.knownDifference}`);
+    } else {
       failures++;
       console.log(`FALHOU ${source.name} ${c.id} ${c.linha} — total TabWin ${c.total}, TabSis ${total}`);
-      const want = new Map(c.rows); const have = new Map(got);
+      const want = new Map(c.rows.map(([label, ...values]) => [label, values.join(' | ')]));
+      const have = new Map(got.map(([label, ...values]) => [label, values.join(' | ')]));
       let shown = 0;
       for (const label of new Set([...want.keys(), ...have.keys()])) {
         if (want.get(label) !== have.get(label) && shown++ < 8) console.log(`   ${label}: TabWin ${want.get(label) ?? '—'}, TabSis ${have.get(label) ?? '—'}`);
@@ -51,5 +70,5 @@ for (const source of expected.sources) {
     }
   }
 }
-console.log(`sim-sinasc: ${count - failures}/${count} casos iguais ao TabWin 4.15`);
+console.log(`sim-sinasc: ${count - failures - known}/${count} casos iguais ao TabWin 4.15${known ? `, ${known} diferença(s) conhecida(s) e documentada(s)` : ''}`);
 if (failures) process.exitCode = 1;

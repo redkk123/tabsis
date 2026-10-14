@@ -71,6 +71,40 @@ function shortTable(definition: CnvDefinition): { table: Int32Array; categories:
   return built;
 }
 
+/** CNV literal: código e faixas em largura fixa, comparados como texto; quem vem depois ganha. */
+const literalTables = new WeakMap<CnvDefinition, {
+  exact: Map<string, { position: number; order: number }>;
+  ranges: Array<{ from: string; to: string; position: number; order: number }>;
+}>();
+
+function literalTable(definition: CnvDefinition) {
+  const cached = literalTables.get(definition);
+  if (cached) return cached;
+  const length = definition.codeLength;
+  const fixed = (code: string): string => code.padEnd(length, ' ').slice(0, length);
+  const positions = new Map<number, number>();
+  definition.categories.forEach((category, position) => {
+    if (!positions.has(category.sequence)) positions.set(category.sequence, position);
+  });
+  const exact = new Map<string, { position: number; order: number }>();
+  const ranges: Array<{ from: string; to: string; position: number; order: number }> = [];
+  definition.rules.forEach((rule, order) => {
+    const position = positions.get(rule.categorySequence);
+    if (position === undefined) return;
+    for (const code of rule.exactCodes) {
+      if (code.trimStart().startsWith('-')) continue;
+      exact.set(fixed(code), { position, order });
+    }
+    for (const range of rule.ranges) {
+      if (!range.from.trim() || !range.to.trim()) continue;
+      ranges.push({ from: fixed(range.from), to: fixed(range.to), position, order });
+    }
+  });
+  const built = { exact, ranges };
+  literalTables.set(definition, built);
+  return built;
+}
+
 export interface ClassifyCnvOptions {
   /**
    * O valor veio de um campo de texto (DBF tipo C), então vale a leitura de
@@ -101,6 +135,20 @@ export function classifyCnv(definition: CnvDefinition, raw: unknown, options: Cl
     const position = table[shortCodeIndex(raw === null ? '' : String(raw), definition.codeLength)] ?? -1;
     if (position < 0) return undefined;
     const category = definition.categories[position]!;
+    return { sequence: category.sequence, label: category.label };
+  }
+
+  if (definition.mode === 'literal' && typeof raw !== 'number' && raw !== undefined) {
+    const { exact, ranges } = literalTable(definition);
+    const code = (raw === null ? '' : String(raw)).padEnd(definition.codeLength, ' ').slice(0, definition.codeLength);
+    const firstWins = definition.precedence === 'first-match-wins';
+    let best = exact.get(code);
+    for (const range of ranges) {
+      if (code < range.from || code > range.to) continue;
+      if (!best || (firstWins ? range.order < best.order : range.order > best.order)) best = range;
+    }
+    if (!best) return undefined;
+    const category = definition.categories[best.position]!;
     return { sequence: category.sequence, label: category.label };
   }
 

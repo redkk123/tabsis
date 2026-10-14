@@ -117,7 +117,7 @@ function spannedCode(record: DataRecord, span: readonly RecordFieldLayout[], sta
   const raw = span.map((layout) => fixedWidthText(record[layout.field], layout)).join('');
   const start = (startPosition ?? 1) - 1;
   const code = raw.slice(start, start + conversion.codeLength);
-  return conversion.mode === 'literal' ? code.replace(/ +$/, '') : code;
+  return code;
 }
 
 function extractSourceValue(

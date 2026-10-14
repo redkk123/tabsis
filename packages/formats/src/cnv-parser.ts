@@ -107,7 +107,12 @@ function parseRuleLine(
   // esses espaços como um código; aparados, o branco caía em outra linha
   // (RE-003, SIM/SINASC). Só conta com vírgula, para não confundir com o
   // espaço que sobra no fim de uma linha-título.
-  const blankCode = mode === 'short' && /^ +,/.test(codesArea);
+  const blankCode = (mode === 'short' || mode === 'literal') && /^ *,/.test(codesArea);
+  // No literal o TabWin compara o código com os espaços como estão
+  // (" 1- 5" pega " 1".." 5"; "01-05" não pega o número 1, que é " 1";
+  // RE-003, testes T5–T7). Só o fim da linha é aparado.
+  const literal = mode === 'literal';
+  const codesList = literal ? codesArea.replace(/\s+$/, '') : codesRaw;
 
   if (!/^\d+$/.test(sequenceRaw)) {
     throw new CnvParseError(
@@ -159,12 +164,17 @@ function parseRuleLine(
     numericUpperInclusive = value;
   } else if (codesRaw || blankCode) {
     if (blankCode) exactCodes.push(' ');
-    for (const rawToken of codesRaw.split(',')) {
-      const token = rawToken.trim();
-      if (!token) continue;
-      const hyphen = token.indexOf('-');
-      if (hyphen > 0 && hyphen < token.length - 1) {
-        ranges.push({ from: token.slice(0, hyphen).trim(), to: token.slice(hyphen + 1).trim() });
+    for (const rawToken of codesList.split(',')) {
+      const token = literal ? rawToken : rawToken.trim();
+      if (!token.trim()) continue;
+      // Faixa só com hífen depois do primeiro caractere do código: "----" (as
+      // linhas-título) continua não sendo faixa nem código.
+      const begin = token.length - token.trimStart().length;
+      const hyphen = token.indexOf('-', begin);
+      if (hyphen > begin && hyphen < token.length - 1) {
+        ranges.push(literal
+          ? { from: token.slice(0, hyphen), to: token.slice(hyphen + 1) }
+          : { from: token.slice(0, hyphen).trim(), to: token.slice(hyphen + 1).trim() });
       } else {
         exactCodes.push(token);
       }
@@ -306,7 +316,11 @@ export function parseCnv(text: string, options: ParseCnvOptions = {}): CnvDefini
     // Documented short-code example says a later row overrides an earlier broad
     // range. The supplied documentation separately notes first-index behavior for
     // long/literal codes. We preserve that distinction explicitly.
-    precedence: header.mode === 'literal' ? 'first-match-wins' : 'last-match-wins',
+    // Também no literal quem vem depois ganha — o Help diz "duplicatas … são
+    // ignoradas a partir da primeira referência", mas o TabWin 4.15 dá o
+    // código à última linha, curto com L ou longo (LITDUP, LONGDUP; e o
+    // CODOCO.CNV do SIA, onde os filhos repetem os códigos do pai; RE-003).
+    precedence: 'last-match-wins',
     categories: categoryList,
     rules,
     comments,

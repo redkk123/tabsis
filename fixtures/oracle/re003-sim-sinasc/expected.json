@@ -3,7 +3,7 @@
  "version": 1,
  "capturedAt": "2026-10-14",
  "referenceEngine": "TabWin 4.15 (TabWin415.exe) under Wine 10.0",
- "evidence": "tabelas salvas pelo próprio TabWin (.TAB); DEF/CNV oficiais de OBITOS_CID10_TAB.zip e NASC_NOV_TAB.zip (ftp.datasus.gov.br)",
+ "evidence": "tabelas salvas pelo próprio TabWin (.TAB); DEF/CNV oficiais de OBITOS_CID10_TAB.zip e NASC_NOV_TAB.zip (ftp.datasus.gov.br); SIA: TAB_SIA.zip + PAAC2501.dbc; SINAN: TAB_SINANNET.zip + HANSBR23.dbc",
  "notes": [
   "Munic Resid - DF (MUNICDF.CNV): o TabWin recusa o arquivo (\"s is not a valid integer value\"), como o TabSis; fica fora.",
   "xCausa (x minúsculo no DEF oficial): o TabWin lista em Linhas, Colunas e Seleções, como X."
@@ -28,7 +28,12 @@
        4267
       ]
      ],
-     "total": 4267
+     "total": [
+      4267
+     ],
+     "incrementos": [
+      "Freqüência"
+     ]
     },
     {
      "id": "S1",
@@ -56,7 +61,12 @@
        4267
       ]
      ],
-     "total": 4267
+     "total": [
+      4267
+     ],
+     "incrementos": [
+      "Freqüência"
+     ]
     },
     {
      "id": "S3",
@@ -104,7 +114,12 @@
        4077
       ]
      ],
-     "total": 4267
+     "total": [
+      4267
+     ],
+     "incrementos": [
+      "Freqüência"
+     ]
     },
     {
      "id": "S4",
@@ -148,7 +163,12 @@
        4088
       ]
      ],
-     "total": 4267
+     "total": [
+      4267
+     ],
+     "incrementos": [
+      "Freqüência"
+     ]
     },
     {
      "id": "S5",
@@ -744,7 +764,12 @@
        0
       ]
      ],
-     "total": 4267
+     "total": [
+      4267
+     ],
+     "incrementos": [
+      "Freqüência"
+     ]
     },
     {
      "id": "S6",
@@ -2404,7 +2429,12 @@
        4079
       ]
      ],
-     "total": 4267
+     "total": [
+      4267
+     ],
+     "incrementos": [
+      "Freqüência"
+     ]
     },
     {
      "id": "S7",
@@ -2468,7 +2498,12 @@
        0
       ]
      ],
-     "total": 4267
+     "total": [
+      4267
+     ],
+     "incrementos": [
+      "Freqüência"
+     ]
     },
     {
      "id": "S8",
@@ -3064,7 +3099,12 @@
        0
       ]
      ],
-     "total": 4267
+     "total": [
+      4267
+     ],
+     "incrementos": [
+      "Freqüência"
+     ]
     }
    ]
   },
@@ -3179,7 +3219,12 @@
        47
       ]
      ],
-     "total": 14483
+     "total": [
+      14483
+     ],
+     "incrementos": [
+      "Freqüência"
+     ]
     },
     {
      "id": "N1",
@@ -3239,7 +3284,12 @@
        404
       ]
      ],
-     "total": 14483
+     "total": [
+      14483
+     ],
+     "incrementos": [
+      "Freqüência"
+     ]
     },
     {
      "id": "N2",
@@ -3359,7 +3409,12 @@
        4843
       ]
      ],
-     "total": 14483
+     "total": [
+      14483
+     ],
+     "incrementos": [
+      "Freqüência"
+     ]
     },
     {
      "id": "N3",
@@ -3395,7 +3450,12 @@
        94
       ]
      ],
-     "total": 14483
+     "total": [
+      14483
+     ],
+     "incrementos": [
+      "Freqüência"
+     ]
     },
     {
      "id": "N4",
@@ -3423,7 +3483,12 @@
        13
       ]
      ],
-     "total": 14483
+     "total": [
+      14483
+     ],
+     "incrementos": [
+      "Freqüência"
+     ]
     },
     {
      "id": "N5",
@@ -4239,7 +4304,12 @@
        14483
       ]
      ],
-     "total": 14483
+     "total": [
+      14483
+     ],
+     "incrementos": [
+      "Freqüência"
+     ]
     },
     {
      "id": "N6",
@@ -4359,7 +4429,12 @@
        164
       ]
      ],
-     "total": 14483
+     "total": [
+      14483
+     ],
+     "incrementos": [
+      "Freqüência"
+     ]
     },
     {
      "id": "N7",
@@ -4423,7 +4498,843 @@
        14420
       ]
      ],
-     "total": 14483
+     "total": [
+      14483
+     ],
+     "incrementos": [
+      "Freqüência"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "SIA",
+   "data": "PAAC2501.dbc",
+   "defText": ";RE-003 SIA producao AC 2025-01\nADADOS\\PA*.DBC\nGPA_QTDAPR\nIValor Aprovado            , PA_VALAPR\nLProdução Aprovada/Não  , PA_INDICA  , 1 , CNV/INDICA.CNV\nLDetalhes_Aprovação     , PA_CODOCO  , 1 , CNV/CODOCO.CNV\n",
+   "cases": [
+    {
+     "id": "A0",
+     "linha": "Produção Aprovada/Não",
+     "incrementos": [
+      "Freqüência",
+      "Valor Aprovado"
+     ],
+     "naoClassificados": "incluir",
+     "rows": [
+      [
+       "Aprovado totalmente",
+       1518908,
+       11635351.65
+      ],
+      [
+       "Aprovado parcialmente",
+       4838,
+       29080.18
+      ],
+      [
+       "Não aprovado",
+       0,
+       0.0
+      ]
+     ],
+     "total": [
+      1523746,
+      11664431.83
+     ]
+    },
+    {
+     "id": "A1",
+     "linha": "Detalhes_Aprovação",
+     "incrementos": [
+      "Freqüência",
+      "Valor Aprovado"
+     ],
+     "naoClassificados": "incluir",
+     "rows": [
+      [
+       "PRODUÇÃO TOTALMENTE APROVADA",
+       1518908,
+       11635351.65
+      ],
+      [
+       "..APROVADO TOTALMENTE       (K)",
+       1515557,
+       11560514.78
+      ],
+      [
+       "..TETO FINANCEIRO           (R)",
+       3251,
+       73442.42
+      ],
+      [
+       "..TETO FINANCEIRO CMP ATUAL (S)",
+       100,
+       1394.45
+      ],
+      [
+       "PRODUÇÃO PARCIALMENTE APROVADA",
+       4838,
+       29080.18
+      ],
+      [
+       "..ULTRAPASSOU TETO FISICO   (L)",
+       97,
+       0.0
+      ],
+      [
+       "..ULTRAPAS.TETO FINANCEIRO  (M)",
+       4741,
+       29080.18
+      ],
+      [
+       "..TETO FINANCEIRO CMP ATUAL (T)",
+       0,
+       0.0
+      ],
+      [
+       "PRODUÇÃO NAO APROVADA",
+       0,
+       0.0
+      ],
+      [
+       "..PROCEDIMENTO SEM ORCAMENTO      (P)",
+       0,
+       0.0
+      ],
+      [
+       "..PROCEDIMENTO SEM VALOR UNITARIO (Q)",
+       0,
+       0.0
+      ],
+      [
+       "..ULTRAPASSOU TETO FISICO         (N)",
+       0,
+       0.0
+      ],
+      [
+       "..ULTRAPASSOU TETO FINANCEIRO     (O)",
+       0,
+       0.0
+      ],
+      [
+       "PRODUÇÃO SEM QUANTIDADE PRODUZIDA (1)",
+       0,
+       0.0
+      ]
+     ],
+     "total": [
+      1523746,
+      11664431.83
+     ]
+    }
+   ]
+  },
+  {
+   "name": "SINAN",
+   "data": "HANSBR23.dbc",
+   "defText": ";RE-003 SINAN hanseniase 2023\nAC:\\TabWin\\SINAN\\HANS*.DBC\nLAno da Notific,       DT_NOTIFIC,  1, ANOS.CNV\nLNº DOSES PB, DOSE_RECEB, 1, NUDOSEPB.CNV\nLNº DOSES MB, DOSE_RECEB, 1, NUDOSEMB.CNV\nLNº DOSES detalhado, DOSE_RECEB, 1, NUDOSES.CNV\nLepisódio reacional, EPIS_RACIO, 1, reacional.cnv\nLTipo de Saída,          TPALTA_N,   1,  SAIDAHANS.CNV\nLAno da Alta,         DTALTA_N,     1, anos.cnv\nLMês da Alta,         DTALTA_N,     5, MESES.CNV\nLMigrado Sinan_W, MIGRADO_W, 1, MIGRADO.CNV\n",
+   "cases": [
+    {
+     "id": "H0",
+     "linha": "Ano da Notific",
+     "incrementos": [
+      "Freqüência"
+     ],
+     "naoClassificados": "incluir",
+     "rows": [
+      [
+       " IGN",
+       0
+      ],
+      [
+       "<1991",
+       0
+      ],
+      [
+       "1991",
+       0
+      ],
+      [
+       "1992",
+       0
+      ],
+      [
+       "1993",
+       0
+      ],
+      [
+       "1994",
+       0
+      ],
+      [
+       "1995",
+       0
+      ],
+      [
+       "1996",
+       0
+      ],
+      [
+       "1997",
+       0
+      ],
+      [
+       "1998",
+       0
+      ],
+      [
+       "1999",
+       0
+      ],
+      [
+       "2000",
+       0
+      ],
+      [
+       "2001",
+       0
+      ],
+      [
+       "2002",
+       0
+      ],
+      [
+       "2003",
+       0
+      ],
+      [
+       "2004",
+       0
+      ],
+      [
+       "2005",
+       0
+      ],
+      [
+       "2006",
+       0
+      ],
+      [
+       "2007",
+       0
+      ],
+      [
+       "2008",
+       0
+      ],
+      [
+       "2009",
+       0
+      ],
+      [
+       "2010",
+       0
+      ],
+      [
+       "2011",
+       0
+      ],
+      [
+       "2012",
+       0
+      ],
+      [
+       "2013",
+       0
+      ],
+      [
+       "2014",
+       0
+      ],
+      [
+       "2015",
+       0
+      ],
+      [
+       "2016",
+       0
+      ],
+      [
+       "2017",
+       0
+      ],
+      [
+       "2018",
+       0
+      ],
+      [
+       "2019",
+       0
+      ],
+      [
+       "2020",
+       0
+      ],
+      [
+       "2021",
+       0
+      ],
+      [
+       "2022",
+       0
+      ],
+      [
+       "2023",
+       30114
+      ],
+      [
+       "2024",
+       0
+      ],
+      [
+       "2025",
+       0
+      ],
+      [
+       "2026",
+       0
+      ]
+     ],
+     "total": [
+      30114
+     ]
+    },
+    {
+     "id": "H1",
+     "linha": "Nº DOSES PB",
+     "incrementos": [
+      "Freqüência"
+     ],
+     "naoClassificados": "incluir",
+     "rows": [
+      [
+       "não preenchido/Ign",
+       2528
+      ],
+      [
+       "nenhuma dose",
+       188
+      ],
+      [
+       "menor que 6",
+       4642
+      ],
+      [
+       "6 doses",
+       3340
+      ],
+      [
+       "maior que 6",
+       542
+      ],
+      [
+       "Não classificados",
+       18874
+      ]
+     ],
+     "total": [
+      30114
+     ],
+     "knownDifference": "nudosePB.cnv é literal e tem faixas que se sobrepõem na mesma linha (\"07-48,7 -48, 7-48\"). Isoladas, as faixas literais são comparação de texto e o TabSis bate (testes RA–RH, K2); sobrepostas, o resultado do TabWin depende da ordem das linhas (K1: com 07-48 antes de \" 7-48\", 8 a 20 ficam sem classificação), efeito da estrutura de busca dele. O Help diz que CNV literal não aceita faixas. Fica documentado; reproduzir exigiria decompilar a rotina."
+    },
+    {
+     "id": "H2",
+     "linha": "Nº DOSES MB",
+     "incrementos": [
+      "Freqüência"
+     ],
+     "naoClassificados": "incluir",
+     "rows": [
+      [
+       "não preenchido/Ign",
+       4
+      ],
+      [
+       "nenhuma dose",
+       2713
+      ],
+      [
+       "<12",
+       10649
+      ],
+      [
+       "12 doses",
+       15255
+      ],
+      [
+       "13 a 23",
+       1225
+      ],
+      [
+       "24 doses",
+       241
+      ],
+      [
+       "> 24",
+       27
+      ]
+     ],
+     "total": [
+      30114
+     ]
+    },
+    {
+     "id": "H3",
+     "linha": "Nº DOSES detalhado",
+     "incrementos": [
+      "Freqüência"
+     ],
+     "naoClassificados": "incluir",
+     "rows": [
+      [
+       "não preenchido/Ign",
+       2713
+      ],
+      [
+       "01",
+       1802
+      ],
+      [
+       "02",
+       906
+      ],
+      [
+       "03",
+       721
+      ],
+      [
+       "04",
+       601
+      ],
+      [
+       "05",
+       612
+      ],
+      [
+       "06",
+       3340
+      ],
+      [
+       "07",
+       542
+      ],
+      [
+       "08",
+       491
+      ],
+      [
+       "09",
+       472
+      ],
+      [
+       "10",
+       569
+      ],
+      [
+       "11",
+       593
+      ],
+      [
+       "12",
+       15255
+      ],
+      [
+       "13",
+       203
+      ],
+      [
+       "14",
+       140
+      ],
+      [
+       "15",
+       123
+      ],
+      [
+       "16",
+       106
+      ],
+      [
+       "17",
+       105
+      ],
+      [
+       "18",
+       159
+      ],
+      [
+       "19",
+       92
+      ],
+      [
+       "20",
+       99
+      ],
+      [
+       "21",
+       77
+      ],
+      [
+       "22",
+       58
+      ],
+      [
+       "24",
+       241
+      ],
+      [
+       ">24",
+       27
+      ],
+      [
+       "Não classificados",
+       67
+      ]
+     ],
+     "total": [
+      30114
+     ]
+    },
+    {
+     "id": "H4",
+     "linha": "episódio reacional",
+     "incrementos": [
+      "Freqüência"
+     ],
+     "naoClassificados": "incluir",
+     "rows": [
+      [
+       "não preenchido",
+       8759
+      ],
+      [
+       "Reação tipo 1",
+       2456
+      ],
+      [
+       "Reação tipo 2",
+       889
+      ],
+      [
+       "Reação tipo 1 e 2",
+       358
+      ],
+      [
+       "Sem Reação",
+       17652
+      ]
+     ],
+     "total": [
+      30114
+     ]
+    },
+    {
+     "id": "H5",
+     "linha": "Tipo de Saída",
+     "incrementos": [
+      "Freqüência"
+     ],
+     "naoClassificados": "incluir",
+     "rows": [
+      [
+       "Não preenchido",
+       4603
+      ],
+      [
+       "Cura",
+       19242
+      ],
+      [
+       "Transf. para o mesmo município",
+       783
+      ],
+      [
+       "Transf. para outro município",
+       1622
+      ],
+      [
+       "Transf. para o outro estado",
+       544
+      ],
+      [
+       "Transf. para outro Pais",
+       17
+      ],
+      [
+       "Óbito",
+       488
+      ],
+      [
+       "Abandono",
+       2238
+      ],
+      [
+       "Erro diagnóstico",
+       575
+      ],
+      [
+       "Trans. não especificada",
+       2
+      ]
+     ],
+     "total": [
+      30114
+     ]
+    },
+    {
+     "id": "H6",
+     "linha": "Ano da Alta",
+     "incrementos": [
+      "Freqüência"
+     ],
+     "naoClassificados": "incluir",
+     "rows": [
+      [
+       " IGN",
+       4609
+      ],
+      [
+       "<1991",
+       0
+      ],
+      [
+       "1991",
+       0
+      ],
+      [
+       "1992",
+       0
+      ],
+      [
+       "1993",
+       0
+      ],
+      [
+       "1994",
+       0
+      ],
+      [
+       "1995",
+       0
+      ],
+      [
+       "1996",
+       0
+      ],
+      [
+       "1997",
+       0
+      ],
+      [
+       "1998",
+       0
+      ],
+      [
+       "1999",
+       0
+      ],
+      [
+       "2000",
+       0
+      ],
+      [
+       "2001",
+       0
+      ],
+      [
+       "2002",
+       2
+      ],
+      [
+       "2003",
+       1
+      ],
+      [
+       "2004",
+       0
+      ],
+      [
+       "2005",
+       1
+      ],
+      [
+       "2006",
+       0
+      ],
+      [
+       "2007",
+       0
+      ],
+      [
+       "2008",
+       0
+      ],
+      [
+       "2009",
+       0
+      ],
+      [
+       "2010",
+       0
+      ],
+      [
+       "2011",
+       0
+      ],
+      [
+       "2012",
+       1
+      ],
+      [
+       "2013",
+       0
+      ],
+      [
+       "2014",
+       1
+      ],
+      [
+       "2015",
+       0
+      ],
+      [
+       "2016",
+       0
+      ],
+      [
+       "2017",
+       1
+      ],
+      [
+       "2018",
+       0
+      ],
+      [
+       "2019",
+       0
+      ],
+      [
+       "2020",
+       2
+      ],
+      [
+       "2021",
+       5
+      ],
+      [
+       "2022",
+       13
+      ],
+      [
+       "2023",
+       5634
+      ],
+      [
+       "2024",
+       18083
+      ],
+      [
+       "2025",
+       1761
+      ],
+      [
+       "2026",
+       0
+      ]
+     ],
+     "total": [
+      30114
+     ]
+    },
+    {
+     "id": "H7",
+     "linha": "Mês da Alta",
+     "incrementos": [
+      "Freqüência"
+     ],
+     "naoClassificados": "incluir",
+     "rows": [
+      [
+       "Ign/Branco",
+       4609
+      ],
+      [
+       "Janeiro",
+       2168
+      ],
+      [
+       "Fevereiro",
+       2162
+      ],
+      [
+       "Marco",
+       2162
+      ],
+      [
+       "Abril",
+       2194
+      ],
+      [
+       "Maio",
+       1977
+      ],
+      [
+       "Junho",
+       1996
+      ],
+      [
+       "Julho",
+       2042
+      ],
+      [
+       "Agosto",
+       2286
+      ],
+      [
+       "Setembro",
+       2129
+      ],
+      [
+       "Outubro",
+       2236
+      ],
+      [
+       "Novembro",
+       2056
+      ],
+      [
+       "Dezembro",
+       2097
+      ]
+     ],
+     "total": [
+      30114
+     ]
+    },
+    {
+     "id": "H8",
+     "linha": "Migrado Sinan_W",
+     "incrementos": [
+      "Freqüência"
+     ],
+     "naoClassificados": "incluir",
+     "rows": [
+      [
+       "IGN/Branco",
+       30114
+      ],
+      [
+       "Não",
+       0
+      ],
+      [
+       "Sim",
+       0
+      ]
+     ],
+     "total": [
+      30114
+     ]
     }
    ]
   }
