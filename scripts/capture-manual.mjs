@@ -12,7 +12,8 @@
  * legendas do manual falam desse. A pasta padrão (`.cache/manual/sim`) tem o
  * `Obito_1996_CID10.def` e as CNVs do `OBITOS_CID10_TAB.zip` oficial: com
  * elas saem as figuras do Painel de tabulação. Sem a pasta, essas ficam de
- * fora (com aviso) e as outras saem normalmente.
+ * fora (com aviso) e as outras saem normalmente. A figura 14 consulta o
+ * catálogo do DATASUS de verdade (precisa de internet).
  *
  * Cada passo é isolado: uma captura que falha não pode levar as outras junto,
  * porque aí o custo de uma tela quebrada vira o manual inteiro sem figuras.
@@ -93,10 +94,43 @@ console.log('capturando:');
 // ("Nunca usei o TabWin" / "Já uso o TabWin").
 await capturar('01-inicio', 'tela inicial, antes de qualquer arquivo', async () => null);
 
+/** Escolhe a opção cujo texto contém `trecho` (os valores internos mudam; o texto é o que a pessoa vê). */
+async function escolherPorTexto(seletor, trecho) {
+  const valor = await pagina.locator(seletor).evaluate((lista, alvo) =>
+    [...lista.options].find((opcao) => opcao.textContent.includes(alvo))?.value, trecho);
+  if (valor === undefined) throw new Error(`${seletor}: sem opção com "${trecho}"`);
+  await pagina.locator(seletor).selectOption(valor);
+  await pagina.waitForTimeout(250);
+}
+
 await capturar('13-busca-datasus', 'diálogo de busca no catálogo oficial', async () => {
   await pagina.locator('#catalog-button').click();
   await pagina.waitForTimeout(400);
   return pagina.locator('dialog[open]').first();
+});
+
+// A busca de verdade, no catálogo do DATASUS (precisa de internet): os óbitos
+// infantis de 2023, o mesmo arquivo do resto do manual.
+// O proxy do DATASUS só atende o site publicado; a captura roda em
+// 127.0.0.1, então se apresenta como ele (como fetch-manual-dataset.mjs).
+// A resposta volta liberada só para tabweb.me (CORS), então a captura busca
+// por fora e entrega à página com a origem local liberada.
+const CORS = { 'access-control-allow-origin': BASE, 'access-control-allow-headers': '*', 'access-control-allow-methods': 'GET, POST, OPTIONS' };
+await pagina.route(/tabwin-web-datasus-proxy/, async (rota) => {
+  if (rota.request().method() === 'OPTIONS') return rota.fulfill({ status: 204, headers: CORS });
+  const resposta = await rota.fetch({ headers: { ...rota.request().headers(), origin: 'https://tabweb.me' } });
+  return rota.fulfill({ response: resposta, headers: { ...resposta.headers(), ...CORS } });
+});
+
+await capturar('14-resultados-catalogo', 'resultado da busca no catálogo, com as ações por arquivo', async () => {
+  await escolherPorTexto('#catalog-system', 'SIM');
+  await escolherPorTexto('#catalog-file-type', 'infant');
+  await escolherPorTexto('#catalog-year', '2023');
+  await pagina.locator('#catalog-search-button').click();
+  await pagina.locator('#catalog-results button').first().waitFor({ timeout: 120_000 });
+  await pagina.waitForTimeout(800);
+  await pagina.locator('#catalog-results').scrollIntoViewIfNeeded();
+  return pagina.locator('#catalog-results');
 });
 await pagina.keyboard.press('Escape');
 
@@ -153,6 +187,19 @@ await capturar('10-consulta-vazia', 'aba de consulta antes de carregar', async (
   await pagina.locator('.view-tabs button[data-view="query"]').click();
   await pagina.waitForTimeout(400);
   return pagina.locator('.results');
+});
+
+// As oito causas básicas mais frequentes, como diz a legenda do manual.
+await capturar('11-consulta-resultado', 'consulta SQL agrupando por causa básica', async () => {
+  await pagina.locator('#query-fields').selectOption(['CAUSABAS']);
+  await pagina.getByRole('button', { name: 'Carregar os dados abertos' }).click();
+  await pagina.locator('#query-status').filter({ hasText: 'pronta com' }).waitFor({ timeout: 180_000 });
+  const tabela = ((await pagina.locator('#query-status').textContent()) ?? '').split(' ')[1];
+  await pagina.locator('#query-sql').fill(`SELECT CAUSABAS, COUNT(*) AS obitos\nFROM "${tabela}"\nGROUP BY CAUSABAS\nORDER BY obitos DESC\nLIMIT 8`);
+  await pagina.locator('#query-run').click();
+  await pagina.locator('#query-status').filter({ hasText: 'linha(s) em' }).waitFor({ timeout: 60_000 });
+  await pagina.waitForTimeout(300);
+  return pagina.locator('[data-panel="query"]');
 });
 
 // O Painel de tabulação com DEF e CNV de verdade: é o caminho principal, e o

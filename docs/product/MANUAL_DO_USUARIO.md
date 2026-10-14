@@ -419,7 +419,7 @@ Duas coisas importantes:
 
 ![Aba de consulta SQL antes de carregar dados, com a lista de campos disponíveis](./manual/10-consulta-vazia.png "A aba Consulta antes de carregar. Num arquivo de 87 campos, a tela diz quantos cabem — carregar todos raramente é o que se quer.")
 
-![Consulta SQL agrupando por causa básica, com o resultado em tabela](./manual/11-consulta-resultado.png "As oito causas básicas mais frequentes entre os óbitos infantis de 2023, em 135 ms. P369 é sepse bacteriana do recém-nascido.")
+![Consulta SQL agrupando por causa básica, com o resultado em tabela](./manual/11-consulta-resultado.png "As oito causas básicas mais frequentes entre os óbitos infantis de 2023, em milissegundos. P369 é sepse bacteriana do recém-nascido.")
 
 ![Aba de auditoria com o registro de procedência e operações](./manual/12-auditoria.png "De onde vieram os dados e o que foi feito com eles — para reproduzir o resultado depois e explicar como foi obtido.")
 
