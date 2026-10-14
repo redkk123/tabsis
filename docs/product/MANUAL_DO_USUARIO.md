@@ -1,4 +1,4 @@
-# TabWin Web — manual do usuário
+# TabSis — manual do usuário
 
 Este manual descreve o que o programa **faz hoje**. Onde algo não é suportado,
 está dito que não é. Onde uma escolha existe mas não é óbvia, está dito qual é
@@ -8,7 +8,7 @@ o padrão — porque um padrão invisível é uma armadilha, não uma conveniên
 
 ## 1. O que é, em uma página
 
-O TabWin Web tabula microdados públicos do DATASUS no navegador, seguindo a
+O TabSis tabula microdados públicos do DATASUS no navegador, seguindo a
 semântica do **TabWin 4.15** do próprio DATASUS. Ele lê os arquivos que você já
 usa: `.DBC`, `.DBF`, `.CSV`, e os metadados legados `.DEF`, `.CNV` e `.MAP`.
 
@@ -36,7 +36,7 @@ está aberto.
 
 ## 2. Primeiro uso, em quatro passos
 
-![Tela inicial do TabWin Web, com a área para abrir arquivo e o painel de configuração à esquerda](./manual/01-inicio.png "A tela inicial. A tarja **Seus dados ficam neste aparelho** não é slogan: não existe servidor de dados neste programa.")
+![Tela inicial do TabSis, com a área para abrir arquivo e o painel de configuração à esquerda](./manual/01-inicio.png "A tela inicial. A tarja **Seus dados ficam neste aparelho** não é slogan: não existe servidor de dados neste programa.")
 
 1. **Abra um arquivo.** Arraste um `.DBC` para a área tracejada, ou clique nela
    para escolher. Se você não tem um arquivo ainda, use **Buscar no DATASUS**
@@ -197,7 +197,7 @@ sempre visível, então a diferença entre os dois é auditável.
 ### Supressão de linhas zeradas
 
 Ligada, esconde linhas cujo valor é zero em todas as colunas. Desligada, o
-TabWin Web mostra todas as categorias que a CNV declara, inclusive as vazias —
+TabSis mostra todas as categorias que a CNV declara, inclusive as vazias —
 que é o que o TabWin 4.15 faz.
 
 ### Medidas adicionais lado a lado

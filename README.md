@@ -1,11 +1,11 @@
 <div align="center">
 
-# TabWin Web
+# TabSis
 
 **Tabulação de microdados públicos do DATASUS no navegador.**
 Sem instalar nada. Sem enviar dados para lugar nenhum.
 
-[**▶ Abrir a aplicação**](https://redkk123.github.io/tabwin-web/) · [**📖 Manual do usuário**](./docs/product/MANUAL_DO_USUARIO.md)
+[**▶ Abrir a aplicação**](https://tabweb.me/) · [**📖 Manual do usuário**](./docs/product/MANUAL_DO_USUARIO.md)
 
 </div>
 
@@ -119,4 +119,15 @@ Três dependências de runtime, e vale nomear o que cada uma faz:
 
 ## Licença
 
-MIT — ver [LICENSE](./LICENSE).
+[GNU AGPL v3 ou posterior](./LICENSE) (`AGPL-3.0-or-later`).
+
+Escolhida porque o TabSis é um sistema web: a AGPL vale também para quem só
+o **hospeda** e oferece a outras pessoas pela internet, não apenas para quem
+distribui o código. Qualquer versão modificada que seja publicada precisa
+abrir o código-fonte das modificações sob a mesma licença e manter os créditos.
+
+As dependências (`@precisa-saude/datasus-dbc` em Apache-2.0, `fflate` e
+`@duckdb/duckdb-wasm` em MIT) têm licenças compatíveis com a AGPL v3.
+
+Até a versão 0.8 o projeto se chamava **TabWin Web** e era distribuído sob MIT;
+as cópias obtidas naquela época continuam valendo sob a MIT.

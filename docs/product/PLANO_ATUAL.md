@@ -115,7 +115,7 @@ Três decisões que a verificação forçou, e que valem ficar escritas:
   o botão simplesmente não aparece — melhor do que oferecer e falhar.
 
 O diálogo diz em destaque que esta é a única parte do aplicativo em que a
-pergunta viaja. Isso não é ornamento: o resto do TabWin Web baixa o arquivo
+pergunta viaja. Isso não é ornamento: o resto do TabSis baixa o arquivo
 e tabula no aparelho sem contar a ninguém o que se quis saber, e perder
 isso de vista por conveniência seria trair o motivo do projeto existir.
 

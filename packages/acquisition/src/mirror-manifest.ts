@@ -64,7 +64,7 @@ export function parseMirrorManifest(conteudo: string): MirrorManifestV1 {
   }
   const objeto = bruto as Partial<MirrorManifestV1> | null;
   if (!objeto || objeto.schema !== MIRROR_MANIFEST_SCHEMA) {
-    throw new Error('Este arquivo não é um manifesto de espelho do TabWin Web');
+    throw new Error('Este arquivo não é um manifesto de espelho do TabSis');
   }
   if (objeto.version !== 1) {
     throw new Error(`Manifesto de espelho na versão ${String(objeto.version)}, desconhecida`);

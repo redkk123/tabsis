@@ -88,7 +88,7 @@ export function parseWorklist(conteudo: string): WorklistV1 {
   }
   const objeto = bruto as Partial<WorklistV1> | null;
   if (!objeto || objeto.schema !== WORKLIST_SCHEMA) {
-    throw new Error('Este arquivo não é uma lista de trabalho do TabWin Web');
+    throw new Error('Este arquivo não é uma lista de trabalho do TabSis');
   }
   if (objeto.version !== 1) {
     throw new Error(`Lista de trabalho na versão ${String(objeto.version)}, que este programa não conhece`);

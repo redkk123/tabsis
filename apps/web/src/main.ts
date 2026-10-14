@@ -5521,7 +5521,7 @@ function renderTabulationDiff(entry: TabulationLogEntry): void {
 
 function renderAudit(): void {
   const audit = {
-    application: { name: 'TabWin Web', version: '0.8.0-dev', compatibilityProfile: currentCompatibilityProfile },
+    application: { name: 'TabSis', version: '0.8.0-dev', compatibilityProfile: currentCompatibilityProfile },
     source: datasetFingerprint,
     datasetSources: activeDatasetSources,
     relatedFiles: loadedSources.filter((source) => !activeDatasetSources.some((datasetSource) =>
@@ -7796,7 +7796,7 @@ async function packageOfficialFileBatch(
         cancelado: batch.cancelled,
         arquivos: manifest,
         observacao: 'Microdados públicos do DATASUS/Ministério da Saúde. '
-          + 'Este pacote foi montado pelo TabWin Web, que não é afiliado ao órgão.',
+          + 'Este pacote foi montado pelo TabSis, que não é afiliado ao órgão.',
       }, null, 2)),
       { level: 0 },
     ];

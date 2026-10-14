@@ -131,7 +131,7 @@ function textOperationPython(field: string, operation: TextOperation): string {
     case 'substring': return operation.length === undefined
       ? `${col} = ${col}.str.slice(${operation.start - 1})`
       : `${col} = ${col}.str.slice(${operation.start - 1}, ${operation.start - 1 + operation.length})`;
-    case 'ibge-municipality': return `${col} = ${col}.astype(str).str.zfill(6).str[:6]  # padroniza IBGE (6 dígitos); a lógica exata do TabWin Web trata 5/6/7 dígitos`;
+    case 'ibge-municipality': return `${col} = ${col}.astype(str).str.zfill(6).str[:6]  # padroniza IBGE (6 dígitos); a lógica exata do TabSis trata 5/6/7 dígitos`;
   }
 }
 
@@ -190,7 +190,7 @@ function stepToR(step: TransformStep): RVerb[] {
     case 'derive-column':
       return [{
         code: `dplyr::mutate(${step.field} = ${formulaToBareColumns(step.formula)})`,
-        notes: ['fórmula do TabWin Web (funções como RATE/ZSCORE/LAG não têm equivalente direto em R)'],
+        notes: ['fórmula do TabSis (funções como RATE/ZSCORE/LAG não têm equivalente direto em R)'],
       }];
     case 'cast-type': {
       const fn = step.to === 'number' ? 'as.numeric' : step.to === 'date' ? 'as.Date' : 'as.character';
@@ -200,7 +200,7 @@ function stepToR(step: TransformStep): RVerb[] {
       if (step.part === 'epidemiological-week' || step.part === 'epidemiological-year') {
         return [{
           code: `dplyr::mutate(${step.target} = aweek::date2week(as.Date(${step.field}), ${step.part === 'epidemiological-week' ? 'floor_day = TRUE' : 'week_start = "Sunday"'}))`,
-          notes: ['semana/ano epidemiológico (regra MMWR/MS); a lógica exata do TabWin Web pode diferir de aweek nas bordas de ano'],
+          notes: ['semana/ano epidemiológico (regra MMWR/MS); a lógica exata do TabSis pode diferir de aweek nas bordas de ano'],
         }];
       }
       return [{ code: `dplyr::mutate(${step.target} = ${DATE_PART_R[step.part]}(as.Date(${step.field})))` }];
@@ -209,7 +209,7 @@ function stepToR(step: TransformStep): RVerb[] {
       const usesIbge = step.operations.some((operation) => operation.kind === 'ibge-municipality');
       return [{
         code: `dplyr::mutate(${step.operations.map((operation) => textOperationR(step.field, operation)).join(', ')})`,
-        ...(usesIbge ? { notes: ['padronização IBGE: a lógica exata do TabWin Web trata 5/6/7 dígitos'] } : {}),
+        ...(usesIbge ? { notes: ['padronização IBGE: a lógica exata do TabSis trata 5/6/7 dígitos'] } : {}),
       }];
     }
     case 'group-summarize':
@@ -237,7 +237,7 @@ function stepToR(step: TransformStep): RVerb[] {
       const by = step.keyPairs.map((pair) => `${rString(pair.current)} = ${rString(pair.source)}`).join(', ');
       return [{
         code: `dplyr::${fn}(${rIdentifier(step.source.label)}, by = c(${by}))`,
-        notes: [`junta a base ${step.source.label} pela chave; diagnóstico de cardinalidade fica no TabWin Web`],
+        notes: [`junta a base ${step.source.label} pela chave; diagnóstico de cardinalidade fica no TabSis`],
       }];
     }
   }
@@ -279,7 +279,7 @@ function stepToPython(step: TransformStep): string[] {
     case 'dedupe':
       return [line(`df = df.drop_duplicates(subset=${pyList(step.keyFields)}, keep="first")`)];
     case 'derive-column':
-      return [line(`df[${pyString(step.field)}] = ${formulaToDataFrameColumns(step.formula)}  # fórmula do TabWin Web (RATE/ZSCORE/LAG não têm equivalente direto em pandas)`)];
+      return [line(`df[${pyString(step.field)}] = ${formulaToDataFrameColumns(step.formula)}  # fórmula do TabSis (RATE/ZSCORE/LAG não têm equivalente direto em pandas)`)];
     case 'cast-type': {
       const col = `df[${pyString(step.field)}]`;
       const cast = step.to === 'number' ? `pd.to_numeric(${col}, errors="coerce")`
@@ -290,7 +290,7 @@ function stepToPython(step: TransformStep): string[] {
     case 'date-part': {
       const col = `df[${pyString(step.field)}]`;
       if (step.part === 'epidemiological-week' || step.part === 'epidemiological-year') {
-        return [line(`df[${pyString(step.target)}] = None  # semana/ano epidemiológico (regra MMWR/MS) - a lógica exata está no TabWin Web`)];
+        return [line(`df[${pyString(step.target)}] = None  # semana/ano epidemiológico (regra MMWR/MS) - a lógica exata está no TabSis`)];
       }
       return [line(`df[${pyString(step.target)}] = pd.to_datetime(${col}).${DATE_PART_PY[step.part]}`)];
     }
@@ -316,7 +316,7 @@ function stepToPython(step: TransformStep): string[] {
       const leftKeys = pyList(step.keyPairs.map((pair) => pair.current));
       const rightKeys = pyList(step.keyPairs.map((pair) => pair.source));
       return [
-        `# diagnóstico de cardinalidade (N:N bloqueado) fica no TabWin Web`,
+        `# diagnóstico de cardinalidade (N:N bloqueado) fica no TabSis`,
         line(`df = df.merge(${rIdentifier(step.source.label)}, how="${how}", left_on=${leftKeys}, right_on=${rightKeys})`),
       ];
     }

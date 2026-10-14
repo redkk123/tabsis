@@ -1,11 +1,11 @@
 # TabWin Bridge — auxiliar local de download
 
-**Opcional.** O TabWin Web funciona inteiro sem ele. Este auxiliar existe para
+**Opcional.** O TabSis funciona inteiro sem ele. Este auxiliar existe para
 um caso específico: downloads do DATASUS que o navegador não consegue concluir
 — CORS, instabilidade do servidor oficial, timeout de proxy, arquivo grande
 demais, conexão que cai no meio de 400 MB.
 
-Estado: **implementado, testado e ligado à interface.** No TabWin Web, em
+Estado: **implementado, testado e ligado à interface.** No TabSis, em
 **Buscar no DATASUS → Downloader local**, você cola o token e clica em
 Verificar. Depois de uma falha de download que ele plausivelmente resolva,
 aparece a oferta de tentar por ele.
@@ -31,7 +31,7 @@ Ele **não**:
 O cenário que importa: **uma página web comandando um processo local**. Se a
 página pudesse escolher qualquer URL, qualquer nome de arquivo ou qualquer
 destino, isto deixaria de ser um auxiliar e viraria um downloader arbitrário
-controlado remotamente — inclusive por uma aba que não é a do TabWin Web.
+controlado remotamente — inclusive por uma aba que não é a do TabSis.
 
 | Ameaça | O que impede |
 | --- | --- |
@@ -107,14 +107,14 @@ apague a pasta do repositório; os arquivos baixados ficam em
   com os cabeçalhos de Private Network Access que o auxiliar já envia. O Safari
   é mais restritivo e provavelmente **não** vai funcionar. Quando a integração
   automática for bloqueada, o caminho é o manual: o arquivo cai na pasta de
-  downloads e você o abre no TabWin Web como qualquer outro. Não vamos
+  downloads e você o abre no TabSis como qualquer outro. Não vamos
   enfraquecer proteção do navegador para "fazer funcionar".
 - **`--continue-at -` retoma o `.part`, mas não confere o que já estava lá.**
   Se o servidor mudar o arquivo entre as tentativas, a retomada pode juntar
   pedaços de versões diferentes. O DATASUS republica arquivos, então isso é
   real. Enquanto não houver verificação de integridade, apague o `.part` na
   dúvida.
-- **Não há verificação de hash do que foi baixado.** O TabWin Web calcula
+- **Não há verificação de hash do que foi baixado.** O TabSis calcula
   SHA-256 quando abre; aqui não há valor esperado com que comparar.
 - **O token é impresso no terminal.** Quem enxerga o seu terminal enxerga o
   token durante aquela sessão.

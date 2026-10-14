@@ -43,16 +43,16 @@
     " />
     <meta name="theme-color" content="#071a28" />
     <meta name="description" content="Tabule microdados DATASUS localmente, direto no navegador." />
-    <meta property="og:title" content="TabWin Web" />
+    <meta property="og:title" content="TabSis" />
     <meta property="og:description" content="Análise local, moderna e auditável de microdados DATASUS." />
-    <title>TabWin Web — análise DATASUS local</title>
+    <title>TabSis — análise DATASUS local</title>
   </head>
   <body>
     <div class="app-shell">
       <header class="topbar">
-        <a class="brand" href="./" aria-label="TabWin Web — início">
+        <a class="brand" href="./" aria-label="TabSis — início">
           <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
-          <span><strong>TabWin</strong><em>Web</em></span>
+          <span><strong>Tab</strong><em>Sis</em></span>
         </a>
         <div class="privacy-pill"><span aria-hidden="true">●</span> Seus dados ficam neste aparelho</div>
         <nav class="topbar-links" aria-label="Recursos">
@@ -490,7 +490,7 @@
                 </select>
               </div>
               <div class="transform-code" id="transform-code" hidden>
-                <p class="quality-note">Visão pedagógica, só leitura: o código é derivado do pipeline, não o contrário, e não é executado. Onde a semântica do TabWin Web difere do R/pandas (semana epidemiológica, código IBGE, funções de fórmula), há um comentário dizendo.</p>
+                <p class="quality-note">Visão pedagógica, só leitura: o código é derivado do pipeline, não o contrário, e não é executado. Onde a semântica do TabSis difere do R/pandas (semana epidemiológica, código IBGE, funções de fórmula), há um comentário dizendo.</p>
                 <pre id="transform-code-output"></pre>
               </div>
               <div class="quality-actions">
@@ -973,7 +973,7 @@
     <dialog id="about-dialog">
       <button class="dialog-close" id="dialog-close" type="button" aria-label="Fechar">×</button>
       <span class="eyebrow">Sobre</span>
-      <h2>TabWin Web</h2>
+      <h2>TabSis</h2>
       <p>Uma reimplementação moderna, local e auditável dos fluxos analíticos do TabWin. Projeto independente; os resultados de compatibilidade são validados contra o TabWin 4.15 real, com tolerância zero.</p>
       <p><a class="dialog-link" href="./manual.html">Manual do usuário</a> — como tabular, filtrar, transformar, calcular taxas e auditar a procedência.</p>
       <!-- O código aberto não é detalhe de crédito, é o que sustenta a
@@ -1059,7 +1059,7 @@
       <span class="eyebrow">Prévia</span>
       <h2>Totais pelo TabNet</h2>
       <p>Uma conferência antes de baixar: o DATASUS soma no servidor dele e devolve só o resultado, em segundos. Serve para confirmar que o conjunto é este — não substitui o microdado, que é o que permite filtrar, transformar e investigar registro a registro.</p>
-      <p class="tabnet-aviso"><strong>Esta é a única parte do TabWin Web que manda algo para fora.</strong> A pergunta viaja até um servidor do governo. O caminho normal baixa o arquivo e tabula neste aparelho, sem contar a ninguém o que você quis saber.</p>
+      <p class="tabnet-aviso"><strong>Esta é a única parte do TabSis que manda algo para fora.</strong> A pergunta viaja até um servidor do governo. O caminho normal baixa o arquivo e tabula neste aparelho, sem contar a ninguém o que você quis saber.</p>
       <div id="tabnet-body"></div>
     </dialog>
 
@@ -1067,7 +1067,7 @@
       <button class="dialog-close" id="catalog-close" type="button" aria-label="Fechar">×</button>
       <span class="eyebrow">Fonte oficial</span>
       <h2>Buscar dados no DATASUS</h2>
-      <p>Escolha o conjunto e o período. O portal oficial prepara o arquivo e o TabWin Web abre o DBC diretamente neste aparelho, com cache local para evitar downloads repetidos.</p>
+      <p>Escolha o conjunto e o período. O portal oficial prepara o arquivo e o TabSis abre o DBC diretamente neste aparelho, com cache local para evitar downloads repetidos.</p>
       <form id="catalog-form" class="catalog-form">
         <label><span>Sistema</span><select id="catalog-system"></select></label>
         <label><span>Tipo de dados</span><select id="catalog-file-type"></select></label>

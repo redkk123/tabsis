@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-# Mede o microdatasus nas mesmas fases que o TabWin Web relata, para que a
+# Mede o microdatasus nas mesmas fases que o TabSis relata, para que a
 # comparação seja de fases equivalentes e não de números soltos.
 #
 # As fases:
@@ -7,7 +7,7 @@
 #   2. leitura     — .dbc para data.frame (descompressão + parse do DBF)
 #   3. tabulação   — uma tabela cruzada simples sobre o resultado
 #
-# O TabWin Web tem uma quarta fase que o microdatasus não tem: o DATASUS monta
+# O TabSis tem uma quarta fase que o microdatasus não tem: o DATASUS monta
 # um pacote .zip antes de liberar o download, porque navegador não fala FTP
 # desde 2021. Esse custo aparece separado no relatório do aplicativo e não deve
 # ser somado à conta do microdatasus, que fala FTP direto.

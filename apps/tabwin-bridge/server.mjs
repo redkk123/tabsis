@@ -4,7 +4,7 @@
  *
  * Resolve downloads do DATASUS que o navegador não consegue concluir: CORS,
  * instabilidade do FTP/HTTP oficial, timeout de proxy, arquivo muito grande,
- * conexão que cai no meio. O TabWin Web continua funcionando inteiro sem ele.
+ * conexão que cai no meio. O TabSis continua funcionando inteiro sem ele.
  *
  * ## O que este processo é, e o que não é
  *
@@ -355,7 +355,7 @@ if (import.meta.url === `file://${process.argv[1]?.replace(/\\/g, '/')}`
     console.log('  origens aceitas:');
     for (const line of describeBridgeAllowlist()) console.log(`    ${line}`);
     console.log('');
-    console.log('  Cole este token no TabWin Web para autorizar esta sessão:');
+    console.log('  Cole este token no TabSis para autorizar esta sessão:');
     console.log(`    ${bridge.token}`);
     console.log('');
     console.log('  Ctrl+C encerra. Nada fica rodando depois.');

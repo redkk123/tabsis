@@ -1,7 +1,7 @@
 import type { TabulationResult } from '../../core/src/model.js';
 
 /**
- * Generalized table comparison for TabWin Web.
+ * Generalized table comparison for TabSis.
  *
  * Safety defaults:
  * - exact row-key matching unless the user explicitly selects another policy;

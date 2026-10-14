@@ -1,5 +1,5 @@
 {
-  "name": "tabwin-web",
+  "name": "tabsis",
   "version": "0.8.0-dev",
   "private": true,
   "type": "module",
@@ -50,5 +50,5 @@
     "vite": "8.2.2",
     "wrangler": "4.127.0"
   },
-  "license": "MIT"
+  "license": "AGPL-3.0-or-later"
 }

@@ -1,10 +1,10 @@
 /**
- * Pacote de laboratório — o contrato tabular entre o TabWin Web e o Tabwin Lab.
+ * Pacote de laboratório — o contrato tabular entre o TabSis e o Tabwin Lab.
  *
  * ## Por que um formato, e não uma importação de código
  *
  * Os dois projetos são separados de propósito: o Lab explora dados; a
- * aquisição e a semântica DEF/CNV ficam no TabWin Web. Se o Lab importasse
+ * aquisição e a semântica DEF/CNV ficam no TabSis. Se o Lab importasse
  * módulos daqui, essa fronteira sumiria na primeira refatoração. Então o que
  * os une é um **formato documentado**, com implementação independente dos dois
  * lados — o Lab lê o pacote sem conhecer uma linha deste repositório.
@@ -92,7 +92,7 @@ export function labPackageProvenance(input: LabPackageInput): LabPackageProvenan
     filters: input.filters ?? [],
     notes: [
       'Microdados públicos do DATASUS/Ministério da Saúde.',
-      'Pacote montado pelo TabWin Web, que não é afiliado ao órgão.',
+      'Pacote montado pelo TabSis, que não é afiliado ao órgão.',
       input.content === 'records'
         ? 'Uma linha por registro aceito pelos filtros ativos no momento da exportação.'
         : 'Resultado de uma tabulação; os totais do TabWin não são células de resultado.',

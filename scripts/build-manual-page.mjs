@@ -164,7 +164,7 @@ const page = `<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Manual do usuário — TabWin Web</title>
+<title>Manual do usuário — TabSis</title>
 <style>
 :root {
   --sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -206,7 +206,7 @@ footer { max-width: 820px; margin: 0 auto; padding: 0 24px 60px; color: var(--mu
 </head>
 <body>
 <header>
-  <strong>TabWin Web</strong>
+  <strong>TabSis</strong>
   <a href="./index.html">← Voltar para a aplicação</a>
 </header>
 <main>
