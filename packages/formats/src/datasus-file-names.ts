@@ -118,15 +118,15 @@ export function describeDatasusFile(fileName: string): DatasusFileDescription | 
     if (UF_NAMES[uf]) {
       const year = Number(digits);
       return letters.startsWith('DO')
-        ? build('SIM', 'Óbitos (por residência)', uf, year)
-        : build('SINASC', 'Nascidos vivos', uf, year);
+        ? build('SIM', 'Óbitos (por residência)', uf, year, undefined, 'DO')
+        : build('SINASC', 'Nascidos vivos', uf, year, undefined, 'DN');
     }
   }
   // SIM nacionais por tipo: DOINF + AA.
-  if (digits.length === 2 && SIM_NATIONAL[letters]) return build('SIM', SIM_NATIONAL[letters]!, 'BR', fullYear(digits));
+  if (digits.length === 2 && SIM_NATIONAL[letters]) return build('SIM', SIM_NATIONAL[letters]!, 'BR', fullYear(digits), undefined, letters);
   // SINAN: AGRAVO + BR + AA (alguns agravos têm 3 letras: SRC).
   if (digits.length === 2 && letters.endsWith('BR') && SINAN[letters.slice(0, -2)]) {
-    return build('SINAN', SINAN[letters.slice(0, -2)]!, 'BR', fullYear(digits));
+    return build('SINAN', SINAN[letters.slice(0, -2)]!, 'BR', fullYear(digits), undefined, letters.slice(0, -2));
   }
   return null;
 }

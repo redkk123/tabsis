@@ -652,6 +652,32 @@ export function listArchiveDocuments(archive: Uint8Array): string[] {
 }
 
 /**
+ * Expande o primeiro arquivo com este nome (sem a pasta, sem diferença de
+ * maiúsculas), procurando também em ZIPs dentro do pacote: o pacote preparado
+ * pelo DATASUS embrulha o Docs_TAB_SINAN.zip, e o nome da pasta
+ * "Documentação" pode vir em outra codificação.
+ */
+export function extractArchiveEntryByBaseName(archive: Uint8Array, baseName: string): Uint8Array {
+  const alvo = baseName.toLowerCase();
+  const base = (name: string) => (name.split(/[\\/]/).pop() ?? name).toLowerCase();
+  let found: Uint8Array | null = null;
+  const visit = (bytes: Uint8Array, depth: number): void => {
+    if (found || depth > ARCHIVE_LIMITS.maxDepth) return;
+    const entries = unzipSync(bytes, {
+      filter: (entry) => !found && (base(entry.name) === alvo || extensionOf(entry.name) === 'ZIP'),
+    });
+    for (const [name, content] of Object.entries(entries)) {
+      if (found) return;
+      if (base(name) === alvo) { found = content; return; }
+      if (extensionOf(name) === 'ZIP') visit(content, depth + 1);
+    }
+  };
+  visit(archive, 0);
+  if (!found) throw new Error(`${baseName} não foi encontrado no pacote do DATASUS`);
+  return found;
+}
+
+/**
  * Expands exactly one named entry, ignoring the per-file eager limit.
  *
  * The limit exists so a huge member is not expanded *automatically* into a tab

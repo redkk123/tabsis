@@ -25,11 +25,12 @@ export interface DatasusFieldEntry {
   values?: string;
 }
 
-export type DatasusDictionarySystem = 'SIM' | 'SINASC';
+export type DatasusDictionarySystem = 'SIM' | 'SINASC' | 'SINAN';
 
 export const DATASUS_DICTIONARY_SOURCES: Readonly<Record<DatasusDictionarySystem, string>> = Object.freeze({
   SIM: 'Estrutura do SIM, DATASUS, 07/2025',
   SINASC: 'Estrutura do SINASC, DATASUS',
+  SINAN: 'Dicionário de dados SINAN NET 5.0, ficha de notificação (NINDIN), DATASUS, rev. 11/2018',
 });
 
 const SIM_ANOS_DE_ESTUDO = '1 – Nenhuma; 2 – 1 a 3 anos; 3 – 4 a 7 anos; 4 – 8 a 11 anos; 5 – 12 anos e mais; 9 – Ignorado';
@@ -159,7 +160,91 @@ const SINASC: Readonly<Record<string, DatasusFieldEntry>> = {
   UFINFORM: { label: 'UF informante', description: 'Código da UF que informou o registro.' },
 };
 
-const DICTIONARIES: Readonly<Record<DatasusDictionarySystem, Readonly<Record<string, DatasusFieldEntry>>>> = { SIM, SINASC };
+/**
+ * SINAN: os campos da ficha de notificação, comuns a todos os agravos
+ * (NINDIN_DIC_DADOS.pdf, Dicionário de dados SINAN NET 5.0, revisado em
+ * novembro/2018, em Docs_TAB_SINAN.zip). Os campos de cada agravo estão no
+ * dicionário do agravo, que o app oferece em PDF.
+ */
+const SINAN_DATA_TRANSF = (nivel: string): DatasusFieldEntry => ({
+  label: `Data de transferência (${nivel})`,
+  description: `Data de transferência do registro ${nivel} para o nível superior do sistema.`,
+  values: DATA,
+});
+const SINAN: Readonly<Record<string, DatasusFieldEntry>> = {
+  NU_NOTIFIC: { label: 'Nº da notificação', description: 'Número da notificação. Campo chave para identificação do registro no sistema.' },
+  TP_NOT: { label: 'Tipo de notificação', description: 'Identifica o tipo da notificação.', values: '1 – Negativa; 2 – Individual; 3 – Surto; 4 – Agregado' },
+  ID_AGRAVO: { label: 'Agravo', description: 'Nome e código do agravo notificado, segundo a CID-10 (ao exportar, é retirado o ponto).' },
+  CS_SUSPEIT: { label: 'Suspeita do agravo', description: 'Especifica a suspeição do agravo (sarampo, rubéola, doenças meningocócicas, outras meningites) e identifica se a notificação de AIDS é de adulto ou criança.' },
+  DT_NOTIFIC: { label: 'Data da notificação', description: 'Data de preenchimento da ficha de notificação.', values: 'dd/mm/aaaa' },
+  SEM_NOT: { label: 'Semana epidemiológica da notificação', description: 'Semana epidemiológica em que o caso foi notificado, preenchida automaticamente a partir da data de notificação (AAAASS).' },
+  NU_ANO: { label: 'Ano da notificação', description: 'Ano da notificação, preenchido pelo sistema a partir da data de notificação.' },
+  SG_UF_NOT: { label: 'UF de notificação', description: 'UF onde está a unidade de saúde (ou outra fonte notificadora) que fez a notificação.' },
+  ID_MUNICIP: { label: 'Município de notificação', description: 'Código do município onde está a unidade de saúde (ou outra fonte notificadora) que fez a notificação.' },
+  ID_REGIONA: { label: 'Regional de saúde de notificação', description: 'Regional de saúde onde está o município da unidade notificadora.' },
+  ID_UNIDADE: { label: 'Unidade de saúde notificadora', description: 'Código (CNES) da unidade de saúde ou outra fonte notificadora que fez o atendimento e a notificação.' },
+  DT_SIN_PRI: { label: 'Data dos primeiros sintomas/diagnóstico', description: 'Data dos primeiros sintomas do caso de agravo agudo; data do diagnóstico do caso de agravo crônico e DRTs; data do acidente nos acidentes da saúde do trabalhador.', values: 'dd/mm/aaaa' },
+  SEM_PRI: { label: 'Semana epidemiológica dos primeiros sintomas', description: 'Semana epidemiológica dos primeiros sintomas/diagnóstico, preenchida automaticamente (AAAASS).' },
+  NM_PACIENT: { label: 'Nome do paciente', description: 'Nome completo do paciente (sem abreviações).' },
+  DT_NASC: { label: 'Data de nascimento', description: 'Data de nascimento do paciente.', values: 'dd/mm/aaaa' },
+  NU_IDADE_N: { label: 'Idade', description: 'Idade em quatro dígitos: o primeiro é a unidade (1 = hora, 2 = dia, 3 = mês, 4 = ano) e os três seguintes, a quantidade. Ex.: 3009 = nove meses; 4018 = dezoito anos.' },
+  CS_SEXO: { label: 'Sexo', description: 'Sexo do paciente.', values: 'M – Masculino; F – Feminino; I – Ignorado' },
+  CS_GESTANT: { label: 'Gestante', description: 'Idade gestacional da paciente.', values: '1 – 1º trimestre; 2 – 2º trimestre; 3 – 3º trimestre; 4 – Idade gestacional ignorada; 5 – Não; 6 – Não se aplica; 9 – Ignorado' },
+  CS_RACA: { label: 'Raça/cor', description: 'Cor ou raça declarada pela pessoa.', values: '1 – Branca; 2 – Preta; 3 – Amarela; 4 – Parda; 5 – Indígena; 9 – Ignorado' },
+  CS_ESCOL_N: { label: 'Escolaridade', description: 'Série e grau que a pessoa está frequentando ou frequentou, considerando a última série concluída com aprovação.', values: '0 – Analfabeto; 1 – 1ª a 4ª série incompleta do EF; 2 – 4ª série completa do EF; 3 – 5ª à 8ª série incompleta do EF; 4 – Ensino fundamental completo; 5 – Ensino médio incompleto; 6 – Ensino médio completo; 7 – Educação superior incompleta; 8 – Educação superior completa; 9 – Ignorado; 10 – Não se aplica' },
+  ID_CNS_SUS: { label: 'Cartão SUS', description: 'Número do Cartão Nacional de Saúde do paciente.' },
+  NM_MAE_PAC: { label: 'Nome da mãe', description: 'Nome completo da mãe do paciente (sem abreviações).' },
+  SG_UF: { label: 'UF de residência', description: 'UF de residência do paciente por ocasião da notificação.' },
+  ID_MN_RESI: { label: 'Município de residência', description: 'Código do município de residência do caso notificado.' },
+  ID_RG_RESI: { label: 'Regional de saúde de residência', description: 'Regional de saúde onde está o município de residência do paciente por ocasião da notificação.' },
+  ID_DISTRIT: { label: 'Distrito de residência', description: 'Código do distrito de residência do paciente por ocasião da notificação.' },
+  ID_BAIRRO: { label: 'Bairro de residência (código)', description: 'Código do bairro de residência do paciente por ocasião da notificação.' },
+  NM_BAIRRO: { label: 'Bairro de residência', description: 'Nome do bairro de residência.' },
+  ID_LOGRADO: { label: 'Logradouro (código)', description: 'Código do logradouro de residência do paciente.' },
+  NM_LOGRADO: { label: 'Logradouro', description: 'Tipo e nome do logradouro de residência do paciente.' },
+  NU_NUMERO: { label: 'Número do logradouro', description: 'Número da casa ou do edifício de residência do paciente.' },
+  NM_COMPLEM: { label: 'Complemento', description: 'Complemento do logradouro (bloco, apartamento, casa…).' },
+  ID_GEO1: { label: 'Geo campo 1', description: 'Campo para georreferenciamento.' },
+  ID_GEO2: { label: 'Geo campo 2', description: 'Campo para georreferenciamento.' },
+  NM_REFEREN: { label: 'Ponto de referência', description: 'Ponto de referência para facilitar a localização da residência do paciente.' },
+  NU_CEP: { label: 'CEP de residência', description: 'CEP de residência do paciente.' },
+  NU_DDD_TEL: { label: 'DDD', description: 'Código DDD do telefone de residência do paciente.' },
+  NU_TELEFON: { label: 'Telefone', description: 'Telefone de residência do paciente.' },
+  CS_ZONA: { label: 'Zona de residência', description: 'Zona de residência do paciente por ocasião da notificação.', values: '1 – Urbana; 2 – Rural; 3 – Periurbana; 9 – Ignorado' },
+  ID_PAIS: { label: 'País de residência', description: 'País onde residia o paciente por ocasião da notificação.' },
+  NDUPLIC_N: { label: 'Duplicidade', description: 'Identifica duplicidade: marcação feita na rotina de duplicidade para registros que não devem ser listados ou contados.', values: '0 ou branco – Não identificado; 1 – Não é duplicidade (não listar); 2 – Duplicidade (não contar)' },
+  IN_VINCULA: { label: 'Vinculação', description: 'Indica se a notificação foi vinculada (hanseníase ou tuberculose).', values: '0 ou branco – Não vinculado; 1 – Vinculado' },
+  DT_INVEST: { label: 'Data da investigação', description: 'Data de início da investigação do caso.', values: 'dd/mm/aaaa' },
+  CLASSI_FIN: { label: 'Classificação final', description: 'Classificação final do caso após investigação.' },
+  CRITERIO: { label: 'Critério de confirmação/descarte', description: 'Critério utilizado para confirmação ou descarte do caso notificado.' },
+  TPAUTOCTO: { label: 'Caso autóctone do município de residência', description: 'Indica se o caso é autóctone do município de residência.', values: '1 – Sim; 2 – Não; 3 – Indeterminado' },
+  COUFINF: { label: 'UF provável da infecção', description: 'UF onde o paciente foi provavelmente infectado.' },
+  COPAISINF: { label: 'País provável da infecção', description: 'País onde o paciente foi provavelmente infectado.' },
+  COMUNINF: { label: 'Município provável da infecção', description: 'Código do município onde o paciente foi provavelmente infectado.' },
+  CODISINF: { label: 'Distrito provável da infecção', description: 'Código do distrito provável de infecção do caso.' },
+  CO_BAINFC: { label: 'Bairro provável da infecção (código)', description: 'Código do bairro provável de infecção do caso.' },
+  NOBAIINF: { label: 'Bairro provável da infecção', description: 'Nome do bairro provável de infecção do caso.' },
+  DOENCA_TRA: { label: 'Doença relacionada ao trabalho', description: 'Indica se a doença está ou não relacionada ao trabalho.', values: '1 – Sim; 2 – Não; 9 – Ignorado' },
+  EVOLUCAO: { label: 'Evolução do caso', description: 'Evolução do caso.' },
+  DT_OBITO: { label: 'Data do óbito', description: 'Data do óbito.', values: 'dd/mm/aaaa' },
+  DT_ENCERRA: { label: 'Data do encerramento', description: 'Data do encerramento do caso.', values: 'dd/mm/aaaa' },
+  FONETICA_N: { label: 'Chave fonética', description: 'Primeiro e último nomes do paciente concatenados (campo interno).' },
+  SOUNDEX: { label: 'Soundex', description: 'Nome do paciente criptografado pelo método Soundex (campo interno).' },
+  DT_DIGITA: { label: 'Data de digitação', description: 'Data da primeira inclusão da notificação no sistema.', values: 'dd/mm/aaaa' },
+  DT_TRANSUS: SINAN_DATA_TRANSF('da unidade de saúde'),
+  DT_TRANSDM: SINAN_DATA_TRANSF('do distrito municipal'),
+  DT_TRANSSM: SINAN_DATA_TRANSF('da secretaria municipal de saúde'),
+  DT_TRANSRM: SINAN_DATA_TRANSF('da regional municipal'),
+  DT_TRANSRS: SINAN_DATA_TRANSF('da regional de saúde'),
+  DT_TRANSSE: SINAN_DATA_TRANSF('da secretaria estadual de saúde'),
+  NU_LOTE_V: { label: 'Lote vertical', description: 'Identifica o lote da transferência da notificação de um nível do sistema para outro (transferência vertical).' },
+  NU_LOTE_H: { label: 'Lote horizontal', description: 'Identifica o lote da transferência de registros dentro de um mesmo nível do sistema (transferência horizontal).' },
+  CS_FLXRET: { label: 'Fluxo de retorno', description: 'Identifica se o registro está habilitado ou foi enviado pelo fluxo de retorno para o município de residência.', values: '0 – Não habilitado; 1 – Habilitado para envio; 2 – Enviado' },
+  FLXRECEBI: { label: 'Recebida por fluxo de retorno', description: 'Identifica se o registro foi recebido pelo fluxo de retorno (campo interno).' },
+  IDENT_MICR: { label: 'Identificação do micro', description: 'Identifica em qual microcomputador o registro foi digitado na primeira vez (campo interno).' },
+};
+
+const DICTIONARIES: Readonly<Record<DatasusDictionarySystem, Readonly<Record<string, DatasusFieldEntry>>>> = { SIM, SINASC, SINAN };
 
 /**
  * O que o dicionário oficial diz de um campo. Com o sistema (do nome do
@@ -174,7 +259,7 @@ export function datasusFieldEntry(
 ): { entry: DatasusFieldEntry; source: string } | undefined {
   const field = fieldName.trim().toUpperCase();
   if (system && IT_LAYOUTS[system]) return entradaDoInforme(field, system, prefix);
-  if (system === 'SIM' || system === 'SINASC') {
+  if (system === 'SIM' || system === 'SINASC' || system === 'SINAN') {
     const entry = DICTIONARIES[system][field];
     return entry ? { entry, source: DATASUS_DICTIONARY_SOURCES[system] } : undefined;
   }

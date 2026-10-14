@@ -243,11 +243,19 @@ Alguns exemplos do DEF de óbitos:
 | Oport notif (30d) | `DIFDATA` | dias entre o óbito e o recebimento da DO, em faixas: até 30 dias (oportuna), 31–60… |
 | Oport invetig (120d) | `NUDIASOBIN` | dias até a investigação, em faixas: até 120 dias (oportuna), 121–150… |
 
-**Documentação oficial com um clique.** Os pacotes auxiliares do DATASUS
-(`TAB_SIH.zip`, `TAB_SIA.zip`, `TAB_CNES.zip`) trazem o Informe Técnico do
-sistema numa pasta `Docs`. Quando o TabSis baixa um desses pacotes, o PDF
-aparece na barra lateral — *documentação oficial do DATASUS: o que é cada
-campo* — e abre com um toque, direto do pacote guardado no aparelho.
+No **SINAN**, entram os campos da ficha de notificação, comuns a todos os
+agravos (sexo, raça/cor, idade, datas, municípios, classificação final,
+evolução…), do *Dicionário de dados SINAN NET 5.0*.
+
+**Documentação oficial com um toque.** Com um arquivo do DATASUS aberto, a
+barra lateral mostra o documento oficial daquele tipo de arquivo — a
+*Estrutura do SIM*, a do SINASC, os Informes Técnicos do SIH, do SIA e do
+CNES; no SINAN, o dicionário de dados do agravo (hanseníase, dengue…) e o da
+ficha de notificação. O primeiro toque busca o PDF no FTP oficial pelo mesmo
+caminho dos dados e guarda neste aparelho; os seguintes abrem na hora. O SINAN
+só publica os dicionários dentro de um pacote de 65 MB: o TabSis avisa o
+tamanho e pergunta antes. Quando um pacote auxiliar baixado já traz o informe
+na pasta `Docs`, ele abre direto do pacote.
 
 O dicionário só diz o que os documentos oficiais dizem. O `NUDIASOBIN`, por
 exemplo, não está na *Estrutura do SIM*: para ele, o painel mostra só as
