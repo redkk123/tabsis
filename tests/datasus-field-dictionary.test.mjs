@@ -45,6 +45,29 @@ test('SINAN: campos da ficha de notificação, comuns a todos os agravos', () =>
   assert.match(sexo?.source ?? '', /SINAN NET/);
   assert.equal(datasusFieldEntry('TP_NOT', 'SINAN')?.entry.label, 'Tipo de notificação');
   assert.match(datasusFieldEntry('NU_IDADE_N', 'SINAN')?.entry.description ?? '', /4018 = dezoito anos/);
-  // Campo do agravo (hanseníase) não está na ficha: fica para o PDF do agravo.
+  // Campo do agravo não está na ficha: sem o prefixo do arquivo, não se sabe o agravo.
   assert.equal(datasusFieldEntry('FORMACLINI', 'SINAN'), undefined);
+});
+
+test('SINAN: dicionário do agravo pelo prefixo do arquivo', () => {
+  const forma = datasusFieldEntry('FORMACLINI', 'SINAN', 'HANS');
+  assert.match(forma?.entry.values ?? '', /4 – V \(Virchowiana\)/);
+  assert.match(forma?.source ?? '', /HANSN_DIC_DADOS/);
+  assert.match(datasusFieldEntry('CLASSI_FIN', 'SINAN', 'DENG')?.entry.values ?? '', /Dengue grave/);
+  assert.equal(datasusFieldEntry('CLASSI_FIN', 'SINAN', 'CHIK')?.source, datasusFieldEntry('CLASSI_FIN', 'SINAN', 'DENG')?.source);
+  assert.equal(datasusFieldEntry('viol_sexu', 'SINAN', 'viol')?.entry.label, 'Tipo de violência: Violência sexual');
+  assert.match(datasusFieldEntry('TPESQUEMA', 'SINAN', 'SIFG')?.entry.values ?? '', /Penicilina/);
+  assert.ok(datasusFieldEntry('TRATAMENTO', 'SINAN', 'TUBE'));
+  assert.ok(datasusFieldEntry('SIN_ICTERI', 'SINAN', 'SIFC') ?? datasusFieldEntry('CLI_ICTERI', 'SINAN', 'SIFC'));
+  // Nome do PDF (com acento, longo ou quebrado) chega ao campo do DBF.
+  assert.equal(datasusFieldEntry('AGRAVDROGAS', 'SINAN', 'TUBE')?.entry, datasusFieldEntry('AGRAVDROGA', 'SINAN', 'TUBE')?.entry);
+  assert.equal(datasusFieldEntry('PETÉQUIA_N', 'SINAN', 'DENG')?.entry, datasusFieldEntry('PETEQUIA_N', 'SINAN', 'DENG')?.entry);
+  assert.equal(datasusFieldEntry('REL_IRMÃO', 'SINAN', 'VIOL')?.entry.label, 'Provável autor: Irmão(ã)');
+  // A ficha também tem CLASSI_FIN, sem os códigos: o agravo vem antes.
+  assert.match(datasusFieldEntry('ZONA', 'SINAN', 'VIOL')?.entry.values ?? '', /Periurbana/);
+  assert.notEqual(datasusFieldEntry('CLASSI_FIN', 'SINAN', 'DENG')?.entry, datasusFieldEntry('CLASSI_FIN', 'SINAN')?.entry);
+  // Campo da ficha continua respondendo com o prefixo de um agravo.
+  assert.equal(datasusFieldEntry('TP_NOT', 'SINAN', 'HANS')?.entry.label, 'Tipo de notificação');
+  // Agravo sem dicionário transcrito: só a ficha.
+  assert.equal(datasusFieldEntry('FORMACLINI', 'SINAN', 'MALA'), undefined);
 });

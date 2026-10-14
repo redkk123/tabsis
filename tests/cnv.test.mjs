@@ -118,11 +118,20 @@ test('CNV curta: quem vem depois ganha também quando letra e dígito dão o mes
   assert.equal(classifyCnv(cnv, 'A01')?.label, 'Faixa 100-199');
   assert.equal(classifyCnv(cnv, 'J99'), undefined);
   assert.equal(classifyCnv(cnv, '950')?.label, 'Faixa 900-999');
-  // CID de 3 caracteres numa CNV de 4: "A15" casa "A15" e a faixa A00-A099 pega A05.
-  const cid = parseCnv(['2 4', row(1, 'Tuberculose', 'A15'), row(2, 'Intestinais', 'A00-A099')].join('\n'));
+  // CID de 3 caracteres numa CNV de 4, escrito com o espaço ("A15 "): casa o
+  // dado "A15" (o campo tem o espaço do fim), e a faixa "A00 -A099" pega A05.
+  const cid = parseCnv(['2 4', row(1, 'Tuberculose', 'A15 ,'), row(2, 'Intestinais', 'A00 -A099')].join('\n'));
   assert.equal(classifyCnv(cid, 'A15')?.label, 'Tuberculose');
   assert.equal(classifyCnv(cid, 'A05')?.label, 'Intestinais');
   assert.equal(classifyCnv(cid, 'A090')?.label, 'Intestinais');
+});
+
+// RE-004, teste J no TabWin 4.15: a lista de códigos é lida de 4 em 4.
+test('CNV de 4: "A15" no fim da linha vira 115 (o TabWin não completa com espaço) e o dado A15 vira 1150', () => {
+  const cnv = parseCnv(['2 4', row(1, 'Codigo A15 no fim', 'A15'), row(2, 'Exato A150', 'A150')].join('\n'));
+  assert.equal(classifyCnv(cnv, '0115')?.label, 'Codigo A15 no fim');
+  assert.equal(classifyCnv(cnv, 'A15')?.label, 'Exato A150');
+  assert.equal(classifyCnv(cnv, 'A150')?.label, 'Exato A150');
 });
 
 test('"----" das linhas-título não é código: não pega o CID M000 (RE-003, Sensíveis AB)', () => {
@@ -137,9 +146,26 @@ test('código "em branco" (espaços antes da vírgula) vale como código, e ganh
   assert.equal(classifyCnv(meses, null)?.label, 'branco');
   assert.equal(classifyCnv(meses, '01')?.label, 'Jan');
   assert.equal(classifyCnv(meses, '77')?.label, 'Ign');
-  // Linha-título com espaço sobrando no fim, sem vírgula, não vira código.
+  // Linha-título sem código (só espaços, ou nada): o TabWin a registra como
+  // o código em branco (RE-004, testes I2 e J2).
   const titulo = parseCnv(['2 2', row(1, 'Grupo', '    '), row(2, 'Jan', '01')].join('\n'), { strict: false });
-  assert.equal(classifyCnv(titulo, null), undefined);
+  assert.equal(classifyCnv(titulo, null)?.label, 'Grupo');
+});
+
+// RE-004, teste I no TabWin 4.15 (pesos: 050, 100, 300, 105, branco, *50).
+test('CNV curta lida como o TabWin: espaço depois da vírgula encerra a lista; símbolo vira 0', () => {
+  const pega = (codes) => {
+    const cnv = parseCnv(['2 3', row(1, 'Teste', codes), row(2, 'Exato 100', '100')].join('\n'));
+    return ['050', '100', '300', '105', null, '*50'].filter((code) => classifyCnv(cnv, code)?.sequence === 1);
+  };
+  assert.deepEqual(pega('050, 300'), ['050', '*50']);
+  assert.deepEqual(pega('*50'), ['050', '*50']);
+  assert.deepEqual(pega('1 5'), ['105']);
+  // Teste H: hífen colado só pega o branco; "-zzz" não pega nada.
+  assert.deepEqual(pega('-500'), [null]);
+  assert.deepEqual(pega('500-'), [null]);
+  assert.deepEqual(pega('---'), [null]);
+  assert.deepEqual(pega('-zzz'), []);
 });
 
 test('rótulo mantém o recuo do começo (hierarquia do CID10_BR), só apara o fim', () => {

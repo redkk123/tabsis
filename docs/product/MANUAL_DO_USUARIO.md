@@ -245,7 +245,24 @@ Alguns exemplos do DEF de óbitos:
 
 No **SINAN**, entram os campos da ficha de notificação, comuns a todos os
 agravos (sexo, raça/cor, idade, datas, municípios, classificação final,
-evolução…), do *Dicionário de dados SINAN NET 5.0*.
+evolução…), do *Dicionário de dados SINAN NET 5.0*. Nos agravos mais
+consultados, também os campos próprios de cada ficha, transcritos um a um do
+dicionário do agravo — o TabSis reconhece o agravo pelo nome do arquivo
+(`HANSBR23.dbc` é hanseníase):
+
+| Arquivo | Agravo | Exemplos |
+| --- | --- | --- |
+| `HANS…` | Hanseníase | forma clínica, classificação operacional, grau de incapacidade, tipo de saída |
+| `TUBE…` | Tuberculose | tipo de entrada, forma, baciloscopias, teste rápido molecular, situação de encerramento |
+| `DENG…`, `CHIK…` | Dengue e chikungunya | classificação final, sinais de alarme e de gravidade, sorologias, critério |
+| `SIFG…` | Sífilis em gestante | classificação clínica, testes treponêmico e não treponêmico, esquema e parceiro |
+| `SIFC…` | Sífilis congênita | pré-natal, tratamento da mãe, exames e sinais da criança, evolução |
+| `VIOL…` | Violência interpessoal/autoprovocada | local, tipo de violência, meio, provável autor, encaminhamentos |
+
+Nos outros agravos, só os campos da ficha de notificação; o resto está no PDF
+do agravo (abaixo). Campos que o DATASUS acrescenta ao disseminar e que nenhum
+dicionário descreve (no `HANS`, `DT_DIAG`, `SEM_DIAG` e `ANO_NASC`) ficam sem
+explicação.
 
 **Documentação oficial com um toque.** Com um arquivo do DATASUS aberto, a
 barra lateral mostra o documento oficial daquele tipo de arquivo — a

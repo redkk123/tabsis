@@ -144,13 +144,55 @@ tudo o que as outras linhas não pegam — é a linha "pega o resto" de 57 linha
 das CNVs oficiais (NATJUR, TP_ESTAB, BR_UFS, FONTEREM…). E a faixa passa do 999
 quando a ponta tem letra (`zzz` = 2600; K01 = 1001).
 
-O hífen colado no começo, sem espaços (`-500`, `---`), só pega o branco, e
-`-zzz` não pega nem ele. Isso não está entendido e **não foi implementado**; é
-raro em CNV oficial com algo depois do hífen (1 caso, `OSMOSE_R.CNV`), e nas
-linhas-título (`----`) só faria diferença para registro em branco.
+O hífen colado no começo (`-500`, `---`) só pega o branco, e `-zzz` não pega
+nem ele. Explicado pela decompilação, abaixo.
 
-**No TabSis:** na CNV curta, espaços seguidos de hífen viram faixa do branco
-até a ponta. Com isso o CNES fica 12/12.
+**No TabSis:** com isso o CNES fica 12/12.
+
+## Como o TabWin lê a lista de códigos da CNV curta (decompilado)
+
+Três rotinas, achadas a partir de quem chama a inserção da lista literal:
+
+- **CnvCarrega** (`0x47737c`, ~8 KB): para cada linha, pega a área de códigos
+  como está (`Copy(linha, 61 ou 113, …)`, sem aparar) e a percorre:
+  lê um código, avança; se o próximo caractere é vírgula, espaço ou o fim,
+  registra; se é hífen, lê o fim e preenche a faixa; vírgula avança; **espaço
+  encerra a lista**.
+- **CnvLeCodigo** (`0x477314`): `Copy(área, posição, tamanho do código)` — no
+  fim da linha o pedaço sai mais curto, sem espaço completando.
+- **CnvIndiceCurto** (`0x476c24`): se o primeiro caractere é espaço, todo
+  espaço vira `0`; se é letra (`A`…`z`, também `[ \ ] ^ _ \``), vale
+  `maiúscula − 0x40` vezes 10^(resto) e sai da frente; o resto passa pelo
+  `Val` do Delphi, e se falhar todo não-dígito vira `0`.
+
+Daí os casos do teste H: `-500` é lido como `-50` (= −50, índice que não
+existe) e depois `0` (o branco); `---` vira `000`; `-zzz` vira `0` (sem
+registro, porque vem `z` depois) e `z` (= 26). E o hífen **não** vale 13, como
+o RE-003 supunha.
+
+### Teste I e teste J — as consequências, medidas
+
+[`ferramentas/re004-cnv-leitura.py`](./ferramentas/re004-cnv-leitura.py):
+
+| CNV | TabWin | Por quê |
+| --- | --- | --- |
+| `050, 300` | só 050 (e o dado `*50`) | o espaço depois da vírgula encerra a lista |
+| linha-título sem código | o branco | lista vazia registra o índice 0 |
+| `*50` | 050 e `*50` | `*` não é letra: `Val` falha, vira `050` |
+| `1 5` | 105 | espaço no meio vira 0 |
+| `A15` no fim da linha, CNV de 4 | o dado `0115` | o pedaço é `A15` = 100 + 15; o dado `A15 ` (com o espaço do campo) é 1150 |
+| título com espaços, CNV de 4 | o branco | `    ` vira `0000` |
+
+**No TabSis:** a CNV curta guarda a área de códigos crua de cada linha
+(`shortArea`) e a tabela é montada pelo mesmo laço, com a mesma conversão
+(`cnv-match.ts`). Goldens, segundos goldens, painel, DBF lookup, RDAC2401 e
+SIM/SINASC/SIA/SINAN/CNES seguem sem diferença.
+
+## Incremento com cara de título
+
+`I* LEITO HOSPITALAR *, LEITHOSP` (Estabelecimento.def do CNES) não é título:
+o TabWin soma o campo `LEITHOSP` (indicador `1`/`0` do arquivo) — 31 no
+STAC2501. O TabSis faz o mesmo; o caso entrou no `verify:sim-sinasc` (40/40).
 
 ## Conferência
 
@@ -168,6 +210,4 @@ do CNES).
 - Terceiro campo com texto e recurso que não é `.CNV` nem `.DBF`.
 - A linha-título `X** DADOS DO PACIENTE **,,,` do `Atencao_Domiciliar.def`
   (SIA), que o TabSis mostra em cinza.
-- Hífen colado no começo do código, sem espaços (teste H1–H4).
 - Espaços + hífen em CNV literal (só a curta foi medida).
-- O que o TabWin faz ao escolher um incremento-título (`I* LEITO HOSPITALAR *`).

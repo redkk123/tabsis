@@ -36,6 +36,15 @@ export interface CnvRuleLine {
    * na separação entre `exactCodes` e `ranges`.
    */
   literalTokens?: Array<string | CnvCodeRange>;
+  /**
+   * CNV curta: a área de códigos da linha como está no arquivo, sem aparar.
+   * O TabWin monta a tabela lendo essa área de `codeLength` em `codeLength`
+   * caracteres (decompilado: CnvCarrega 0x47737c, CnvLeCodigo 0x477314;
+   * RE-004, teste I) — e detalhes como parar no espaço depois da vírgula só
+   * se reproduzem a partir dela. `exactCodes`/`ranges` continuam para mostrar
+   * e editar.
+   */
+  shortArea?: string;
   sourceOrder: number;
   sourceLine: number;
 }
