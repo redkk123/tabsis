@@ -1,0 +1,718 @@
+{
+ "schema": "tabsis.dbf-lookup-oracle",
+ "version": 1,
+ "capturedAt": "2026-10-14",
+ "referenceEngine": "TabWin 4.15 (TabWin415.exe) under Wine 10.0",
+ "evidence": "tabelas salvas pelo próprio TabWin (.TAB); docs/reverse-engineering/RE_003_CNV_CODIGO_CURTO.md",
+ "inputs": {
+  "data": "RDAC2401.dbc",
+  "lookups": [
+   "DBF/TCNESAC.DBF",
+   "DBF/HUF_MEC.DBF (CP850)"
+  ],
+  "cnv": "SEXO.CNV"
+ },
+ "notes": [
+  "Rótulos do HUF_MEC: o TabWin mostra \"Säo\" para \"São\" (conversão própria do CP850); a comparação usa o código CNES do começo do rótulo."
+ ],
+ "defText": ";RE-003 DBF relacionado\nAC:\\TabWin\\G001\\RD*.DBC\nLSexo,SEXO,1,SEXO.CNV\nLHospital AC (CNES),CNES              , NOMEFANT  ,DBF\\TCNESAC.DBF\nLHU's MEC EBSERH (CNES)               , CNES      , NOMEFANT  ,DBF\\HUF_MEC.DBF\nSHospital AC (CNES),CNES              , NOMEFANT  ,DBF\\TCNESAC.DBF\n",
+ "cases": [
+  {
+   "id": "D1",
+   "linha": "Sexo",
+   "naoClassificados": "ignorar",
+   "selecoes": [
+    [
+     "Hospital AC (CNES)",
+     [
+      "2000083",
+      "2000296"
+     ]
+    ]
+   ],
+   "rows": [
+    [
+     "Masculino",
+     24
+    ],
+    [
+     "Feminino",
+     250
+    ],
+    [
+     "Ignorado",
+     0
+    ]
+   ],
+   "total": 274
+  },
+  {
+   "id": "D2",
+   "linha": "HU's MEC EBSERH (CNES)",
+   "naoClassificados": "incluir",
+   "rows": [
+    [
+     "0000396 HC da Univ. Federal de Pernambuco (HC-UFPE)",
+     0
+    ],
+    [
+     "0002534 HU da Universidade Federal de Sergipe (HU-UFS)",
+     0
+    ],
+    [
+     "0003816 HU Professor Edgard Santos (Hupes-UFBA)",
+     0
+    ],
+    [
+     "0004731 Maternidade Climério de Oliveira (MCO-UFBA)",
+     0
+    ],
+    [
+     "0009709 HU Maria Aparecida Pedrossian (Humap-UFMS)",
+     0
+    ],
+    [
+     "0010510 HU da Universidade de Brasília (HUB-UnB)",
+     0
+    ],
+    [
+     "0012505 HU Antônio Pedro (HUAP-UFF)",
+     0
+    ],
+    [
+     "0027049 HC da Univ. Federal de Minas Gerais (HC-UFMG)",
+     0
+    ],
+    [
+     "2006197 HU Professor Alberto Antunes (HUPAA-UFAL)",
+     0
+    ],
+    [
+     "2017644 HU Getúlio Vargas (HUGV-UFAM)",
+     0
+    ],
+    [
+     "2077485 Hospital Säo Paulo - UNIFESP (UNIFESP)",
+     0
+    ],
+    [
+     "2146339 Ambulatório Amélio Marques (AAM-HC-UFU)",
+     0
+    ],
+    [
+     "2146355 Hospital de Clínicas de Uberlândia (HC-UFU)",
+     0
+    ],
+    [
+     "2146371 Unidade Diálise Hemodiálise (UDH-HC-UFU)",
+     0
+    ],
+    [
+     "2206595 HC da Univ. Feder. do Triângulo Mineiro (HC-UFTM)",
+     0
+    ],
+    [
+     "2218798 HU da Univ. Federal de Juiz de Fora (HU-UFJF)",
+     0
+    ],
+    [
+     "2237601 Hospital de Clínicas de Porto Alegre (HCPA)",
+     0
+    ],
+    [
+     "2244306 HU da Univ. Federal de Santa Maria (HUSM-UFSM)",
+     0
+    ],
+    [
+     "2252694 HE da Univ. Federal de Pelotas (HE-UFPel)",
+     0
+    ],
+    [
+     "2269430 Instituto de Psiquiatria da UFRJ (UFRJ)",
+     0
+    ],
+    [
+     "2270021 Maternidade Escola da UFRJ (UFRJ)",
+     0
+    ],
+    [
+     "2270668 Hospital Escola Säo Francisco de Assis (UFRJ)",
+     0
+    ],
+    [
+     "2280167 Hospital Universitário Clementino Fraga Filho (UFRJ)",
+     0
+    ],
+    [
+     "2295415 HU Gaffree e Guinle (HUGG-Unirio)",
+     0
+    ],
+    [
+     "2296594 Instituto de Ginecologia (UFRJ)",
+     0
+    ],
+    [
+     "2296616 Instituto de Puericultura e Pediatria Martagäo Gesteira (UFRJ)",
+     0
+    ],
+    [
+     "2332981 HU Joäo de Barros Barreto (HUJBB-UFPA)",
+     0
+    ],
+    [
+     "2338424 HC da Universidade Federal de Goiás (HC-UFG)",
+     0
+    ],
+    [
+     "2384299 Complexo do HC da Univ.Fed. do Paraná (CHC-UFPR)",
+     0
+    ],
+    [
+     "2400243 HU Lauro Wanderley (HULW-UFPB)",
+     0
+    ],
+    [
+     "2409208 Maternidade Escola Januário Cicco (Mejc-UFRN)",
+     0
+    ],
+    [
+     "2481286 Maternidade Escola Assis Chateaubriand (Meac-UFC)",
+     0
+    ],
+    [
+     "2504502 HU Júlio Maria Bandeira de Mello (HUJB-UFCG)",
+     0
+    ],
+    [
+     "2561492 HU Walter Cantídio (HUWC-UFC)",
+     0
+    ],
+    [
+     "2640244 Maternidade Victor F. do Amaral (MVFA-UFPR)",
+     0
+    ],
+    [
+     "2653982 Hospital Universitário Onofre Lopes (Huol-UFRN)",
+     0
+    ],
+    [
+     "2655411 Hospital Universitário Júlio Müller (HUJM-UFMT)",
+     0
+    ],
+    [
+     "2659832 Centro de Referência em Oftalmologia - CEROF (UFG)",
+     0
+    ],
+    [
+     "2676060 Hospital Universitário Alcides Carneiro (UFCG)",
+     0
+    ],
+    [
+     "2694751 HU Bettina Ferro de Souza (HUBFS-UFPA)",
+     0
+    ],
+    [
+     "2707675 HU Dr. Miguel Riet Correa Junior (HU-Furg)",
+     0
+    ],
+    [
+     "2708361 Instituto de Neurologia Deolindo Couto (UFRJ)",
+     0
+    ],
+    [
+     "2710935 HU da Univ. Federal da Grande Dourados (HU-UFGD)",
+     0
+    ],
+    [
+     "2726653 HU da Universidade Federal do Maranhäo (HU-UFMA)",
+     0
+    ],
+    [
+     "3157245 HU da Univ. Federal de Santa Catarina (HU-UFSC)",
+     0
+    ],
+    [
+     "3285391 HU da Universidade Federal do Piauí (HU-UFPI)",
+     0
+    ],
+    [
+     "3432076 HU da Universidade Federal do Amapá (HU-Unifap)",
+     0
+    ],
+    [
+     "3654826 Hospital de Doencas Tropicais (HDT-UFT)",
+     0
+    ],
+    [
+     "4014111 Hospital Universitário Ana Bezerra (Huab-UFRN)",
+     0
+    ],
+    [
+     "4044916 HU Cassiano Antônio Moraes (Hucam-UFES)",
+     0
+    ],
+    [
+     "5358833 Instituto de Doenças do Tórax (UFRJ)",
+     0
+    ],
+    [
+     "5586348 HU da Univ. Federal de Säo Carlos (HU-Ufscar)",
+     0
+    ],
+    [
+     "6042414 HU da Univ. Fed. Vale do S. Francisco (HU-Univasf)",
+     0
+    ],
+    [
+     "6568343 Hospital Universitário de Lagarto (HUL-UFS)",
+     0
+    ],
+    [
+     "Não classificados",
+     4315
+    ]
+   ],
+   "total": 4315
+  },
+  {
+   "id": "D3",
+   "linha": "HU's MEC EBSERH (CNES)",
+   "naoClassificados": "discriminar",
+   "rows": [
+    [
+     "0000396 HC da Univ. Federal de Pernambuco (HC-UFPE)",
+     0
+    ],
+    [
+     "0002534 HU da Universidade Federal de Sergipe (HU-UFS)",
+     0
+    ],
+    [
+     "0003816 HU Professor Edgard Santos (Hupes-UFBA)",
+     0
+    ],
+    [
+     "0004731 Maternidade Climério de Oliveira (MCO-UFBA)",
+     0
+    ],
+    [
+     "0009709 HU Maria Aparecida Pedrossian (Humap-UFMS)",
+     0
+    ],
+    [
+     "0010510 HU da Universidade de Brasília (HUB-UnB)",
+     0
+    ],
+    [
+     "0012505 HU Antônio Pedro (HUAP-UFF)",
+     0
+    ],
+    [
+     "0027049 HC da Univ. Federal de Minas Gerais (HC-UFMG)",
+     0
+    ],
+    [
+     "2006197 HU Professor Alberto Antunes (HUPAA-UFAL)",
+     0
+    ],
+    [
+     "2017644 HU Getúlio Vargas (HUGV-UFAM)",
+     0
+    ],
+    [
+     "2077485 Hospital Säo Paulo - UNIFESP (UNIFESP)",
+     0
+    ],
+    [
+     "2146339 Ambulatório Amélio Marques (AAM-HC-UFU)",
+     0
+    ],
+    [
+     "2146355 Hospital de Clínicas de Uberlândia (HC-UFU)",
+     0
+    ],
+    [
+     "2146371 Unidade Diálise Hemodiálise (UDH-HC-UFU)",
+     0
+    ],
+    [
+     "2206595 HC da Univ. Feder. do Triângulo Mineiro (HC-UFTM)",
+     0
+    ],
+    [
+     "2218798 HU da Univ. Federal de Juiz de Fora (HU-UFJF)",
+     0
+    ],
+    [
+     "2237601 Hospital de Clínicas de Porto Alegre (HCPA)",
+     0
+    ],
+    [
+     "2244306 HU da Univ. Federal de Santa Maria (HUSM-UFSM)",
+     0
+    ],
+    [
+     "2252694 HE da Univ. Federal de Pelotas (HE-UFPel)",
+     0
+    ],
+    [
+     "2269430 Instituto de Psiquiatria da UFRJ (UFRJ)",
+     0
+    ],
+    [
+     "2270021 Maternidade Escola da UFRJ (UFRJ)",
+     0
+    ],
+    [
+     "2270668 Hospital Escola Säo Francisco de Assis (UFRJ)",
+     0
+    ],
+    [
+     "2280167 Hospital Universitário Clementino Fraga Filho (UFRJ)",
+     0
+    ],
+    [
+     "2295415 HU Gaffree e Guinle (HUGG-Unirio)",
+     0
+    ],
+    [
+     "2296594 Instituto de Ginecologia (UFRJ)",
+     0
+    ],
+    [
+     "2296616 Instituto de Puericultura e Pediatria Martagäo Gesteira (UFRJ)",
+     0
+    ],
+    [
+     "2332981 HU Joäo de Barros Barreto (HUJBB-UFPA)",
+     0
+    ],
+    [
+     "2338424 HC da Universidade Federal de Goiás (HC-UFG)",
+     0
+    ],
+    [
+     "2384299 Complexo do HC da Univ.Fed. do Paraná (CHC-UFPR)",
+     0
+    ],
+    [
+     "2400243 HU Lauro Wanderley (HULW-UFPB)",
+     0
+    ],
+    [
+     "2409208 Maternidade Escola Januário Cicco (Mejc-UFRN)",
+     0
+    ],
+    [
+     "2481286 Maternidade Escola Assis Chateaubriand (Meac-UFC)",
+     0
+    ],
+    [
+     "2504502 HU Júlio Maria Bandeira de Mello (HUJB-UFCG)",
+     0
+    ],
+    [
+     "2561492 HU Walter Cantídio (HUWC-UFC)",
+     0
+    ],
+    [
+     "2640244 Maternidade Victor F. do Amaral (MVFA-UFPR)",
+     0
+    ],
+    [
+     "2653982 Hospital Universitário Onofre Lopes (Huol-UFRN)",
+     0
+    ],
+    [
+     "2655411 Hospital Universitário Júlio Müller (HUJM-UFMT)",
+     0
+    ],
+    [
+     "2659832 Centro de Referência em Oftalmologia - CEROF (UFG)",
+     0
+    ],
+    [
+     "2676060 Hospital Universitário Alcides Carneiro (UFCG)",
+     0
+    ],
+    [
+     "2694751 HU Bettina Ferro de Souza (HUBFS-UFPA)",
+     0
+    ],
+    [
+     "2707675 HU Dr. Miguel Riet Correa Junior (HU-Furg)",
+     0
+    ],
+    [
+     "2708361 Instituto de Neurologia Deolindo Couto (UFRJ)",
+     0
+    ],
+    [
+     "2710935 HU da Univ. Federal da Grande Dourados (HU-UFGD)",
+     0
+    ],
+    [
+     "2726653 HU da Universidade Federal do Maranhäo (HU-UFMA)",
+     0
+    ],
+    [
+     "3157245 HU da Univ. Federal de Santa Catarina (HU-UFSC)",
+     0
+    ],
+    [
+     "3285391 HU da Universidade Federal do Piauí (HU-UFPI)",
+     0
+    ],
+    [
+     "3432076 HU da Universidade Federal do Amapá (HU-Unifap)",
+     0
+    ],
+    [
+     "3654826 Hospital de Doencas Tropicais (HDT-UFT)",
+     0
+    ],
+    [
+     "4014111 Hospital Universitário Ana Bezerra (Huab-UFRN)",
+     0
+    ],
+    [
+     "4044916 HU Cassiano Antônio Moraes (Hucam-UFES)",
+     0
+    ],
+    [
+     "5358833 Instituto de Doenças do Tórax (UFRJ)",
+     0
+    ],
+    [
+     "5586348 HU da Univ. Federal de Säo Carlos (HU-Ufscar)",
+     0
+    ],
+    [
+     "6042414 HU da Univ. Fed. Vale do S. Francisco (HU-Univasf)",
+     0
+    ],
+    [
+     "6568343 Hospital Universitário de Lagarto (HUL-UFS)",
+     0
+    ],
+    [
+     "2000121",
+     202
+    ],
+    [
+     "2000733",
+     399
+    ],
+    [
+     "2001020",
+     46
+    ],
+    [
+     "2001500",
+     217
+    ],
+    [
+     "5858208",
+     23
+    ],
+    [
+     "2000865",
+     124
+    ],
+    [
+     "2001578",
+     829
+    ],
+    [
+     "5336171",
+     648
+    ],
+    [
+     "2000083",
+     51
+    ],
+    [
+     "2000997",
+     42
+    ],
+    [
+     "2001586",
+     509
+    ],
+    [
+     "2000296",
+     223
+    ],
+    [
+     "2000857",
+     57
+    ],
+    [
+     "2000636",
+     80
+    ],
+    [
+     "2001594",
+     23
+    ],
+    [
+     "2002078",
+     524
+    ],
+    [
+     "5701929",
+     22
+    ],
+    [
+     "2000385",
+     95
+    ],
+    [
+     "2000970",
+     29
+    ],
+    [
+     "2000822",
+     7
+    ],
+    [
+     "5661714",
+     24
+    ],
+    [
+     "2000172",
+     19
+    ],
+    [
+     "2000024",
+     45
+    ],
+    [
+     "2000725",
+     35
+    ],
+    [
+     "2000393",
+     42
+    ]
+   ],
+   "total": 4315
+  },
+  {
+   "id": "D4",
+   "linha": "Hospital AC (CNES)",
+   "naoClassificados": "incluir",
+   "rows": [
+    [
+     "2000024 UNIDADE MISTA DE SAUDE DO MUNICIPIO DE RODRIGUES ALVES",
+     45
+    ],
+    [
+     "2000083 HOSPITAL DR ABEL PINHEIRO MACIEL FILHO",
+     51
+    ],
+    [
+     "2000121 HOSPITAL DR SANSAO GOMES",
+     202
+    ],
+    [
+     "2000172 SESACRE HOSPITAL DE DERMATOLOGIA SANITARIA",
+     19
+    ],
+    [
+     "2000180 SANTA CASA DE MISERICORDIA DE CRUZEIRO DO SUL",
+     0
+    ],
+    [
+     "2000296 HOSPITAL DA MULHER E DA CRIANCA DO JURUA",
+     223
+    ],
+    [
+     "2000385 HOSPITAL INFANTIL IOLANDA COSTA E SILVA",
+     95
+    ],
+    [
+     "2000393 HOSPITAL EPAMINONDAS JACOME",
+     42
+    ],
+    [
+     "2000636 HOSPITAL GERAL DE FEIJO",
+     80
+    ],
+    [
+     "2000725 HOSPITAL DR ARY RODRIGUES",
+     35
+    ],
+    [
+     "2000733 MATERNIDADE E CLINICAS DE MULHERES BARBARA HELIODORA",
+     399
+    ],
+    [
+     "2000822 UNIDADE MISTA ANA NERY",
+     7
+    ],
+    [
+     "2000857 HOSPITAL DE SAUDE MENTAL DO ACRE",
+     57
+    ],
+    [
+     "2000865 HOSPITAL JOAO CANCIO FERNANDES",
+     124
+    ],
+    [
+     "2000970 SESACRE UNIDADE MISTA DE MANOEL URBANO",
+     29
+    ],
+    [
+     "2000997 HOSPITAL DR MANOEL MARINHO MONTE",
+     42
+    ],
+    [
+     "2001020 UNIDADE MISTA DE SAUDE ANTONIO BALBINO RODRIGUES",
+     46
+    ],
+    [
+     "2001500 HOSPITAL RAIMUNDO CHAAR",
+     217
+    ],
+    [
+     "2001578 HOSPITAL GERAL DE CLINICAS DE RIO BRANCO",
+     829
+    ],
+    [
+     "2001586 FUNDHACRE",
+     509
+    ],
+    [
+     "2001594 UNIDADE MISTA DE MARECHAL THAUMATURGO",
+     23
+    ],
+    [
+     "2002078 HOSPITAL SANTA JULIANA",
+     524
+    ],
+    [
+     "5336171 HOSPITAL REGIONAL DO JURUA IRMA NAIR TERESINHA REICHERT",
+     648
+    ],
+    [
+     "5353947 UNIDADE MISTA DE JORDAO",
+     0
+    ],
+    [
+     "5661714 UNIDADE MISTA DE PORTO WALTER",
+     24
+    ],
+    [
+     "5701929 UNIDADE MISTA MARIA DE JESUS ANDER MAZICA",
+     22
+    ],
+    [
+     "5858208 UNIDADE MISTA DE SANTA ROSA",
+     23
+    ]
+   ],
+   "total": 4315
+  }
+ ]
+}

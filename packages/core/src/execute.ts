@@ -231,7 +231,9 @@ function axisFromDimension(
       label: entry.label,
       source: 'conversion',
     }));
-    if (dimension.unclassifiedPolicy === 'discriminate') {
+    // "Incluir": a linha "Não classificados" só aparece se houver algum — o
+    // TabWin não a mostra vazia (Help do TabWin v2; RE-003, D4 e T4).
+    if (dimension.unclassifiedPolicy === 'discriminate' && observed.has(UNCLASSIFIED_KEY)) {
       items.push({ key: UNCLASSIFIED_KEY, label: UNCLASSIFIED_LABEL, source: 'conversion' });
     }
     items.push(...discriminatedCodes(dimension, observed));
@@ -260,7 +262,9 @@ function axisFromDimension(
         ? { excludeFromTotal: true }
         : {}),
     }));
-    if (dimension.unclassifiedPolicy === 'discriminate') {
+    // "Incluir": a linha "Não classificados" só aparece se houver algum — o
+    // TabWin não a mostra vazia (Help do TabWin v2; RE-003, D4 e T4).
+    if (dimension.unclassifiedPolicy === 'discriminate' && observed.has(UNCLASSIFIED_KEY)) {
       items.push({ key: UNCLASSIFIED_KEY, label: UNCLASSIFIED_LABEL, source: 'conversion' });
     }
     items.push(...discriminatedCodes(dimension, observed));

@@ -226,6 +226,6 @@ análise para este executável.
 
 - O número máximo de linhas extras do Discriminar (`PTR_0057371C`) não foi
   medido. O TabSis não limita.
-- Seleção por tabela DBF (ex.: "Hospital AC (CNES)") no painel usa os códigos
-  brutos; o TabWin real não foi comparado nesse caso.
+- ~~Seleção por tabela DBF~~: conferida em 2026-10-14 (RE-003, `verify:dbf-lookup`
+  4/4).
 - `Testar CRC` em `.dbf` solto não se aplica (só o DBC tem CRC gravado).

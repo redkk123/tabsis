@@ -102,8 +102,9 @@ Do Help do TabWin v2 (versão impressa, Vigilância em Saúde de MG):
 
 Próximos passos sugeridos para a tabulação:
 
-- [ ] Seleção por tabela DBF (ex.: "Hospital AC (CNES)") conferida contra o
-      TabWin real.
+- [x] Seleção por tabela DBF (ex.: "Hospital AC (CNES)") conferida contra o
+      TabWin real (`verify:dbf-lookup` 4/4); "Não classificados" vazio não
+      aparece mais, como no TabWin.
 - [ ] Assistente para criar DEF (o TabWin tem o formulário `TFFAZDEF`).
 
 ---

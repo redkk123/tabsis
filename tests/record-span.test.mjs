@@ -53,3 +53,13 @@ test('withRecordLayout não mexe em campo de texto que comporta o código, e val
   assert.equal(result.recordsAccepted, 1);
   assert.throws(() => compileQueryPlan({ ...spec, filters: [{ ...spec.filters[0], recordSpan: [{ field: 'IDADE', type: 'N', length: 2, decimals: 0 }] }] }), /start at its own field/);
 });
+
+test('Incluir: a linha "Não classificados" só aparece se houver algum (TabWin não mostra vazia)', () => {
+  const sexo = parseCnv(['2 1', row(1, 'Masculino', '1'), row(2, 'Feminino', '3')].join('\n'));
+  const spec = { compatibilityProfile: 'tabwin-4.15', rows: { field: 'SEXO', conversionId: 'SEXO', unclassifiedPolicy: 'discriminate' }, measure: { kind: 'count' }, filters: [] };
+  const semNenhum = executeInMemory(records, compileQueryPlan(spec), { SEXO: sexo });
+  assert.deepEqual(semNenhum.rows.map((r) => r.label), ['Masculino', 'Feminino']);
+  const comUm = executeInMemory([...records, { SEXO: '9' }], compileQueryPlan(spec), { SEXO: sexo });
+  assert.deepEqual(comUm.rows.map((r) => r.label), ['Masculino', 'Feminino', 'Não classificados']);
+  assert.equal(comUm.cells.at(-1)[0], 1);
+});

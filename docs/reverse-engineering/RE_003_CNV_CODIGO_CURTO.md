@@ -174,3 +174,27 @@ leitura só das colunas usadas (Parquet, cache) já inclui o campo vizinho.
 
 Isso também fecha a lacuna do campo numérico em CNV curta: com a largura do
 campo, o número é lido alinhado à direita, como o TabWin.
+
+## Tabela DBF relacionada: Linha e Seleção (2026-10-14)
+
+Linhas do DEF como `LHospital AC (CNES),CNES,NOMEFANT,DBF\TCNESAC.DBF`: o nome
+na tabela vem de outro DBF. A Linha já tinha caso de referência (G015); faltava
+a Seleção e o que acontece com código que não está no DBF. Quatro casos no
+`RDAC2401`, salvos pelo TabWin (`fixtures/oracle/re003-dbf-lookup`,
+`npm run verify:dbf-lookup`):
+
+| Caso | TabWin | TabSis |
+| --- | --- | --- |
+| D1 — Linha Sexo, Seleção de 2 hospitais (2000083 e 2000296) | Masculino 24, Feminino 250, total 274 | igual |
+| D2 — Linha "HU's MEC EBSERH" (`HUF_MEC.DBF`, nacional), Incluir | todos os HUs com 0, "Não classificados" 4.315 | igual |
+| D3 — a mesma, Discriminar | uma linha por CNES, só o código, na ordem em que aparece | igual |
+| D4 — Linha Hospital AC, Incluir, nenhum código fora do DBF | **sem** linha "Não classificados" | mostrava a linha com 0 → corrigido |
+
+O D4 confirma o Help ("Se não houver, essa linha não será incluída") e o T4
+acima, que também não tinha a linha: com Incluir, "Não classificados" só
+aparece quando há algum.
+
+Diferença que fica, de propósito: o `HUF_MEC.DBF` está em CP850, e o TabWin
+mostra "Säo Paulo" onde o arquivo diz "São Paulo" (a conversão de acentos dele
+erra o `ã`). O TabSis mostra "São". A comparação usa o código CNES do começo
+do rótulo.
