@@ -111,13 +111,66 @@ regras).
   TabWin.
 - A CNV literal (`L`, ou código com mais de 4 posições) e a de faixas (`F`)
   não mudaram.
-- **Campo numérico (DBF tipo N) continua pela comparação de texto.** O TabWin
-  lê os caracteres do campo alinhado à direita; aqui o leitor já entrega o
-  número, sem a largura original, e adivinhar o alinhamento poderia classificar
-  errado em silêncio. Fica em aberto até um caso real pedir.
+- Campo numérico (DBF tipo N): resolvido depois, com a estrutura do registro
+  (ver "Dado real", abaixo). Sem cabeçalho de DBF (CSV), continua pela
+  comparação de texto.
 
 Conferido depois da mudança: `npm test` (843), `verify:painel` 6/6,
 `verify:goldens` e `verify:goldens:second` (10 casos) sem nenhuma diferença.
 Um teste antigo esperava `AA` como não classificado numa CNV `00-99`; pela
 regra medida, `AA` é o código 10 e cai em `00-99`. O teste passou a usar `ZZ`
 (código 260).
+
+## Dado real: RDAC2401 com o RD2008.DEF (2026-10-14)
+
+Para conferir em dado do DATASUS, procurei no `RD2008.DEF` as variáveis em
+que a tabela mudaria, e tabulei essas mesmas no TabWin, salvando cada tabela
+como `.TAB` pelo próprio programa (esperado em
+[`fixtures/oracle/re003-rdac2401/expected.json`](../../fixtures/oracle/re003-rdac2401/expected.json);
+`npm run verify:re003 -- <pasta com RDAC2401.dbc e CNV/>`).
+
+Apareceram duas coisas que o teste com arquivos de mentira não mostrava:
+
+**1. O código atravessa para o campo seguinte.** `COD_IDADE` tem 1 caractere e
+as CNVs de idade (`IDADEBAS`, `IDADEPUB`, `IDADE18`, `IDADEDET`) têm código de
+3. O TabWin lê 3 caracteres a partir de `COD_IDADE` **no registro de largura
+fixa**, entrando em `IDADE` (2): o registro `426` é unidade 4 (anos), idade 26.
+O TabSis lia só o `4`. Resultado na Faixa etária (18) do RDAC2401:
+
+| | <1a | 1-4a | 5-9a | … | 80e+a | Ign |
+| --- | ---: | ---: | ---: | --- | ---: | ---: |
+| TabWin 4.15 | 184 | 168 | 130 | … | 187 | 0 |
+| TabSis antes | 184 | 0 | 0 | … | 3 | 4.128 |
+| TabSis agora | 184 | 168 | 130 | … | 187 | 0 |
+
+Quem tabulava a faixa etária do SIH pelo DEF oficial no TabSis recebia quase
+tudo como "Ign". Os casos de referência anteriores não usavam essa variável.
+
+**2. `----` não é código.** As linhas-título das CNVs de Sensíveis à Atenção
+Básica têm `----` no lugar dos códigos. Lido como código curto, `-` vale 13 e
+`----` viraria o mesmo código de `M000`; o TabWin não classifica `M000` ali. O
+hífen é separador de faixa: código que começa com hífen, ou faixa com uma ponta
+vazia, é ignorado.
+
+E a parte que o teste anterior previu se confirmou: CID de 3 caracteres
+(`N39 `) numa CNV de 4 é lido com o espaço valendo 0 (`N390`) e cai na
+categoria certa — antes ficava sem classificação.
+
+| Variável | TabWin × TabSis |
+| --- | --- |
+| Faixa etária (5), (9), (18), Idade detalhada | iguais (lê `COD_IDADE`+`IDADE`) |
+| Sensíveis Atenção Básica 1, 2, 3 | iguais |
+
+### Como o TabSis faz
+
+O plano passa a dizer, para cada Linha, Coluna ou Seleção com CNV, quais campos
+do registro o código atravessa (`recordSpan`: nome, tipo, largura e decimais,
+tirados do cabeçalho do DBF por `withRecordLayout`). O executor remonta o
+trecho do registro como estava escrito — texto à esquerda, número à direita
+com as casas decimais, branco como espaços — e lê `codeLength` caracteres a
+partir da posição. Campo de texto que comporta o código continua como antes.
+Como o `recordSpan` fica no plano, a receita salva reproduz a mesma leitura, e a
+leitura só das colunas usadas (Parquet, cache) já inclui o campo vizinho.
+
+Isso também fecha a lacuna do campo numérico em CNV curta: com a largura do
+campo, o número é lido alinhado à direita, como o TabWin.

@@ -21,6 +21,10 @@ export function fieldsUsedByPlan(plan: QueryPlan): string[] {
 
   add(plan.spec.rows.field);
   add(plan.spec.columns?.field);
+  // O código da CNV que atravessa para o campo vizinho precisa dele também.
+  for (const item of plan.spec.rows.recordSpan ?? []) add(item.field);
+  for (const item of plan.spec.columns?.recordSpan ?? []) add(item.field);
+  for (const filter of plan.spec.filters) for (const item of filter.recordSpan ?? []) add(item.field);
   add(plan.spec.measure.field);
   add(plan.spec.measure.weightField);
   for (const measure of plan.spec.measures ?? []) {

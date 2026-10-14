@@ -12,6 +12,19 @@ export class QueryPlanError extends Error {
  * transform-pipeline filter-rows step, so none of them can ever accept a
  * predicate that another rejects. Exported for that reuse.
  */
+function validateRecordSpan(span: unknown, field: string, label: string): void {
+  if (span === undefined) return;
+  if (!Array.isArray(span) || !span.length) throw new QueryPlanError(`${label} recordSpan must be a non-empty array`);
+  for (const item of span as Array<Record<string, unknown>>) {
+    if (!item || typeof item.field !== 'string' || !item.field || typeof item.type !== 'string'
+      || !Number.isInteger(item.length) || (item.length as number) <= 0
+      || !Number.isInteger(item.decimals) || (item.decimals as number) < 0) {
+      throw new QueryPlanError(`${label} recordSpan is invalid`);
+    }
+  }
+  if ((span as Array<{ field: string }>)[0]!.field !== field) throw new QueryPlanError(`${label} recordSpan must start at its own field`);
+}
+
 export function validateFilter(filter: FilterSpec, label: string): void {
   if (typeof filter?.field !== 'string' || !filter.field.trim()) throw new QueryPlanError(`${label} has no field`);
   if (filter.origin !== undefined && filter.origin !== 'data-quality') {
@@ -20,6 +33,7 @@ export function validateFilter(filter: FilterSpec, label: string): void {
   if (filter.startPosition !== undefined && (!Number.isInteger(filter.startPosition) || filter.startPosition <= 0)) {
     throw new QueryPlanError(`${label} startPosition must be a positive integer`);
   }
+  validateRecordSpan(filter.recordSpan, filter.field, label);
   if (filter.mode !== undefined && filter.mode !== 'include' && filter.mode !== 'exclude') {
     throw new QueryPlanError(`${label} mode is invalid`);
   }
@@ -126,6 +140,7 @@ export function compileQueryPlan(spec: TabulationSpec): QueryPlan {
     if (dimension?.startPosition !== undefined && (!Number.isInteger(dimension.startPosition) || dimension.startPosition <= 0)) {
       throw new QueryPlanError(`${label} startPosition must be a positive integer`);
     }
+    if (dimension) validateRecordSpan(dimension.recordSpan, dimension.field, `${label} dimension`);
     if (dimension?.unclassifiedPolicy !== undefined
       && dimension.unclassifiedPolicy !== 'omit' && dimension.unclassifiedPolicy !== 'discriminate'
       && dimension.unclassifiedPolicy !== 'discriminate-codes') {

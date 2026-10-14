@@ -8,6 +8,7 @@ import {
 } from '@precisa-saude/datasus-dbc';
 import {
   compileQueryPlan,
+  withRecordLayout,
   frequencyMeasureFromDef,
   lookupDefinitionFromDefOption,
   parsePortableTable,
@@ -3525,7 +3526,19 @@ function buildPlan(measureOverride?: MeasureSpec): QueryPlan {
     suppressZeroRows: suppressZero.checked,
     suppressZeroColumns: suppressZeroColumns.checked,
   };
-  return compileQueryPlan(spec);
+  return compilarPlano(spec);
+}
+
+/**
+ * Compila com a estrutura do DBF aberto, para o código da CNV ser lido como o
+ * TabWin lê: no registro de largura fixa, atravessando para o campo vizinho
+ * quando o código é mais longo que o campo (Faixa etária do SIH = COD_IDADE +
+ * IDADE; RE-003).
+ */
+function compilarPlano(spec: TabulationSpec): QueryPlan {
+  if (!dbfHeader) return compileQueryPlan(spec);
+  const layout = dbfHeader.fields.map((field) => ({ field: field.name, type: field.type, length: field.length, decimals: field.decimalCount }));
+  return compileQueryPlan(withRecordLayout(spec, layout, Object.fromEntries(cnvByName)));
 }
 
 function conversionsForPlan(plan: QueryPlan): ConversionRegistry {
@@ -6184,7 +6197,7 @@ async function tabulateForMap(): Promise<TabulationResult | null> {
   // Os filtros da pessoa continuam valendo: o mapa mostra o mesmo recorte da
   // análise, só que por geografia. Ignorá-los daria um mapa que contradiz a
   // tabela ao lado.
-  const plan = compileQueryPlan({
+  const plan = compilarPlano({
     compatibilityProfile: currentCompatibilityProfile,
     rows: { field: escolhido.field },
     measure: { kind: 'count' as const },
@@ -9876,7 +9889,7 @@ async function executarDoPainel(spec: TabulationSpec, info: { titulo?: string; s
   sincronizarControlesComPainel(spec);
   // Filtros de fora do painel (o recorte "Onde", limpeza assistida) continuam
   // valendo, e entram no mesmo plano.
-  const plan = compileQueryPlan({ ...spec, filters: [...spec.filters, ...extras] });
+  const plan = compilarPlano({ ...spec, filters: [...spec.filters, ...extras] });
   const ok = await runAnalysis(undefined, plan);
   if (!ok || !currentResult) return null;
   const nomes = arquivosDoPainel ? arquivosDoPainel.join(' + ') : datasetName;

@@ -121,3 +121,9 @@ test('CNV curta: quem vem depois ganha também quando letra e dígito dão o mes
   assert.equal(classifyCnv(cid, 'A05')?.label, 'Intestinais');
   assert.equal(classifyCnv(cid, 'A090')?.label, 'Intestinais');
 });
+
+test('"----" das linhas-título não é código: não pega o CID M000 (RE-003, Sensíveis AB)', () => {
+  const cnv = parseCnv(['2 4', row(1, '19. Pré-natal e parto', '----'), row(2, '19.1 ITU na gravidez', 'O23 -O239', '1')].join('\n'));
+  assert.equal(classifyCnv(cnv, 'M000'), undefined);
+  assert.equal(classifyCnv(cnv, 'O230')?.sequence, 2);
+});

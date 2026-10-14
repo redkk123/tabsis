@@ -8,6 +8,15 @@ export interface SourceFingerprint {
   sourceUrl?: string;
 }
 
+/** Um campo do registro de largura fixa do DBF, na ordem do arquivo. */
+export interface RecordFieldLayout {
+  field: string;
+  /** Tipo xBase: C, N, F, D, L… */
+  type: string;
+  length: number;
+  decimals: number;
+}
+
 export interface DimensionSpec {
   field: string;
   conversionId?: string;
@@ -15,6 +24,14 @@ export interface DimensionSpec {
   lookupId?: string;
   /** 1-based initial character position inside the source field, as in DEF Campo D. */
   startPosition?: number;
+  /**
+   * O campo e os seguintes do registro de largura fixa do DBF, quando o código
+   * da CNV passa do fim do campo ou o campo é numérico. O TabWin lê os
+   * caracteres a partir da posição do campo, atravessando para o vizinho: no
+   * SIH, `COD_IDADE` (1) + `IDADE` (2) formam o código de 3 da Faixa etária
+   * (RE-003). Preenchido por `withRecordLayout` a partir do cabeçalho do DBF.
+   */
+  recordSpan?: RecordFieldLayout[];
   /**
    * Explicit handling when a raw value is empty or has no CNV match.
    *
@@ -47,6 +64,14 @@ interface FilterSpecBase {
   conversionId?: string;
   /** 1-based initial character position inside the source field, as in DEF Campo D. */
   startPosition?: number;
+  /**
+   * O campo e os seguintes do registro de largura fixa do DBF, quando o código
+   * da CNV passa do fim do campo ou o campo é numérico. O TabWin lê os
+   * caracteres a partir da posição do campo, atravessando para o vizinho: no
+   * SIH, `COD_IDADE` (1) + `IDADE` (2) formam o código de 3 da Faixa etária
+   * (RE-003). Preenchido por `withRecordLayout` a partir do cabeçalho do DBF.
+   */
+  recordSpan?: RecordFieldLayout[];
 }
 
 export type FilterSpec = FilterSpecBase & (

@@ -8,8 +8,10 @@ import type {
   FilterSpec,
   MeasureSpec,
   QueryPlan,
+  RecordFieldLayout,
   ResultAxisItem,
   TabulationResult,
+  TabulationSpec,
 } from './model.js';
 
 export type ConversionRegistry = Readonly<Record<string, CnvDefinition | DimensionLookupDefinition>>;
@@ -88,12 +90,46 @@ function getLookup(registry: ConversionRegistry, id: string): DimensionLookupDef
   return definition;
 }
 
+/** O valor como estava escrito no registro de largura fixa do DBF. */
+function fixedWidthText(value: unknown, layout: RecordFieldLayout): string {
+  const width = layout.length;
+  if (value === null || value === undefined) return ' '.repeat(width);
+  let text: string;
+  if (typeof value === 'number') {
+    text = layout.decimals > 0 ? value.toFixed(layout.decimals) : String(Math.round(value));
+    return text.padStart(width).slice(-width);
+  }
+  if (value instanceof Date) {
+    text = `${value.getUTCFullYear()}${String(value.getUTCMonth() + 1).padStart(2, '0')}${String(value.getUTCDate()).padStart(2, '0')}`;
+  } else if (typeof value === 'boolean') {
+    text = value ? 'T' : 'F';
+  } else {
+    text = String(value);
+  }
+  return text.padEnd(width).slice(0, width);
+}
+
+/**
+ * Lê o código como o TabWin: `codeLength` caracteres a partir da posição, no
+ * registro de largura fixa, atravessando para os campos seguintes (RE-003).
+ */
+function spannedCode(record: DataRecord, span: readonly RecordFieldLayout[], startPosition: number | undefined, conversion: CnvDefinition): string {
+  const raw = span.map((layout) => fixedWidthText(record[layout.field], layout)).join('');
+  const start = (startPosition ?? 1) - 1;
+  const code = raw.slice(start, start + conversion.codeLength);
+  return conversion.mode === 'literal' ? code.replace(/ +$/, '') : code;
+}
+
 function extractSourceValue(
   record: DataRecord,
   field: string,
   startPosition: number | undefined,
   conversion: CnvDefinition | undefined,
+  span?: readonly RecordFieldLayout[],
 ): unknown {
+  if (span && conversion && (conversion.mode === 'short' || conversion.mode === 'literal')) {
+    return spannedCode(record, span, startPosition, conversion);
+  }
   const raw = record[field];
   if (raw === null || raw === undefined) return raw;
 
@@ -129,6 +165,7 @@ export function resolveDimensionValue(
     dimension.field,
     dimension.startPosition,
     definition,
+    dimension.recordSpan,
   );
   if (lookup) {
     const key = String(raw ?? '').trim();
@@ -144,7 +181,7 @@ export function resolveDimensionValue(
     return { key: value, label: value };
   }
 
-  const match = classifyCnv(definition, raw, { textual: typeof record[dimension.field] !== 'number' });
+  const match = classifyCnv(definition, raw, { textual: Boolean(dimension.recordSpan) || typeof record[dimension.field] !== 'number' });
   if (!match) {
     return unclassifiedValue(dimension, String(raw ?? '').trim(), definition.mode === 'literal');
   }
@@ -159,7 +196,7 @@ function acceptsFilter(
   const definition = filter.conversionId
     ? getConversion(conversions, filter.conversionId)
     : undefined;
-  const raw = extractSourceValue(record, filter.field, filter.startPosition, definition);
+  const raw = extractSourceValue(record, filter.field, filter.startPosition, definition, filter.recordSpan);
   let matches: boolean;
   if (filter.kind === 'numeric-range') {
     const value = typeof raw === 'number' ? raw : Number(String(raw ?? '').replace(',', '.'));
@@ -174,7 +211,7 @@ function acceptsFilter(
   } else if (!definition) {
     matches = filter.acceptedCategories.includes(String(raw ?? ''));
   } else {
-    const match = classifyCnv(definition, raw, { textual: typeof record[filter.field] !== 'number' });
+    const match = classifyCnv(definition, raw, { textual: Boolean(filter.recordSpan) || typeof record[filter.field] !== 'number' });
     matches = match
       ? filter.acceptedCategories.includes(String(match.sequence))
       : filter.includeUnclassified === true;
@@ -522,4 +559,41 @@ export function executeInMemory(
   const accumulator = createTabulationAccumulator(plan, conversions);
   accumulator.push(records);
   return accumulator.finish();
+}
+
+/**
+ * Preenche o `recordSpan` das dimensões e filtros com CNV quando o TabWin leria
+ * além do campo: o código da CNV é mais longo que o que sobra do campo a partir
+ * da posição, ou o campo é numérico (o TabWin lê o número como estava escrito,
+ * alinhado à direita). Campo de texto que comporta o código fica como está — a
+ * leitura é a mesma.
+ */
+export function withRecordLayout(
+  spec: TabulationSpec,
+  layout: readonly RecordFieldLayout[],
+  conversions: ConversionRegistry,
+): TabulationSpec {
+  const spanFor = <T extends { field: string; conversionId?: string; startPosition?: number; recordSpan?: RecordFieldLayout[] }>(item: T): T => {
+    const { recordSpan: _old, ...rest } = item;
+    const conversion = item.conversionId ? conversions[item.conversionId] : undefined;
+    if (!conversion || 'kind' in conversion || (conversion.mode !== 'short' && conversion.mode !== 'literal')) return rest as T;
+    const index = layout.findIndex((candidate) => candidate.field === item.field);
+    if (index < 0) return rest as T;
+    const own = layout[index]!;
+    const needed = (item.startPosition ?? 1) - 1 + conversion.codeLength;
+    if (own.type.toUpperCase() === 'C' && needed <= own.length) return rest as T;
+    const span: RecordFieldLayout[] = [];
+    let covered = 0;
+    for (let at = index; at < layout.length && (covered < needed || !span.length); at++) {
+      span.push({ ...layout[at]! });
+      covered += layout[at]!.length;
+    }
+    return { ...rest, recordSpan: span } as T;
+  };
+  return {
+    ...spec,
+    rows: spanFor(spec.rows),
+    ...(spec.columns ? { columns: spanFor(spec.columns) } : {}),
+    filters: spec.filters.map((filter) => spanFor(filter)),
+  };
 }
