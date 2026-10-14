@@ -1,0 +1,21 @@
+NEW
+Titulo1=Teste TabSis oraculo
+Titulo2=Freqüência Valor Total segundo Sexo
+[Opções]
+DEF=C:\TabWin\G001\TESTE.DEF
+PATH=C:\TabWin\G001\RD*.DBC
+Linha=Sexo
+Incremento=Freqüência
+Incremento=Valor Total
+Suprime_Linhas_Zeradas=false
+Suprime_Colunas_Zeradas=true
+Não_Classificados=0
+[Arquivos]
+RDAC2401.dbc
+Registros_Processados= 4315
+Tempo_Decorrido= 0:00
+"Sexo";"Freqüência";"Valor Total"
+"Masculino";1761;2077684,41
+"Feminino";2554;2230388,35
+"Ignorado";0;0,00
+"Total";4315;4308072,76

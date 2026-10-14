@@ -204,6 +204,37 @@ export interface TabulationResult {
   dataQuality?: DataQualityRuleOutcome[];
 }
 
+/**
+ * "Notas técnicas" do TabWin (Help do TabWin v2): um texto preso a uma linha,
+ * a uma coluna ou a uma célula (as duas chaves), até 32 por tabela, salvas com
+ * ela e impressas no rodapé.
+ */
+export interface TechnicalNote {
+  rowKey?: string;
+  columnKey?: string;
+  text: string;
+}
+
+export const MAX_TECHNICAL_NOTES = 32;
+
+/** Recusa nota sem alvo, texto vazio ou longo demais, alvo repetido e mais de 32 notas. */
+export function validateTechnicalNotes(value: unknown, where: string): asserts value is TechnicalNote[] {
+  if (!Array.isArray(value) || value.length > MAX_TECHNICAL_NOTES) throw new Error(`invalid technical notes in ${where}`);
+  const seen = new Set<string>();
+  for (const note of value as Array<Record<string, unknown>>) {
+    const rowKey = note?.rowKey; const columnKey = note?.columnKey;
+    if (!note || typeof note.text !== 'string' || !note.text.trim() || note.text.length > 240
+      || (rowKey !== undefined && (typeof rowKey !== 'string' || !rowKey))
+      || (columnKey !== undefined && (typeof columnKey !== 'string' || !columnKey))
+      || (rowKey === undefined && columnKey === undefined)) {
+      throw new Error(`invalid technical note in ${where}`);
+    }
+    const target = `${rowKey ?? ''}\u0000${columnKey ?? ''}`;
+    if (seen.has(target)) throw new Error(`duplicate technical note target in ${where}`);
+    seen.add(target);
+  }
+}
+
 export interface DerivedColumnSpec {
   key: string;
   label: string;

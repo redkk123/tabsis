@@ -28,6 +28,8 @@ import {
   type TableOperation,
   type TabulationResult,
   type TabulationSpec,
+  type TechnicalNote,
+  MAX_TECHNICAL_NOTES,
   type DerivedColumnSpec,
   type TotalPolicy,
   type RecipeTransformStep,
@@ -77,7 +79,7 @@ import {
 } from '../../../packages/acquisition/src/datasus.ts';
 import { tabulationToCsv, tabulationToJson, tabulationToXml } from '../../../packages/export/src/tabulation.ts';
 import { tabulationToXlsx } from '../../../packages/export/src/xlsx.ts';
-import { parseTabFile, tabFileNumber, tabFileValue } from '../../../packages/formats/src/tab-file.ts';
+import { parseTabFile, tabFileFromClipboard, tabFileNumber, tabFileValue } from '../../../packages/formats/src/tab-file.ts';
 import {
   labPackageEntries,
   labPackageFilename,
@@ -101,6 +103,13 @@ import {
   type GeographicCandidate,
 } from '../../../packages/analysis/src/geographic-fields.ts';
 import { criarAbaConsulta, type AbaConsulta } from './aba-consulta.ts';
+import {
+  tabulationToTabwinPrn,
+  tabulationToTabwinSql,
+  tabulationToTabwinTab,
+  type TabwinFormatContext,
+} from '../../../packages/export/src/tabwin-formats.ts';
+import { encodeWindows1252 } from '../../../packages/formats/src/windows-1252.ts';
 import { criarGerarDef } from './gerar-def.ts';
 import { criarEditorCnv } from './editor-cnv.ts';
 import {
@@ -505,6 +514,9 @@ const exportCsvButton = element<HTMLButtonElement>('#export-csv-button');
 const exportJsonButton = element<HTMLButtonElement>('#export-json-button');
 const exportXlsxButton = element<HTMLButtonElement>('#export-xlsx-button');
 const exportXmlButton = element<HTMLButtonElement>('#export-xml-button');
+const exportTabButton = element<HTMLButtonElement>('#export-tab-button');
+const exportPrnButton = element<HTMLButtonElement>('#export-prn-button');
+const exportSqlButton = element<HTMLButtonElement>('#export-sql-button');
 const chartPngButton = element<HTMLButtonElement>('#chart-png-button');
 const chartSvgButton = element<HTMLButtonElement>('#chart-svg-button');
 const chartType = element<HTMLSelectElement>('#chart-type');
@@ -779,6 +791,8 @@ let currentPlan: QueryPlan | null = null;
 let baseResult: TabulationResult | null = null;
 let currentResult: TabulationResult | null = null;
 let tableOperations: TableOperation[] = [];
+/** Notas técnicas da tabela na tela (Help do TabWin v2), até 32. */
+let tableNotes: TechnicalNote[] = [];
 let currentRowLabel = '';
 let currentView: ViewName = 'table';
 let toastTimer = 0;
@@ -3568,7 +3582,7 @@ function clearAnalysisResult(message: string): void {
   tableEditing.hidden = true;
   includeTableButton.disabled = true;
   for (const button of [exportCsvButton, exportJsonButton, exportXlsxButton, exportXmlButton,
-    chartPngButton, chartSvgButton, chartPrintButton, microdatasusCsvButton, saveRecipeButton,
+    exportTabButton, exportPrnButton, exportSqlButton, chartPngButton, chartSvgButton, chartPrintButton, microdatasusCsvButton, saveRecipeButton,
     saveTableButton, selectedDbfButton]) button.disabled = true;
   chart.replaceChildren();
   statisticsResult.replaceChildren(Object.assign(document.createElement('p'), { textContent: message }));
@@ -3615,6 +3629,7 @@ async function runAnalysis(measureOverride?: MeasureSpec, planOverride?: QueryPl
     tableTitle.value = resultTitle.textContent;
     tableSubtitle.value = '';
     tableFooter.value = '';
+    tableNotes = [];
     renderResult();
     appendTabulationLogEntry(plan, result, cached);
     if (cached) showToast('Resultado em cache — sem nova leitura do arquivo');
@@ -3622,6 +3637,7 @@ async function runAnalysis(measureOverride?: MeasureSpec, planOverride?: QueryPl
     exportJsonButton.disabled = false;
     exportXlsxButton.disabled = false;
     exportXmlButton.disabled = false;
+    for (const button of [exportTabButton, exportPrnButton, exportSqlButton]) button.disabled = false;
     chartPngButton.disabled = false;
     chartSvgButton.disabled = false;
     chartPrintButton.disabled = false;
@@ -4051,6 +4067,20 @@ function tableSpacerRow(colSpan: number, height: number): HTMLTableRowElement {
   return tr;
 }
 
+function noteFor(rowKey: string | undefined, columnKey: string | undefined): TechnicalNote | undefined {
+  return tableNotes.find((note) => note.rowKey === rowKey && note.columnKey === columnKey);
+}
+
+/** Marca vermelha e o texto ao passar o mouse, como o TabWin mostra a nota técnica. */
+function markNote(cell: HTMLElement, rowKey: string | undefined, columnKey: string | undefined): void {
+  if (rowKey !== undefined) cell.dataset.rowKey = rowKey;
+  if (columnKey !== undefined) cell.dataset.columnKey = columnKey;
+  const note = noteFor(rowKey, columnKey);
+  if (!note) return;
+  cell.classList.add('has-note');
+  cell.title = `Nota técnica: ${note.text}`;
+}
+
 function buildTableRow(result: TabulationResult, rowIndex: number): HTMLTableRowElement {
   const row = result.rows[rowIndex]!;
   const tr = document.createElement('tr');
@@ -4058,11 +4088,13 @@ function buildTableRow(result: TabulationResult, rowIndex: number): HTMLTableRow
     const label = document.createElement('th');
     label.scope = 'row';
     label.textContent = displayRowLabel(row);
+    markNote(label, row.key, undefined);
     tr.append(label);
   }
   (result.cells[rowIndex] ?? []).forEach((value, columnIndex) => {
     const td = document.createElement('td');
     td.textContent = tableNumber(value, result.columns[columnIndex]?.decimals);
+    markNote(td, row.key, result.columns[columnIndex]?.key);
     // TabWin mostra os negativos em vermelho (menos na linha de total).
     if (value < 0) td.className = 'negative';
     tr.append(td);
@@ -4204,6 +4236,7 @@ function renderTable(result: TabulationResult): void {
     const th = document.createElement('th');
     th.scope = 'col';
     th.textContent = column.label;
+    markNote(th, undefined, column.key);
     headerRow.append(th);
   }
   // Como no TabWin: clicar no título ordena — o primeiro clique do maior para
@@ -4260,6 +4293,23 @@ function renderTable(result: TabulationResult): void {
     totalRow.append(cell);
   }
   foot.append(totalRow);
+  // As notas técnicas também saem no rodapé — é o que vai para o papel.
+  const notasVisiveis = tableNotes.filter((note) =>
+    (note.rowKey === undefined || result.rows.some((row) => row.key === note.rowKey))
+    && (note.columnKey === undefined || result.columns.some((column) => column.key === note.columnKey)));
+  for (const note of notasVisiveis) {
+    const noteRow = document.createElement('tr');
+    noteRow.className = 'table-note-footer';
+    const noteCell = document.createElement('td');
+    noteCell.colSpan = tableColumnCount(result);
+    const alvo = [
+      note.rowKey !== undefined ? result.rows.find((row) => row.key === note.rowKey)?.label : undefined,
+      note.columnKey !== undefined ? result.columns.find((column) => column.key === note.columnKey)?.label : undefined,
+    ].filter(Boolean).join(' × ');
+    noteCell.textContent = `Nota técnica — ${alvo}: ${note.text}`;
+    noteRow.append(noteCell);
+    foot.append(noteRow);
+  }
   if (tableFooter.value.trim()) {
     const footerRow = document.createElement('tr');
     footerRow.className = 'table-custom-footer';
@@ -8649,6 +8699,7 @@ function saveRecipe(): void {
       tableTitle: tableTitle.value.trim(),
       tableSubtitle: tableSubtitle.value.trim(),
       tableFooter: tableFooter.value.trim(),
+      ...(tableNotes.length ? { tableNotes: tableNotes.map((note) => ({ ...note })) } : {}),
     },
   };
   downloadBlob(
@@ -8680,6 +8731,7 @@ function savePortableTable(): void {
       keyVisible: tableKeyVisible.checked,
       subtitle: tableSubtitle.value.trim(),
       footer: tableFooter.value.trim(),
+      ...(tableNotes.length ? { notes: tableNotes.map((note) => ({ ...note })) } : {}),
     },
   };
   downloadBlob(
@@ -8760,6 +8812,7 @@ async function openPortableTable(file: File): Promise<void> {
   tableTitle.value = table.title;
   tableSubtitle.value = table.presentation?.subtitle ?? '';
   tableFooter.value = table.presentation?.footer ?? '';
+  tableNotes = (table.presentation?.notes ?? []).map((note) => ({ ...note }));
   if (table.presentation) {
     tableSortDirection.value = table.presentation.sortDirection;
     tableDecimals.value = String(table.presentation.decimalPlaces);
@@ -8780,6 +8833,7 @@ async function openPortableTable(file: File): Promise<void> {
   exportJsonButton.disabled = false;
   exportXlsxButton.disabled = false;
   exportXmlButton.disabled = false;
+  for (const button of [exportTabButton, exportPrnButton, exportSqlButton]) button.disabled = false;
   chartPngButton.disabled = false;
   chartSvgButton.disabled = false;
   chartPrintButton.disabled = false;
@@ -8801,7 +8855,13 @@ async function openPortableTable(file: File): Promise<void> {
  */
 async function openLegacyTabFile(file: File): Promise<void> {
   const bytes = new Uint8Array(await file.arrayBuffer());
-  const tab = parseTabFile(textDecoder.decode(bytes));
+  openLegacyTabText(textDecoder.decode(bytes), file.name, 'tabela do TabWin 4.15');
+}
+
+/** Mostra um `.TAB` (aberto ou colado) como resultado somente para leitura. */
+function openLegacyTabText(text: string, name: string, kind: string): void {
+  const file = { name };
+  const tab = parseTabFile(text);
   if (!tab.matrix) throw new Error(`${file.name}: não traz matriz de resultado`);
   const matrix = tab.matrix;
 
@@ -8845,7 +8905,7 @@ async function openLegacyTabFile(file: File): Promise<void> {
   currentRowLabel = matrix.cornerLabel;
   rowField.replaceChildren(new Option(matrix.cornerLabel, ''));
   columnField.replaceChildren(new Option(tabFileValue(tab, 'Coluna') ?? 'Resultado salvo', ''));
-  resultKicker.textContent = `${file.name} · tabela do TabWin 4.15`;
+  resultKicker.textContent = `${file.name} · ${kind}`;
   const title = tabFileValue(tab, 'Titulo2') ?? tabFileValue(tab, 'Titulo1') ?? file.name;
   resultTitle.textContent = title;
   tableTitle.value = title;
@@ -8855,7 +8915,7 @@ async function openLegacyTabFile(file: File): Promise<void> {
   saveRecipeButton.disabled = true;
   saveTableButton.disabled = false;
   labPackageButton.disabled = false;
-  for (const button of [exportCsvButton, exportJsonButton, exportXlsxButton, exportXmlButton]) {
+  for (const button of [exportCsvButton, exportJsonButton, exportXlsxButton, exportXmlButton, exportTabButton, exportPrnButton, exportSqlButton]) {
     button.disabled = false;
   }
 
@@ -8874,7 +8934,7 @@ async function openLegacyTabFile(file: File): Promise<void> {
     note.textContent = `Procedência declarada no próprio arquivo — ${origin.join(' · ')}`;
     element<HTMLElement>('#table-view').prepend(note);
   }
-  showToast(`${file.name}: tabela do TabWin aberta somente para leitura.`);
+  showToast(`${file.name}: ${kind} aberta somente para leitura.`);
 }
 
 async function includePortableTable(file: File): Promise<void> {
@@ -9014,6 +9074,7 @@ async function openRecipe(file: File): Promise<void> {
   }
   if (recipe.view?.tableSubtitle !== undefined) tableSubtitle.value = recipe.view.tableSubtitle;
   if (recipe.view?.tableFooter !== undefined) tableFooter.value = recipe.view.tableFooter;
+  tableNotes = (recipe.view?.tableNotes ?? []).map((note) => ({ ...note }));
   if (recipe.resultOperations?.length && baseResult) {
     tableOperations = recipe.resultOperations.map((operation) => structuredClone(operation));
     currentResult = replayTableOperations(baseResult, tableOperations);
@@ -9103,6 +9164,29 @@ function exportXlsx(): void {
   downloadBlob(new Blob([bytes as BlobPart], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   }), `${exportBaseName()}.xlsx`);
+}
+
+/** Os formatos do "Salvar como" do TabWin: o que está na tela, com os totais que a tabela mostra. */
+function tabwinFormatContext(): TabwinFormatContext {
+  const result = currentResult!;
+  return {
+    rowLabel: exportRowLabel(),
+    title: tableTitle.value.trim() || (resultKicker.textContent ?? '').split(' · ').pop()?.trim() || datasetName,
+    subtitle: tableSubtitle.value.trim() || resultTitle.textContent || '',
+    ...(painel?.logAtual() ? { log: painel.logAtual() } : {}),
+    rowTotalColumn: showRowTotalColumn(result),
+    totals: result.columns.map((column) => displayedColumnTotal(result, column.key)),
+  };
+}
+
+function exportTabwin(kind: 'tab' | 'prn' | 'sql'): void {
+  if (!currentResult) return;
+  const context = tabwinFormatContext();
+  const text = kind === 'tab' ? tabulationToTabwinTab(currentResult, context)
+    : kind === 'prn' ? tabulationToTabwinPrn(currentResult, context)
+      : tabulationToTabwinSql(currentResult, { ...context, tableName: exportBaseName() });
+  // Windows-1252, como o TabWin grava: é assim que ele lê de volta.
+  downloadBlob(new Blob([encodeWindows1252(text) as BlobPart], { type: 'text/plain;charset=windows-1252' }), `${exportBaseName()}.${kind}`);
 }
 
 async function copyPresentedTable(): Promise<void> {
@@ -9397,6 +9481,58 @@ includeTableInput.addEventListener('change', () => {
   void includePortableTable(file).catch((error) => showToast(error instanceof Error ? error.message : String(error), true));
   includeTableInput.value = '';
 });
+const noteDialog = element<HTMLDialogElement>('#note-dialog');
+const noteTarget = element<HTMLElement>('#note-target');
+const noteText = element<HTMLInputElement>('#note-text');
+let noteEditing: { rowKey?: string; columnKey?: string } | null = null;
+// "Notas técnicas" do TabWin: botão direito na linha, na coluna ou na célula.
+resultTable.addEventListener('contextmenu', (event) => {
+  const cell = (event.target as HTMLElement).closest<HTMLElement>('th, td');
+  if (!cell || !currentResult || (cell.dataset.rowKey === undefined && cell.dataset.columnKey === undefined)) return;
+  event.preventDefault();
+  const rowKey = cell.dataset.rowKey;
+  const columnKey = cell.dataset.columnKey;
+  noteEditing = { ...(rowKey !== undefined ? { rowKey } : {}), ...(columnKey !== undefined ? { columnKey } : {}) };
+  const alvo = [
+    rowKey !== undefined ? `linha "${currentResult.rows.find((row) => row.key === rowKey)?.label ?? rowKey}"` : '',
+    columnKey !== undefined ? `coluna "${currentResult.columns.find((column) => column.key === columnKey)?.label ?? columnKey}"` : '',
+  ].filter(Boolean).join(', ');
+  noteTarget.textContent = alvo;
+  noteText.value = noteFor(rowKey, columnKey)?.text ?? '';
+  noteDialog.showModal();
+  noteText.focus();
+});
+element<HTMLButtonElement>('#note-close').addEventListener('click', () => noteDialog.close());
+element<HTMLFormElement>('#note-form').addEventListener('submit', (event) => {
+  event.preventDefault();
+  if (!noteEditing || !currentResult) return;
+  const { rowKey, columnKey } = noteEditing;
+  const others = tableNotes.filter((note) => !(note.rowKey === rowKey && note.columnKey === columnKey));
+  const text = noteText.value.trim();
+  if (text && others.length >= MAX_TECHNICAL_NOTES) {
+    showToast(`O TabWin aceita até ${MAX_TECHNICAL_NOTES} notas técnicas por tabela`, true);
+    return;
+  }
+  // Texto vazio apaga a nota, como apagar o texto no TabWin.
+  tableNotes = text ? [...others, { ...noteEditing, text }] : others;
+  noteDialog.close();
+  renderTable(currentResult);
+  showToast(text ? 'Nota técnica guardada' : 'Nota técnica apagada');
+});
+const pasteTableDialog = element<HTMLDialogElement>('#paste-table-dialog');
+const pasteTableText = element<HTMLTextAreaElement>('#paste-table-text');
+element<HTMLButtonElement>('#paste-table-button').addEventListener('click', () => {
+  pasteTableText.value = '';
+  pasteTableDialog.showModal();
+  pasteTableText.focus();
+});
+element<HTMLButtonElement>('#paste-table-close').addEventListener('click', () => pasteTableDialog.close());
+element<HTMLButtonElement>('#paste-table-open').addEventListener('click', () => {
+  try {
+    openLegacyTabText(tabFileFromClipboard(pasteTableText.value), 'Tabela colada', 'colada da área de transferência');
+    pasteTableDialog.close();
+  } catch (error) { showToast(error instanceof Error ? error.message : String(error), true); }
+});
 compareOpenBButton.addEventListener('click', () => compareBInput.click());
 compareBInput.addEventListener('change', () => {
   const file = compareBInput.files?.[0];
@@ -9422,6 +9558,9 @@ exportCsvButton.addEventListener('click', exportCsv);
 exportJsonButton.addEventListener('click', exportJson);
 exportXlsxButton.addEventListener('click', exportXlsx);
 exportXmlButton.addEventListener('click', exportXml);
+exportTabButton.addEventListener('click', () => exportTabwin('tab'));
+exportPrnButton.addEventListener('click', () => exportTabwin('prn'));
+exportSqlButton.addEventListener('click', () => exportTabwin('sql'));
 tabulationLogCopyAll.addEventListener('click', () => {
   if (!tabulationLog.length) return;
   // Chronological (oldest first) reads as a timeline once pasted, even

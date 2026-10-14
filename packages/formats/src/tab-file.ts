@@ -26,8 +26,8 @@
  *   because a positional guess would silently swallow a real category that
  *   happened to sort last.
  *
- * Writing `.TAB` is out of scope here. Per the project rule, only fields
- * proven stable across several real artifacts should ever be written back.
+ * Writing `.TAB` lives in `packages/export/src/tabwin-formats.ts`, checked
+ * byte for byte against files the real TabWin saved (and opened back in it).
  */
 
 export interface TabFileEntry {
@@ -251,4 +251,52 @@ export function tabFileNumber(cell: string): number | null {
     : text;
   const value = Number(normalized);
   return Number.isFinite(value) ? value : null;
+}
+
+/**
+ * Número como vem colado de uma planilha: `1.761`, `2.077.684,41` (pt-BR),
+ * `2,077,684.41` (en), `47,27`, `-3`. Vazio ou traço vira 0, como o TabWin
+ * mostra célula zerada ("-" no HTML dele). `null` quando não é número.
+ */
+export function pastedNumber(cell: string): number | null {
+  let text = cell.trim().replace(/[\s ]/g, '');
+  if (!text || text === '-' || text === '—') return 0;
+  const comma = text.lastIndexOf(',');
+  const dot = text.lastIndexOf('.');
+  if (comma >= 0 && dot >= 0) {
+    text = comma > dot ? text.replace(/\./g, '').replace(',', '.') : text.replace(/,/g, '');
+  } else if (comma >= 0) {
+    text = /^-?\d{1,3}(,\d{3}){2,}$/.test(text) ? text.replace(/,/g, '') : text.replace(',', '.');
+  } else if (dot >= 0 && /^-?\d{1,3}(\.\d{3})+$/.test(text)) {
+    // "1.761" e "4.315": separador de milhar, o que uma tabela em pt-BR copia.
+    text = text.replace(/\./g, '');
+  }
+  const value = Number(text);
+  return /^-?(\d+\.?\d*|\.\d+)$/.test(text) && Number.isFinite(value) ? value : null;
+}
+
+/**
+ * "Colar do Clipboard" do TabWin: uma tabela copiada (separada por tabulação,
+ * a primeira linha de títulos, a primeira coluna de nomes) vira o texto de um
+ * `.TAB`, para abrir pelo mesmo caminho e com as mesmas operações.
+ */
+export function tabFileFromClipboard(text: string, title = 'Tabela colada'): string {
+  const rows = text.replace(/\r\n?/g, '\n').split('\n').filter((line) => line.trim())
+    .map((line) => line.split('\t'));
+  if (rows.length < 2 || rows[0]!.length < 2) {
+    throw new Error('cole uma tabela com títulos na primeira linha e nomes na primeira coluna, separada por tabulação');
+  }
+  const quote = (value: string): string => `"${value.trim().replace(/"/g, "'")}"`;
+  const width = rows[0]!.length;
+  const lines = [quote(rows[0]![0] ?? ''), ...rows[0]!.slice(1).map(quote)].join(';');
+  const body = rows.slice(1).map((row, index) => {
+    const cells = row.slice(1, width).map((cell, column) => {
+      const value = pastedNumber(cell);
+      if (value === null) throw new Error(`"${cell.trim()}" não é número (linha ${index + 2}, coluna ${column + 2})`);
+      return String(value).replace('.', ',');
+    });
+    while (cells.length < width - 1) cells.push('0');
+    return [quote(row[0] ?? ''), ...cells].join(';');
+  });
+  return ['NEW', `Titulo1=${title}`, `Titulo2=${title}`, lines, ...body].join('\r\n') + '\r\n';
 }

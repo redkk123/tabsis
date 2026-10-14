@@ -190,4 +190,7 @@ authoring and accent conversion remain **Cataloged**; CRC testing is **Web**
 | Gera CNV a partir dos campos / Numera CNV | **Web** — uma categoria por código existente; renumeração mantém subtotais. |
 | Regressão: coluna de estimados | **Web** — Nova coluna por expressão (intercepto + inclinação × X). |
 | Histograma: intervalos iguais / igual freqüência | **Web** — "Manual" (limites digitados) não reproduzido. |
-| Notas técnicas, colar tabela, `.LST` | **Cataloged** |
+| Salvar como TAB / PRN / SQL | **Web, byte a byte** — iguais aos arquivos que o TabWin 4.15 gravou (`fixtures/oracle/tabwin-salvar-como`); o `.TAB` do TabSis abre no TabWin. CNV/SPRING exigem linhas com chave; DBF não gravou no TabWin. |
+| Colar tabela | **Web** — TSV com títulos e nomes; milhar/decimal pt-BR e inglês. |
+| Notas técnicas | **Web** — linha, coluna ou célula; até 32; receita e tabela salva; rodapé impresso. O `.TAB` não leva as notas (formato não capturado). |
+| `.LST` | **Cataloged** |

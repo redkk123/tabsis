@@ -362,6 +362,9 @@ manual do curso TabWin de fev/2011):
 | … → Gera CNV / Numera CNV | Editor de CNV → **Gerar do campo** / **Numerar**. |
 | Estatísticas → Regressão linear (coluna estimada) | Estatística → Regressão → "Inserir coluna com os valores estimados". |
 | Estatísticas → Histograma → Igual freqüência | Estatística → Histograma → Tipo de classe. |
+| Arquivo → Salvar como (Tabela do TabWin, Texto, SQL) | Botões **TAB**, **PRN** e **SQL** no topo da tabela. O `.TAB` abre no TabWin. |
+| Editar → Colar | "Análises e tabelas salvas" → **Colar tabela**. |
+| Botão direito → nota técnica | Botão direito na linha, coluna ou célula. |
 
 Valores negativos aparecem em vermelho, como no TabWin.
 

@@ -836,6 +836,37 @@ test('do Help do TabWin: Gerar DEF, Gerar CNV do campo, Numerar, igual freqüên
   await expect(page.locator('.histogram-row').first()).toBeVisible();
 });
 
+test('colar tabela, nota técnica com o botão direito e .TAB que o TabWin abre', async ({ page }) => {
+  await page.goto('/');
+  await openSidebarGroup(page, 'saved');
+  await page.locator('#paste-table-button').click();
+  await page.locator('#paste-table-text').fill('Sexo\tFreqüência\tValor Total\nMasculino\t1.761\t2.077.684,41\nFeminino\t2.554\t2.230.388,35\nTotal\t4.315\t4.308.072,76');
+  await page.locator('#paste-table-open').click();
+  const tabela = page.locator('#result-table');
+  await expect(tabela.locator('tbody')).toContainText('Masculino');
+  await expect(tabela.locator('tfoot')).toContainText('4.315');
+
+  // Nota técnica na célula Feminino × Valor Total.
+  const celula = tabela.locator('tbody tr', { hasText: 'Feminino' }).locator('td').nth(1);
+  await celula.click({ button: 'right' });
+  await expect(page.locator('#note-dialog')).toBeVisible();
+  await page.locator('#note-text').fill('Valores de janeiro, sem as AIH rejeitadas');
+  await page.locator('#note-form button[type=submit]').click();
+  await expect(celula).toHaveClass(/has-note/);
+  await expect(tabela.locator('tfoot')).toContainText('Nota técnica — Feminino × Valor Total: Valores de janeiro');
+
+  // .TAB do TabWin: Windows-1252, ";" e vírgula decimal, linha Total no fim.
+  const download = page.waitForEvent('download');
+  await page.locator('#export-tab-button').click();
+  const arquivo = await download;
+  expect(arquivo.suggestedFilename()).toMatch(/\.tab$/);
+  const bytes = await (await import('node:fs/promises')).readFile(await arquivo.path());
+  const texto = new TextDecoder('windows-1252').decode(bytes);
+  expect(texto.startsWith('NEW\r\n')).toBe(true);
+  expect(texto).toContain('"Feminino";2554;2230388,35\r\n');
+  expect(texto).toContain('"Total";4315;4308072,76\r\n');
+});
+
 test('the transform pipeline computes a new field with the same formula language, over records', async ({ page }) => {
   await page.goto('/');
   await page.locator('#file-input').setInputFiles('e2e/fixtures/investigate-e2e.csv');

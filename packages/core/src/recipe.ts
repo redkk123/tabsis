@@ -1,5 +1,6 @@
 import { validateAxisBounds } from './axis-bounds.js';
-import type { QueryPlan, SourceFingerprint, TableOperation, TabulationSpec } from './model.js';
+import type { QueryPlan, SourceFingerprint, TableOperation, TabulationSpec, TechnicalNote } from './model.js';
+import { validateTechnicalNotes } from './model.js';
 import { compileQueryPlan } from './plan.js';
 
 export interface ConversionFingerprint {
@@ -117,6 +118,7 @@ export interface AnalysisRecipeV1 {
     tableTitle?: string;
     tableSubtitle?: string;
     tableFooter?: string;
+    tableNotes?: TechnicalNote[];
   };
 }
 
@@ -374,6 +376,7 @@ export function parseRecipe(json: string): AnalysisRecipeV1 {
       throw new Error(`invalid table ${name} in TabSis recipe`);
     }
   }
+  if (parsed.view?.tableNotes !== undefined) validateTechnicalNotes(parsed.view.tableNotes, 'TabSis recipe');
   return parsed as AnalysisRecipeV1;
 }
 

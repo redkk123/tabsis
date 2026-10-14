@@ -95,9 +95,17 @@ Do Help do TabWin v2 (versão impressa, Vigilância em Saúde de MG):
 - [x] Regressão linear: botão que insere a coluna de valores estimados.
 - [x] Histograma com classes de **igual freqüência**, além de intervalos
       iguais (fica na receita).
-- [ ] Notas técnicas em linha/coluna/célula; colar tabela da área de
-      transferência; arquivo `.LST` (lista de arquivos com PAUSE, pensado para
-      troca de CD-ROM — no navegador os arquivos já são escolhidos à mão).
+- [x] **Salvar como TAB, PRN e SQL**, iguais byte a byte aos que o TabWin
+      grava; o `.TAB` do TabSis abre no TabWin 4.15 (com log e "Restaurar
+      consulta") — tela em `docs/reverse-engineering/telas/17-…`.
+- [x] **Colar tabela** (TSV do TabSis, do TabWin ou de planilha; milhar e
+      decimal pt-BR ou inglês).
+- [x] **Notas técnicas**: botão direito em linha, coluna ou célula; marca
+      vermelha, texto ao passar o mouse, rodapé impresso; até 32; ficam na
+      receita e na tabela salva.
+- [ ] Arquivo `.LST` (lista de arquivos com PAUSE, pensado para troca de
+      CD-ROM — no navegador os arquivos já são escolhidos à mão). Salvar como
+      CNV/SPRING (exigem linhas com código) e DBF (o TabWin não gravou).
 - [ ] Comprimir DBF → DBC (o TabWin comprime; o TabSis só expande).
 
 Próximos passos sugeridos para a tabulação:
