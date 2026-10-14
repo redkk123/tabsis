@@ -2,14 +2,14 @@
   "schema": "tabwin-web.mirror",
   "version": 1,
   "baseUrl": "https://pub-41df939070d7465a8513416a16be8f88.r2.dev",
-  "updatedAt": "2026-10-14T06:35:04.543Z",
+  "updatedAt": "2026-10-14T23:25:58.046Z",
   "entries": [
     {
       "name": "DNBR2023.dbc",
       "path": "sinasc/DNBR2023.dbc",
       "sha256": "6fd6070d5effbdc87f9a3118c66507febc3aaaddf13d3ad648e7c8357abf83a9",
       "bytes": 125549172,
-      "fetchedAt": "2026-10-14T06:34:47.805Z",
+      "fetchedAt": "2026-10-14T23:25:40.609Z",
       "source": "ftp://ftp.datasus.gov.br/dissemin/publicos/SINASC/1996_/Dados/DNRES/DNBR2023.dbc",
       "parquet": {
         "path": "sinasc/DNBR2023.parquet",
@@ -24,7 +24,7 @@
       "path": "sinasc/DNBR2024.dbc",
       "sha256": "5c45cc4b1952d3c0095b200d71541b861d4856e45ac041e2a55dded0ebc3f82c",
       "bytes": 117643243,
-      "fetchedAt": "2026-10-14T06:28:06.017Z",
+      "fetchedAt": "2026-10-14T23:19:02.789Z",
       "source": "ftp://ftp.datasus.gov.br/dissemin/publicos/SINASC/1996_/Dados/DNRES/DNBR2024.dbc",
       "parquet": {
         "path": "sinasc/DNBR2024.parquet",
@@ -39,7 +39,7 @@
       "path": "sim/DOINF23.dbc",
       "sha256": "8634319e3555cfd4d88f6c544160b4947ed7c69d54705fd15400d9d5a8c3b0c9",
       "bytes": 3524627,
-      "fetchedAt": "2026-10-14T06:35:04.541Z",
+      "fetchedAt": "2026-10-14T23:25:58.046Z",
       "source": "ftp://ftp.datasus.gov.br/dissemin/publicos/SIM/CID10/DOFET/DOINF23.dbc",
       "parquet": {
         "path": "sim/DOINF23.parquet",

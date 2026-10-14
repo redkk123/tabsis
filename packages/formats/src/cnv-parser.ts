@@ -206,6 +206,7 @@ function parseRuleLine(
     categorySequence: sequence,
     exactCodes,
     ranges,
+    ...(mode === 'short' ? { shortArea: codesArea.replace(/[\r\n]+$/, '') } : {}),
     ...(literal && literalTokens.length ? { literalTokens } : {}),
     ...(numericUpperInclusive !== undefined ? { numericUpperInclusive } : {}),
     sourceOrder,

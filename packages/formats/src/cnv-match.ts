@@ -12,29 +12,67 @@ function matchesRule(code: string, rule: CnvRuleLine): boolean {
 
 /**
  * Índice de um código curto (até 4 posições), como o TabWin 4.15 calcula —
- * medido no programa real com DBFs e CNVs de teste (RE-003):
+ * decompilado (CnvIndiceCurto, 0x476c24; RE-004) e medido (RE-003 T1–T4,
+ * RE-004 H e I):
  *
- * - o código tem sempre `codeLength` caracteres; o que falta à direita é
- *   espaço, como no campo de largura fixa do DBF;
- * - 1ª posição: dígito vale ele mesmo; qualquer outro caractere vale os 5 bits
- *   baixos do código ASCII — `A`/`a` = 1 … `I` = 9, `J` = 10 … `Z` = 26, `@` e
- *   espaço = 0. Por isso `A01` e `101` são o mesmo código, e `J01` não colide
- *   com nenhum código numérico;
- * - demais posições: dígito vale ele mesmo, qualquer outra coisa vale 0
- *   (`1A1`, `1 1` e `101` são o mesmo código; campo em branco é `000`).
+ * 1. se o primeiro caractere é espaço, todo espaço vira 0 (" 5 " → "050");
+ * 2. se o primeiro caractere é letra (ou [ \\ ] ^ _ `), ele vale a posição
+ *    dela (A/a = 1 … Z/z = 26) vezes 10^(resto) e sai da frente: `A01` = 101;
+ * 3. o resto passa pelo `Val` do Delphi (aceita espaços na frente e sinal);
+ *    se falhar, todo não-dígito vira 0 e tenta de novo (`1A1` = 101,
+ *    `*50` = 50, `-` = 0, `---` = 0).
  *
- * O Help do TabWin diz "A a J valem 0 a 9"; o programa faz A = 1 e aceita
- * letras além do J. Vale o que o programa faz.
+ * O texto tem o tamanho que o TabWin leu: o campo inteiro, com os espaços do
+ * fim, ou o pedaço da lista de códigos da CNV (que pode ser mais curto no fim
+ * da linha). `-50` dá −50, índice que não existe — como no TabWin.
  */
 export function shortCodeIndex(code: string, codeLength: number): number {
-  const padded = code.slice(0, codeLength).padEnd(codeLength, ' ');
-  let index = 0;
-  for (let position = 0; position < codeLength; position++) {
-    const char = padded.charCodeAt(position);
-    const digit = char >= 0x30 && char <= 0x39 ? char - 0x30 : position === 0 ? char & 0x1f : 0;
-    index = index * 10 + digit;
+  let texto = code.length > codeLength ? code.slice(0, codeLength) : code;
+  if (texto.length && texto[0] === ' ') texto = texto.replace(/ /g, '0');
+  let frente = 0;
+  const primeiro = texto.charCodeAt(0);
+  if (texto.length && primeiro >= 0x41 && primeiro <= 0x7a) {
+    const maiuscula = primeiro >= 0x61 ? primeiro - 0x20 : primeiro;
+    frente = (maiuscula - 0x40) * 10 ** (texto.length - 1);
+    texto = texto.slice(1);
   }
-  return index;
+  let valor = valDelphi(texto);
+  if (valor === undefined) valor = valDelphi(texto.replace(/[^0-9]/g, '0')) ?? 0;
+  return frente + valor;
+}
+
+/** `Val` do Delphi para inteiro: espaços na frente, sinal, `$` hexadecimal; nada depois. */
+function valDelphi(texto: string): number | undefined {
+  const achado = /^ *([+-]?)(\$[0-9a-fA-F]+|[0-9]+)$/.exec(texto);
+  if (!achado) return undefined;
+  const numero = achado[2]!.startsWith('$') ? parseInt(achado[2]!.slice(1), 16) : parseInt(achado[2]!, 10);
+  return achado[1] === '-' ? -numero : numero;
+}
+
+/**
+ * A lista de códigos de uma linha da CNV curta, lida como o TabWin lê
+ * (CnvCarrega, 0x47737c): de `codeLength` em `codeLength` caracteres; um
+ * código só vale se depois dele vem vírgula, espaço ou o fim; hífen abre uma
+ * faixa; vírgula avança; **espaço encerra a lista** — por isso "050, 300" só
+ * registra o 050 (RE-004, teste I). Linha sem código nenhum registra o
+ * índice 0, o branco.
+ */
+function lerAreaCurta(area: string, length: number, registrar: (de: number, ate: number) => void): void {
+  const n = area.length;
+  const em = (posicao: number): string => area[posicao - 1] ?? '';
+  let pos = 1;
+  do {
+    const de = shortCodeIndex(area.slice(pos - 1, pos - 1 + length), length);
+    pos += length;
+    if (em(pos) === ',' || em(pos) === ' ' || n < pos) registrar(de, de);
+    if (pos < n && em(pos) === '-') {
+      pos += 1;
+      const ate = shortCodeIndex(area.slice(pos - 1, pos - 1 + length), length);
+      pos += length;
+      if (de <= ate) registrar(de, ate);
+    }
+    if (em(pos) === ',') pos += 1;
+  } while (em(pos) !== ' ' && pos <= n);
 }
 
 /** Tabela índice → posição da categoria, montada uma vez por CNV curta. */
@@ -44,7 +82,7 @@ function shortTable(definition: CnvDefinition): { table: Int32Array; categories:
   const cached = shortTables.get(definition);
   if (cached) return cached;
   const length = definition.codeLength;
-  const table = new Int32Array(32 * 10 ** (length - 1)).fill(-1);
+  const table = new Int32Array(33 * 10 ** (length - 1)).fill(-1);
   const categories = new Map<number, number>();
   definition.categories.forEach((category, position) => {
     if (!categories.has(category.sequence)) categories.set(category.sequence, position);
@@ -55,10 +93,15 @@ function shortTable(definition: CnvDefinition): { table: Int32Array; categories:
   for (const rule of rules) {
     const position = categories.get(rule.categorySequence);
     if (position === undefined) continue;
-    // "----" é o marcador das linhas-título, sem código: para o TabWin o hífen
-    // separa faixa, então isso não é código (RE-003). Com espaços antes
-    // ("    -zzzz") o parser já fez dele uma faixa a partir do branco (RE-004);
-    // o hífen colado só pegaria o registro em branco, o que fica de fora.
+    if (rule.shortArea !== undefined) {
+      // Como o TabWin: a área crua da linha, lida pelo mesmo laço.
+      lerAreaCurta(rule.shortArea, length, (de, ate) => {
+        for (let index = Math.max(de, 0); index <= ate && index < table.length; index++) table[index] = position;
+      });
+      continue;
+    }
+    // Definição montada sem a área crua (editor, testes antigos): usa os
+    // códigos e faixas já separados — uma aproximação da leitura acima.
     for (const code of rule.exactCodes) if (!code.startsWith('-')) table[shortCodeIndex(code, length)] = position;
     for (const range of rule.ranges) {
       // Início " " é o branco ("    -zzzz"; RE-004); ponta vazia não é faixa.
@@ -181,7 +224,9 @@ export function classifyCnv(definition: CnvDefinition, raw: unknown, options: Cl
 
   if (definition.mode === 'short' && (options.textual ?? true) && typeof raw !== 'number' && raw !== undefined) {
     const { table } = shortTable(definition);
-    const position = table[shortCodeIndex(raw === null ? '' : String(raw), definition.codeLength)] ?? -1;
+    // O dado tem a largura fixa do campo: o que falta à direita é espaço.
+    const texto = (raw === null ? '' : String(raw)).padEnd(definition.codeLength, ' ');
+    const position = table[shortCodeIndex(texto, definition.codeLength)] ?? -1;
     if (position < 0) return undefined;
     const category = definition.categories[position]!;
     return { sequence: category.sequence, label: category.label };

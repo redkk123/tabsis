@@ -152,8 +152,8 @@ Básica têm `----` no lugar dos códigos. Lido como código curto, `-` vale 13 
 hífen é separador de faixa: código que começa com hífen, ou faixa com uma ponta
 vazia, é ignorado. (Refinado no [RE-004](./RE_004_LOOKUP_ORDEM_CNES.md): o
 `M000` nem cabe na tabela de 4 posições; espaços antes do hífen, como em
-`    -zzzz`, fazem uma faixa a partir do branco; e o hífen colado pega o
-registro em branco, o que o TabSis ainda não reproduz.)
+`    -zzzz`, fazem uma faixa a partir do branco; e a leitura da lista foi
+decompilada — o hífen vale 0, não 13, e `----` registra o branco.)
 
 E a parte que o teste anterior previu se confirmou: CID de 3 caracteres
 (`N39 `) numa CNV de 4 é lido com o espaço valendo 0 (`N390`) e cai na
