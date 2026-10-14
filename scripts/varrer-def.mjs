@@ -1,3 +1,12 @@
+/**
+ * Varredura de um DEF oficial: para cada variável com CNV, compara a leitura
+ * por texto (a antiga) com a do motor atual (código curto como número, branco,
+ * campos atravessados) num arquivo de dados, e lista onde dão categorias
+ * diferentes. É o que aponta quais variáveis vale tabular no TabWin para
+ * conferir (RE-003: SIH, SIM, SINASC).
+ *
+ * Uso (depois de npm run build): node scripts/varrer-def.mjs <arquivo.def> <pasta das CNV> <dados.dbc>
+ */
 import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { dbcToDbf, readDbfHeader, readDbfRecords } from '@precisa-saude/datasus-dbc';

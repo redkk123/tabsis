@@ -204,7 +204,7 @@ do rótulo.
 Pacotes auxiliares oficiais `OBITOS_CID10_TAB.zip` e `NASC_NOV_TAB.zip` e
 dados do Acre (`DOAC2024.dbc`, 4.267 óbitos; `DNAC2022.dbc`, 14.483 nascidos
 vivos), todos de `ftp.datasus.gov.br/dissemin/publicos`. Uma varredura de todas
-as variáveis dos DEFs oficiais apontou onde a leitura antiga e a atual
+as variáveis dos DEFs oficiais (`scripts/varrer-def.mjs`) apontou onde a leitura antiga e a atual
 divergiam; essas variáveis foram tabuladas no TabWin e salvas como `.TAB`
 (`fixtures/oracle/re003-sim-sinasc`, `npm run verify:sim-sinasc -- <pasta SIM>
 <pasta SINASC>`). Começou em 10/16 e terminou em **16/16**, depois de quatro
