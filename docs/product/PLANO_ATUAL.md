@@ -45,9 +45,8 @@ Publicação (2026-10-14):
       DNBR2023 119,7 → 56,5 MB, DOINF23 3,4 → 1,6 MB; paridade conferida antes
       de cada envio e hashes publicados conferidos byte a byte.
 - [x] PR redkk123/tabsis#2.
-- [ ] `datasus-dbc`: os 4 commits do bundle foram trazidos para cima da 2.0.4
-      (63/63 testes), mas o fork público para abrir o PR não foi criado —
-      fica para o dono decidir.
+- [x] `datasus-dbc`: os 4 commits trazidos para cima da 2.0.4 (63/63 testes);
+      PR Precisa-Saude/datasus-dbc#27 aberto pelo Red, esperando o mantenedor.
 
 Funções do TabWin acrescentadas depois (2026-10-14), todas tiradas do
 binário com o rea:
@@ -60,8 +59,22 @@ binário com o rea:
 - [x] **Salvar registros** no painel.
 - [x] **Acentuação do DOS**: DBF em CP850 é detectado pelo conteúdo e lido
       com os acentos certos (HUF_MEC.dbf e HUF_FILIAL.dbf do TAB_SIH são CP850).
-- [ ] "Fixar comprimento da chave": a rotina só guarda um número; o uso está
-      em outra função, ainda não lida.
+- [x] "Fixar comprimento da chave": o manual do curso explicou o uso (Incluir
+      tabela comparando só os N primeiros caracteres do código).
+
+Do manual do curso TabWin (SESAP-RN/COSEMS-RN, fev/2011), que o Red mandou:
+
+- [x] Somar / Menor / Maior de várias colunas; títulos que o TabWin sugere
+      (Soma, Diferença, Produto, Quociente, A., Abs., Int., Seqüência…).
+- [x] Produto e Quociente com total pré-calculado (a conta feita nos totais).
+- [x] Tipo de total em qualquer coluna, Recalcula total, Pré-calculado congela.
+- [x] Casas decimais por coluna; "Percentagem=c2/c1*100,00" fixa 2 casas;
+      "Título=c2/c1" em Nova coluna.
+- [x] Clique no título da coluna ordena (maior→menor, depois menor→maior);
+      Seqüência depois de ordenar numera as "n" maiores.
+- [x] Suprimir/agregar linhas por critério (igual/maior/menor/diferente) com
+      a linha "Outras"; negativos em vermelho.
+- [ ] Largura de coluna (o navegador ajusta sozinho) e salvar em PRN/SPR/SQL.
 - [ ] Comprimir DBF → DBC (o TabWin comprime; o TabSis só expande).
 
 Próximos passos sugeridos para a tabulação:

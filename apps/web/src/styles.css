@@ -860,6 +860,11 @@ dialog p { color: #676d74; font-size: 13px; line-height: 1.6; }
    por RDAC2401.DBC, que não é o nome que a pessoa baixou. */
 #result-kicker { text-transform: none; letter-spacing: .01em; }
 #result-table .row-total { font-weight: 700; background: var(--surface-2); }
+#result-table tbody td.negative { color: var(--danger); }
+#result-table thead th.sortable { cursor: pointer; user-select: none; }
+#result-table thead th.sortable:hover { text-decoration: underline; }
+#result-table thead th[aria-sort="descending"]::after { content: " ▼"; font-size: .75em; }
+#result-table thead th[aria-sort="ascending"]::after { content: " ▲"; font-size: .75em; }
 .table-tools { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
 .table-tool { border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
 .table-tool > summary { padding: 10px 13px; cursor: pointer; color: var(--ink); font-weight: 600; }

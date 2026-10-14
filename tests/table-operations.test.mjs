@@ -200,3 +200,125 @@ test('Calcular indicador: A × escala ÷ B por linha, zero com B zero, e o total
   // 63 × 100.000 ÷ 8.900.000, e não a soma das taxas.
   assert.equal(Number(coluna.precalculatedTotal.toFixed(6)), Number((63 * 1e5 / 8_900_000).toFixed(6)));
 });
+
+test('Fixar comprimento da chave: o código IBGE de 7 dígitos do TabNet casa com o de 6 do TabWin', async () => {
+  const { applyTableOperation, createIncludeTableOperation } = await import('../dist/packages/analysis/src/table-operations.js');
+  const tabwin = {
+    rows: [{ key: '120040', label: 'Rio Branco', source: 'raw' }, { key: '120020', label: 'Cruzeiro do Sul', source: 'raw' }],
+    columns: [{ key: 'C', label: 'Internações', source: 'raw' }], cells: [[1789], [546]],
+    warnings: [], recordsSeen: 2335, recordsAccepted: 2335,
+  };
+  const tabnet = {
+    rows: [{ key: '1200203', label: 'CRUZEIRO DO SUL', source: 'raw' }, { key: '1200401', label: 'RIO BRANCO', source: 'raw' }],
+    columns: [{ key: 'P', label: 'População', source: 'raw' }], cells: [[91888], [364756]],
+    warnings: [], recordsSeen: 0, recordsAccepted: 0,
+  };
+  assert.throws(() => applyTableOperation(tabwin, createIncludeTableOperation(tabwin, tabnet, 'TabNet')), /exactly match/);
+  const r = applyTableOperation(tabwin, createIncludeTableOperation(tabwin, tabnet, 'TabNet', { keyLength: 6 })).result;
+  assert.deepEqual(r.cells, [[1789, 364756], [546, 91888]]);
+});
+
+// Manual do curso TabWin (SESAP-RN/COSEMS-RN, fev/2011), p. 49–58: Somar,
+// Mínimo e Máximo de várias colunas, total de Produto/Quociente, Tipo de
+// total, Recalcula total, Decimais e Seqüência depois de ordenar.
+test('Soma, Menor e Maior de várias colunas; a soma não conta a linha excluída do total', async () => {
+  const { applyTableOperation, calculateColumnTotal } = await import('../dist/packages/analysis/src/table-operations.js');
+  const coluna = (operator) => applyTableOperation(base, {
+    kind: 'aggregate-columns', operator, columnKeys: ['x', 'y'], output: output(operator),
+  }).result;
+  assert.deepEqual(coluna('add').cells.map((row) => row[2]), [12, -5, 7]);
+  assert.deepEqual(coluna('minimum').cells.map((row) => row[2]), [2, -5, 3]);
+  assert.deepEqual(coluna('maximum').cells.map((row) => row[2]), [10, 0, 4]);
+  assert.equal(calculateColumnTotal(coluna('add'), 'add'), 19);
+  assert.throws(() => applyTableOperation(base, {
+    kind: 'aggregate-columns', operator: 'add', columnKeys: ['x'], output: output('s'),
+  }), /at least two/);
+});
+
+test('Produto e Quociente: o total pré-calculado é a conta feita nos totais, e encadeia', async () => {
+  const { applyTableOperation, displayedColumnTotal } = await import('../dist/packages/analysis/src/table-operations.js');
+  const produto = applyTableOperation(base, {
+    kind: 'binary', operator: 'multiply', leftColumnKey: 'x', rightColumnKey: 'y',
+    divisionByZero: 'error', output: output('p', 'Produto', 'precalculated'),
+  }).result;
+  // 13 × 6, não a soma dos produtos (20 + 12 = 32).
+  assert.equal(displayedColumnTotal(produto, 'p'), 78);
+  const quociente = applyTableOperation(base, {
+    kind: 'binary', operator: 'divide', leftColumnKey: 'x', rightColumnKey: 'y',
+    divisionByZero: 'zero', output: output('q', 'Quociente', 'precalculated'),
+  }).result;
+  assert.equal(displayedColumnTotal(quociente, 'q'), 13 / 6);
+  const deNovo = applyTableOperation(quociente, {
+    kind: 'binary', operator: 'divide', leftColumnKey: 'q', rightColumnKey: 'x',
+    divisionByZero: 'zero', output: output('qq', 'Quociente', 'precalculated'),
+  }).result;
+  assert.equal(displayedColumnTotal(deNovo, 'qq'), (13 / 6) / 13);
+  assert.throws(() => applyTableOperation(base, {
+    kind: 'binary', operator: 'add', leftColumnKey: 'x', rightColumnKey: 'y',
+    divisionByZero: 'error', output: output('s', 'Soma', 'precalculated'),
+  }), /precalculated total is only defined/);
+});
+
+test('Tipo de total e Recalcula total: Pré-calculado congela; Soma volta a somar', async () => {
+  const { applyTableOperation, displayedColumnTotal, replayTableOperations } = await import('../dist/packages/analysis/src/table-operations.js');
+  const media = applyTableOperation(base, { kind: 'set-total-policy', columnKeys: ['x'], totalPolicy: 'mean' }).result;
+  assert.equal(displayedColumnTotal(media, 'x'), 6.5);
+  const congelado = replayTableOperations(base, [
+    { kind: 'set-total-policy', columnKeys: ['x', 'y'], totalPolicy: 'precalculated' },
+    { kind: 'suppress-rows', rowKeys: ['a'] },
+  ]);
+  assert.equal(displayedColumnTotal(congelado, 'x'), 13);
+  assert.equal(displayedColumnTotal(congelado, 'y'), 6);
+  const recalculado = applyTableOperation(congelado, { kind: 'set-total-policy', columnKeys: ['x'], totalPolicy: 'sum' }).result;
+  assert.equal(displayedColumnTotal(recalculado, 'x'), 3);
+  assert.equal(recalculado.columns[0].precalculatedTotal, undefined);
+  assert.throws(() => applyTableOperation(base, { kind: 'set-total-policy', columnKeys: [], totalPolicy: 'sum' }), /at least one/);
+});
+
+test('Decimais por coluna: na nova coluna e depois, em qualquer coluna', async () => {
+  const { applyTableOperation } = await import('../dist/packages/analysis/src/table-operations.js');
+  const pct = applyTableOperation(base, {
+    kind: 'expression', expression: 'c2/c1*100', divisionByZero: 'zero',
+    output: { ...output('pct', 'Percentagem'), decimals: 2 },
+  }).result;
+  assert.equal(pct.columns.at(-1).decimals, 2);
+  const fixada = applyTableOperation(pct, { kind: 'set-decimals', columnKeys: ['x'], decimals: 1 }).result;
+  assert.equal(fixada.columns[0].decimals, 1);
+  const solta = applyTableOperation(fixada, { kind: 'set-decimals', columnKeys: ['x'], decimals: null }).result;
+  assert.equal('decimals' in solta.columns[0], false);
+  assert.throws(() => applyTableOperation(base, { kind: 'set-decimals', columnKeys: ['x'], decimals: 11 }), /0 to 10/);
+  assert.throws(() => applyTableOperation(base, {
+    kind: 'constant', value: 1, output: { ...output('k'), decimals: 1.5 },
+  }), /0 to 10/);
+});
+
+test('Seqüência depois de ordenar numera pela posição na ordem (as "n" maiores)', async () => {
+  const { applyTableOperation } = await import('../dist/packages/analysis/src/table-operations.js');
+  const maiores = applyTableOperation(base, {
+    kind: 'sequence', start: 1, step: 1, order: { columnKey: 'x', direction: 'descending' }, output: output('seq', 'Seqüência'),
+  }).result;
+  assert.deepEqual(maiores.cells.map((row) => row[2]), [1, 3, 2]);
+  const menores = applyTableOperation(base, {
+    kind: 'sequence', start: 1, step: 1, order: { columnKey: 'x', direction: 'ascending' }, output: output('seq', 'Seqüência'),
+  }).result;
+  assert.deepEqual(menores.cells.map((row) => row[2]), [3, 1, 2]);
+});
+
+test('a receita aceita as operações novas e recusa as malformadas', async () => {
+  const { validateTableOperation } = await import('../dist/packages/core/src/recipe.js');
+  for (const operation of [
+    { kind: 'set-total-policy', columnKeys: ['x'], totalPolicy: 'precalculated' },
+    { kind: 'set-decimals', columnKeys: ['x'], decimals: null },
+    { kind: 'set-decimals', columnKeys: ['x'], decimals: 2 },
+    { kind: 'aggregate-columns', operator: 'maximum', columnKeys: ['x', 'y'], output: output('m', 'Maior') },
+    { kind: 'sequence', start: 1, step: 1, order: { columnKey: 'x', direction: 'descending' }, output: output('s') },
+    { kind: 'constant', value: 1, output: { ...output('k'), decimals: 3 } },
+  ]) validateTableOperation(operation);
+  for (const operation of [
+    { kind: 'set-total-policy', columnKeys: ['x'], totalPolicy: 'average' },
+    { kind: 'set-decimals', columnKeys: [], decimals: 2 },
+    { kind: 'set-decimals', columnKeys: ['x'], decimals: -1 },
+    { kind: 'sequence', start: 1, step: 1, order: { columnKey: 'x', direction: 'sideways' }, output: output('s') },
+    { kind: 'constant', value: 1, output: { ...output('k'), decimals: 'dois' } },
+  ]) assert.throws(() => validateTableOperation(operation), /invalid/);
+});

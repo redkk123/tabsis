@@ -735,6 +735,56 @@ test('Excel-style formulas compute a derived column, and the advertised function
   await expect(table).not.toContainText('Proibida');
 });
 
+test('como no TabWin: clique no título ordena, Seqüência segue a ordem, "…*100,00" fixa casas e o Tipo de total muda o total', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#file-input').setInputFiles('e2e/fixtures/investigate-e2e.csv');
+  await expect(page.locator('#run-button')).toBeEnabled();
+  await page.locator('#row-field').selectOption('MUNIC');
+  await page.locator('#analysis-form').evaluate((form: HTMLFormElement) => form.requestSubmit());
+  await expect(page.locator('#result-table tbody')).toContainText('M007');
+
+  const numero = (texto: string): number => Number(texto.replace(/\./g, '').replace(',', '.'));
+  const coluna = async (indice: number): Promise<number[]> => (await page.locator(`#result-table tbody tr td:nth-of-type(${indice})`).allTextContents())
+    .filter((texto) => texto.trim()).map(numero);
+  const titulo = page.locator('#result-table thead th', { hasText: 'Frequência' });
+
+  // Primeiro clique: do maior para o menor; segundo: do menor para o maior.
+  await titulo.click();
+  await expect(titulo).toHaveAttribute('aria-sort', 'descending');
+  const desc = await coluna(1);
+  expect(desc).toEqual([...desc].sort((a, b) => b - a));
+  await titulo.click();
+  await expect(titulo).toHaveAttribute('aria-sort', 'ascending');
+  const asc = await coluna(1);
+  expect(asc).toEqual([...asc].sort((a, b) => a - b));
+
+  // Seqüência depois de ordenar: a primeira linha mostrada é a 1.
+  await titulo.click();
+  await page.locator('#table-operation-kind').selectOption('sequence');
+  await page.locator('#table-operation-number').fill('1');
+  await page.locator('#table-operation-apply').click();
+  await expect(page.locator('#result-table thead')).toContainText('Seqüência');
+  expect((await coluna(2))[0]).toBe(1);
+
+  // "Título=conta" com ",00" no fim: duas casas decimais nessa coluna.
+  await page.locator('#table-operation-kind').selectOption('expression');
+  await page.locator('#table-operation-expression').fill('Percentagem=c1/c1*100,00');
+  await page.locator('#table-operation-apply').click();
+  await expect(page.locator('#result-table thead')).toContainText('Percentagem');
+  await expect(page.locator('#result-table tbody tr').first().locator('td').nth(2)).toHaveText('100,00');
+
+  // Tipo de total → Média; Recalcular total volta à soma.
+  const total = page.locator('#result-table tfoot tr').first().locator('td').first();
+  const soma = numero((await total.textContent()) ?? '');
+  await page.locator('#table-edit-column').selectOption({ label: 'Frequência' });
+  await page.locator('#table-column-total').selectOption('mean');
+  await page.locator('#table-column-total-apply').click();
+  await expect(total).not.toHaveText(String(soma));
+  expect(numero((await total.textContent()) ?? '')).toBeCloseTo(soma / desc.length, 0);
+  await page.locator('#table-column-recalculate').click();
+  expect(numero((await total.textContent()) ?? '')).toBe(soma);
+});
+
 test('the transform pipeline computes a new field with the same formula language, over records', async ({ page }) => {
   await page.goto('/');
   await page.locator('#file-input').setInputFiles('e2e/fixtures/investigate-e2e.csv');

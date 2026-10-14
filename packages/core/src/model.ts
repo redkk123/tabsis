@@ -163,6 +163,8 @@ export interface ResultAxisItem {
   totalPolicy?: TotalPolicy;
   /** The total shown when `totalPolicy` is `precalculated` (TabWin "Pré Calculado"). */
   precalculatedTotal?: number;
+  /** Fixed decimal places for this column (TabWin "Quadro → Decimais"); absent = the table setting. */
+  decimals?: number;
 }
 
 export interface TabulationResult {
@@ -180,7 +182,18 @@ export interface TabulationResult {
 export interface DerivedColumnSpec {
   key: string;
   label: string;
-  totalPolicy: Exclude<TotalPolicy, 'precalculated'>;
+  /**
+   * `precalculated` only for binary multiply/divide/percentage: the total is
+   * the same operation applied to the column totals — what TabWin shows for
+   * "Produto" and "Quociente" (manual do curso TabWin, fev/2011, p. 50).
+   */
+  totalPolicy: TotalPolicy;
+  /**
+   * Decimal places shown for the new column: the "Casas decimais" of TabWin's
+   * Calcular indicador, or the ",00" of "Percentagem=c2/c1*100,00" in Nova
+   * coluna (manual do curso TabWin, fev/2011, p. 48 and 55–56).
+   */
+  decimals?: number;
 }
 
 export type TableOperation =
@@ -211,6 +224,17 @@ export type TableOperation =
        */
       kind: 'percent-of-total';
       sourceColumnKey: string;
+      output: DerivedColumnSpec;
+    }
+  | {
+      /**
+       * TabWin "Somar", "Mínimo" and "Máximo" over two or more columns at once
+       * (TabWin titles: "Soma", "Menor", "Maior"). The sum's total is the sum
+       * of the column totals.
+       */
+      kind: 'aggregate-columns';
+      operator: 'add' | 'minimum' | 'maximum';
+      columnKeys: string[];
       output: DerivedColumnSpec;
     }
   | {
@@ -253,6 +277,13 @@ export type TableOperation =
       kind: 'sequence';
       start: number;
       step: number;
+      /**
+       * Number the rows by their rank in this order instead of their position
+       * — TabWin's "clique no cabeçalho, depois Operações → Seqüência", the
+       * way to list the "n" largest categories (manual, p. 54). Ties keep the
+       * row order.
+       */
+      order?: { columnKey: string; direction: 'ascending' | 'descending' };
       output: DerivedColumnSpec;
     }
   | {
@@ -269,12 +300,28 @@ export type TableOperation =
   | { kind: 'rename-column'; columnKey: string; label: string }
   | { kind: 'move-column'; columnKey: string; direction: 'left' | 'right' }
   | { kind: 'delete-column'; columnKey: string }
+  /**
+   * TabWin "Quadro → Tipo de total" (and "Operações → Recalcula total", which
+   * is the same with `sum`). `precalculated` freezes the total each column
+   * shows right now, so later operations no longer change it (manual, p. 54
+   * and 57–58).
+   */
+  | { kind: 'set-total-policy'; columnKeys: string[]; totalPolicy: TotalPolicy }
+  /** TabWin "Quadro → Decimais": fixed places per column; `null` returns to the table setting. */
+  | { kind: 'set-decimals'; columnKeys: string[]; decimals: number | null }
   | { kind: 'transpose' }
   | {
       /** Self-contained, strict row-key join. This is a modern explicit policy until golden-tested. */
       kind: 'include-table';
       sourceLabel: string;
       requireMatchingLabels: boolean;
+      /**
+       * TabWin "Quadro → Fixar comprimento da chave": compare only the first N
+       * characters of each row key, so a TabNet table keyed by the 7-digit IBGE
+       * code joins a TabWin table keyed by the 6-digit one (manual do curso
+       * TabWin, fev/2011, p. 59–60). Absent = whole key.
+       */
+      keyLength?: number;
       rows: Array<Pick<ResultAxisItem, 'key' | 'label'>>;
       columns: ResultAxisItem[];
       cells: number[][];

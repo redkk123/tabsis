@@ -27,6 +27,7 @@ import {
   type TableOperation,
   type TabulationResult,
   type TabulationSpec,
+  type DerivedColumnSpec,
   type TotalPolicy,
   type RecipeTransformStep,
   createPhaseTimings,
@@ -244,6 +245,7 @@ import {
   applyTableOperation,
   calculateColumnTotal,
   createIncludeTableOperation,
+  displayedColumnTotal,
   replayTableOperations,
 } from '../../../packages/analysis/src/table-operations.ts';
 import {
@@ -487,6 +489,8 @@ const includeTableButton = element<HTMLButtonElement>('#include-table-button');
 const saveTableButton = element<HTMLButtonElement>('#save-table-button');
 const tableInput = element<HTMLInputElement>('#table-input');
 const includeTableInput = element<HTMLInputElement>('#include-table-input');
+/** "Fixar comprimento da chave" do TabWin: vazio compara a chave inteira. */
+const tableKeyLength = element<HTMLInputElement>('#table-key-length');
 const startPosition = element<HTMLInputElement>('#start-position');
 const columnStartPosition = element<HTMLInputElement>('#column-start-position');
 const suppressZero = element<HTMLInputElement>('#suppress-zero');
@@ -612,6 +616,15 @@ const tableOperationZeroLabel = element<HTMLElement>('#table-operation-zero-labe
 const tableOperationZero = element<HTMLSelectElement>('#table-operation-zero');
 const tableOperationLabel = element<HTMLInputElement>('#table-operation-label');
 const tableOperationTotal = element<HTMLSelectElement>('#table-operation-total');
+const tableOperationDecimals = element<HTMLSelectElement>('#table-operation-decimals');
+const tableOperationColumnsLabel = element<HTMLElement>('#table-operation-columns-label');
+const tableOperationColumns = element<HTMLSelectElement>('#table-operation-columns');
+const tableCriterionColumn = element<HTMLSelectElement>('#table-criterion-column');
+const tableCriterionOperator = element<HTMLSelectElement>('#table-criterion-operator');
+const tableCriterionValue = element<HTMLInputElement>('#table-criterion-value');
+const tableCriterionAggregate = element<HTMLInputElement>('#table-criterion-aggregate');
+const tableCriterionLabel = element<HTMLInputElement>('#table-criterion-label');
+const tableCriterionApply = element<HTMLButtonElement>('#table-criterion-apply');
 const tableOperationApply = element<HTMLButtonElement>('#table-operation-apply');
 const tableOperationUndo = element<HTMLButtonElement>('#table-operation-undo');
 const tableOperationReset = element<HTMLButtonElement>('#table-operation-reset');
@@ -638,6 +651,11 @@ const tableColumnRename = element<HTMLButtonElement>('#table-column-rename');
 const tableColumnLeft = element<HTMLButtonElement>('#table-column-left');
 const tableColumnRight = element<HTMLButtonElement>('#table-column-right');
 const tableColumnDelete = element<HTMLButtonElement>('#table-column-delete');
+const tableColumnTotal = element<HTMLSelectElement>('#table-column-total');
+const tableColumnTotalApply = element<HTMLButtonElement>('#table-column-total-apply');
+const tableColumnRecalculate = element<HTMLButtonElement>('#table-column-recalculate');
+const tableColumnDecimals = element<HTMLSelectElement>('#table-column-decimals');
+const tableColumnDecimalsApply = element<HTMLButtonElement>('#table-column-decimals-apply');
 const tableAggregateLabel = element<HTMLInputElement>('#table-aggregate-label');
 const tableAggregateRemove = element<HTMLInputElement>('#table-aggregate-remove');
 const tableTranspose = element<HTMLButtonElement>('#table-transpose');
@@ -3658,19 +3676,33 @@ function renderDataQualityOutcomes(): void {
   }
 }
 
+const TOTAL_POLICY_NAMES: Record<TotalPolicy, string> = {
+  none: 'Sem total', sum: 'Soma', product: 'Produto', mean: 'Média', initial: 'Inicial',
+  final: 'Final', min: 'Mínimo', max: 'Máximo', precalculated: 'Pré-calculado',
+};
+
 function operationLabel(operation: TableOperation): string {
   const names: Record<string, string> = {
     add: 'soma', subtract: 'subtração', multiply: 'produto', divide: 'divisão',
     minimum: 'mínimo', maximum: 'máximo', percentage: 'percentual', factor: 'fator',
     cumulative: 'acumulado', absolute: 'absoluto', integer: 'inteiro', sequence: 'sequência', constant: 'constante',
     'percent-of-total': 'percentual do total', normalize: 'normalizar (escore z)', indicator: 'indicador',
+    'aggregate-columns': 'várias colunas',
     expression: 'expressão',
   };
   if (operation.kind === 'rename-column') return `${operation.label} · renomear coluna`;
   if (operation.kind === 'move-column') return `${operation.columnKey} · mover ${operation.direction === 'left' ? 'à esquerda' : 'à direita'}`;
   if (operation.kind === 'delete-column') return `${operation.columnKey} · remover coluna`;
+  if (operation.kind === 'set-total-policy') {
+    return `${operation.columnKeys.join(', ')} · ${operation.totalPolicy === 'sum' ? 'recalcular total (Soma)' : `tipo de total: ${TOTAL_POLICY_NAMES[operation.totalPolicy]}`}`;
+  }
+  if (operation.kind === 'set-decimals') {
+    return `${operation.columnKeys.join(', ')} · ${operation.decimals === null ? 'casas decimais da tabela' : `${operation.decimals} casa(s) decimal(is)`}`;
+  }
   if (operation.kind === 'transpose') return 'Transpor linhas/colunas';
-  if (operation.kind === 'include-table') return `${operation.sourceLabel} · incluir tabela por chave`;
+  if (operation.kind === 'include-table') {
+    return `${operation.sourceLabel} · incluir tabela por chave${operation.keyLength ? ` (${operation.keyLength} caracteres)` : ''}`;
+  }
   if (operation.kind === 'suppress-rows') return `${operation.rowKeys.length} linha(s) · suprimir`;
   if (operation.kind === 'aggregate-rows') return `${operation.outputRow.label} · agregar ${operation.rowKeys.length} linha(s)`;
   return `${operation.output.label} · ${names[operation.kind === 'binary' ? operation.operator : operation.kind] ?? operation.kind}`;
@@ -3688,15 +3720,26 @@ function updateTableOperationControls(): void {
     tableOperationLeft.append(option);
     tableOperationRight.append(option.cloneNode(true));
   }
+  const marcadas = new Set([...tableOperationColumns.selectedOptions].map((option) => option.value));
+  const criterio = tableCriterionColumn.value;
+  tableOperationColumns.replaceChildren();
+  tableCriterionColumn.replaceChildren();
+  for (const column of currentResult?.columns ?? []) {
+    tableOperationColumns.add(new Option(column.label, column.key, false, marcadas.has(column.key)));
+    tableCriterionColumn.add(new Option(column.label, column.key));
+  }
+  if ([...tableCriterionColumn.options].some((option) => option.value === criterio)) tableCriterionColumn.value = criterio;
   if ([...tableOperationLeft.options].some((option) => option.value === previousLeft)) tableOperationLeft.value = previousLeft;
   if ([...tableOperationRight.options].some((option) => option.value === previousRight)) tableOperationRight.value = previousRight;
   else if (tableOperationRight.options.length > 1) tableOperationRight.selectedIndex = 1;
 
   const kind = tableOperationKind.value;
   const binary = ['add', 'subtract', 'multiply', 'divide', 'minimum', 'maximum', 'percentage', 'indicator'].includes(kind);
+  const many = ['sum-columns', 'min-columns', 'max-columns'].includes(kind);
   tableOperationScaleLabel.hidden = kind !== 'indicator';
+  tableOperationColumnsLabel.hidden = !many;
   const sourceFree = kind === 'sequence' || kind === 'constant' || kind === 'expression';
-  tableOperationLeftLabel.hidden = sourceFree;
+  tableOperationLeftLabel.hidden = sourceFree || many;
   tableOperationRightLabel.hidden = !binary;
   tableOperationNumberLabel.hidden = kind !== 'factor' && kind !== 'sequence' && kind !== 'constant';
   tableOperationExpressionLabel.hidden = kind !== 'expression';
@@ -3754,15 +3797,17 @@ function renderFormulaHelp(): void {
 function suggestedOperationLabel(kind: string): string {
   const left = currentResult?.columns.find((column) => column.key === tableOperationLeft.value)?.label ?? 'A';
   const right = currentResult?.columns.find((column) => column.key === tableOperationRight.value)?.label ?? 'B';
+  const scale = tableOperationScale.selectedOptions[0]?.textContent ?? 'por 1';
+  // Os títulos que o TabWin sugere (manual do curso TabWin, fev/2011): quem
+  // vem dele reconhece a coluna pelo nome.
   const labels: Record<string, string> = {
-    add: `${left} + ${right}`, subtract: `${left} − ${right}`, multiply: `${left} × ${right}`,
-    divide: `${left} ÷ ${right}`, minimum: `Mínimo (${left}, ${right})`, maximum: `Máximo (${left}, ${right})`,
+    add: 'Soma', subtract: 'Diferença', multiply: 'Produto', divide: 'Quociente',
+    minimum: 'Menor', maximum: 'Maior', 'sum-columns': 'Soma', 'min-columns': 'Menor', 'max-columns': 'Maior',
     percentage: `% ${left} / ${right}`, factor: `${left} × ${tableOperationNumber.value || '1'}`,
-    cumulative: `Acumulado: ${left}`, absolute: `Absoluto: ${left}`, integer: `Inteiro: ${left}`,
-    // Os mesmos cabeçalhos que o TabWin dá: "%" e "Z" antes do nome da coluna.
+    cumulative: `A.${left}`, absolute: `Abs.${left}`, integer: `Int.${left}`,
     'percent-of-total': `%${left}`, normalize: `Z${left}`,
-    indicator: `${left} ÷ ${right} ${tableOperationScale.selectedOptions[0]?.textContent ?? ''}`.trim(),
-    sequence: 'Sequência', constant: 'Nova coluna', expression: 'Coluna calculada',
+    indicator: `${left}/${right} ${scale}`,
+    sequence: 'Seqüência', constant: 'Constante', expression: 'Coluna calculada',
   };
   return labels[kind] ?? 'Nova coluna';
 }
@@ -3774,10 +3819,12 @@ function applySelectedTableOperation(): void {
   if (['factor', 'sequence', 'constant'].includes(kind) && !Number.isFinite(numeric)) {
     throw new Error('Informe um fator ou valor numérico válido');
   }
-  const output = {
+  const casas = Number(tableOperationDecimals.value);
+  const output: DerivedColumnSpec = {
     key: `__derived_${tableOperations.length + 1}`,
     label: tableOperationLabel.value.trim() || suggestedOperationLabel(kind),
-    totalPolicy: tableOperationTotal.value as Exclude<TotalPolicy, 'precalculated'>,
+    totalPolicy: tableOperationTotal.value as TotalPolicy,
+    ...(casas >= 0 ? { decimals: casas } : {}),
   };
   let operation: TableOperation;
   if (['add', 'subtract', 'multiply', 'divide', 'minimum', 'maximum', 'percentage'].includes(kind)) {
@@ -3788,6 +3835,14 @@ function applySelectedTableOperation(): void {
     };
   } else if (kind === 'factor') {
     operation = { kind, sourceColumnKey: tableOperationLeft.value, factor: numeric, output };
+  } else if (kind === 'sum-columns' || kind === 'min-columns' || kind === 'max-columns') {
+    const columnKeys = [...tableOperationColumns.selectedOptions].map((option) => option.value);
+    if (columnKeys.length < 2) throw new Error('Marque ao menos duas colunas');
+    operation = {
+      kind: 'aggregate-columns',
+      operator: kind === 'sum-columns' ? 'add' : kind === 'min-columns' ? 'minimum' : 'maximum',
+      columnKeys, output,
+    };
   } else if (kind === 'indicator') {
     operation = {
       kind, numeratorColumnKey: tableOperationLeft.value, denominatorColumnKey: tableOperationRight.value,
@@ -3798,10 +3853,30 @@ function applySelectedTableOperation(): void {
   } else if (kind === 'integer') {
     operation = { kind, sourceColumnKey: tableOperationLeft.value, rounding: 'truncate', output };
   } else if (kind === 'sequence') {
-    operation = { kind, start: numeric, step: 1, output };
-  } else if (kind === 'expression') {
+    // Como no TabWin: ordenar pela coluna (clique no título) e depois pedir a
+    // Seqüência numera as linhas pela posição nessa ordem — as "n" maiores.
+    const ordenada = tableSortDirection.value !== 'original' && tableSortColumn.value !== '__row_key__';
     operation = {
-      kind, expression: tableOperationExpression.value,
+      kind, start: numeric, step: 1, output,
+      ...(ordenada ? {
+        order: { columnKey: tableSortColumn.value, direction: tableSortDirection.value as 'ascending' | 'descending' },
+      } : {}),
+    };
+  } else if (kind === 'expression') {
+    // Também aceita o jeito do TabWin: "Custo Médio=c2/c1" — título, sinal de
+    // igual e a conta, com c1, c2… para as colunas.
+    const tabwin = /^\s*([^=\[\]()<>;"']*[A-Za-zÀ-ú][^=\[\]()<>;"']*?)\s*=(?!=)(.+)$/.exec(tableOperationExpression.value);
+    if (tabwin && !tableOperationLabel.value.trim()) output.label = tabwin[1]!.trim();
+    let conta = tabwin ? tabwin[2]!.trim() : tableOperationExpression.value;
+    // "Percentagem=c2/c1*100,00": no TabWin, os zeros depois da vírgula no
+    // fim dizem quantas casas decimais a coluna mostra (manual, p. 55–56).
+    const casasTabwin = tabwin ? /(\d+),(\d+)\s*$/.exec(conta) : null;
+    if (casasTabwin) {
+      conta = conta.slice(0, casasTabwin.index) + casasTabwin[1];
+      if (output.decimals === undefined) output.decimals = casasTabwin[2]!.length;
+    }
+    operation = {
+      kind, expression: conta,
       divisionByZero: tableOperationZero.value as 'error' | 'zero', output,
     };
   } else {
@@ -3858,6 +3933,9 @@ function updateColumnEditButtons(): void {
   tableColumnLeft.disabled = index <= 0;
   tableColumnRight.disabled = index < 0 || index >= (currentResult?.columns.length ?? 0) - 1;
   tableColumnDelete.disabled = (currentResult?.columns.length ?? 0) <= 1;
+  tableColumnTotalApply.disabled = index < 0;
+  tableColumnRecalculate.disabled = index < 0;
+  tableColumnDecimalsApply.disabled = index < 0;
 }
 
 function updateRowEditButtons(): void {
@@ -3885,8 +3963,11 @@ function currentTableRowIndexes(): number[] {
   }, tableLocate.value);
 }
 
-function tableNumber(value: number): string {
-  const decimals = Number(tableDecimals.value);
+function tableNumber(value: number, columnDecimals?: number): string {
+  // Casas fixadas na coluna (Quadro → Decimais, indicador, "…*100,00") valem
+  // enquanto a tabela estiver em Automático; escolher um número ali vale para todas.
+  const global = Number(tableDecimals.value);
+  const decimals = global < 0 && columnDecimals !== undefined ? columnDecimals : global;
   if (decimals < 0) return numberFormat.format(value);
   return new Intl.NumberFormat('pt-BR', {
     minimumFractionDigits: decimals,
@@ -3962,11 +4043,13 @@ function buildTableRow(result: TabulationResult, rowIndex: number): HTMLTableRow
     label.textContent = displayRowLabel(row);
     tr.append(label);
   }
-  for (const value of result.cells[rowIndex] ?? []) {
+  (result.cells[rowIndex] ?? []).forEach((value, columnIndex) => {
     const td = document.createElement('td');
-    td.textContent = tableNumber(value);
+    td.textContent = tableNumber(value, result.columns[columnIndex]?.decimals);
+    // TabWin mostra os negativos em vermelho (menos na linha de total).
+    if (value < 0) td.className = 'negative';
     tr.append(td);
-  }
+  });
   if (showRowTotalColumn(result)) {
     const td = document.createElement('td');
     td.className = 'row-total';
@@ -4106,6 +4189,22 @@ function renderTable(result: TabulationResult): void {
     th.textContent = column.label;
     headerRow.append(th);
   }
+  // Como no TabWin: clicar no título ordena — o primeiro clique do maior para
+  // o menor, o seguinte do menor para o maior (manual do curso, p. 56).
+  const ordenaveis = [...headerRow.children] as HTMLTableCellElement[];
+  const chaves = [...(tableKeyVisible.checked ? ['__row_key__'] : []), ...result.columns.map((column) => column.key)];
+  ordenaveis.forEach((th, index) => {
+    const chave = chaves[index]!;
+    const ativa = tableSortColumn.value === chave && tableSortDirection.value !== 'original';
+    th.classList.add('sortable');
+    th.tabIndex = 0;
+    th.title = 'Clique para ordenar (de novo inverte)';
+    th.setAttribute('aria-sort', ativa ? (tableSortDirection.value === 'ascending' ? 'ascending' : 'descending') : 'none');
+    th.addEventListener('click', () => ordenarPeloTitulo(chave));
+    th.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); ordenarPeloTitulo(chave); }
+    });
+  });
   if (showRowTotalColumn(result)) {
     const th = document.createElement('th');
     th.scope = 'col';
@@ -4132,9 +4231,8 @@ function renderTable(result: TabulationResult): void {
   }
   for (const column of result.columns) {
     const cell = document.createElement('td');
-    const policy = column.totalPolicy ?? 'sum';
-    const total = policy === 'precalculated' ? column.precalculatedTotal : calculateColumnTotal(result, column.key, policy);
-    cell.textContent = total === undefined ? '—' : tableNumber(total);
+    const total = displayedColumnTotal(result, column.key);
+    cell.textContent = total === undefined ? '—' : tableNumber(total, column.decimals);
     totalRow.append(cell);
   }
   if (showRowTotalColumn(result)) {
@@ -4154,6 +4252,16 @@ function renderTable(result: TabulationResult): void {
     footerRow.append(footerCell);
     foot.append(footerRow);
   }
+}
+
+function ordenarPeloTitulo(chave: string): void {
+  const mesma = tableSortColumn.value === chave;
+  tableSortColumn.value = chave;
+  // Linha (rótulo) começa em ordem alfabética; valores, do maior para o menor.
+  const primeira = chave === '__row_key__' ? 'ascending' : 'descending';
+  const segunda = primeira === 'ascending' ? 'descending' : 'ascending';
+  tableSortDirection.value = mesma && tableSortDirection.value === primeira ? segunda : primeira;
+  tableSortDirection.dispatchEvent(new Event('change'));
 }
 
 function populateChartBindings(result: TabulationResult): void {
@@ -8734,7 +8842,9 @@ async function includePortableTable(file: File): Promise<void> {
   if (!currentResult) throw new Error('Gere ou abra uma tabela antes de incluir outra');
   const table = parsePortableTable(await file.text());
   const included = replayTableOperations(table.baseResult, table.operations);
-  const operation = createIncludeTableOperation(currentResult, included, table.title || file.name);
+  const comprimento = Number(tableKeyLength.value);
+  const operation = createIncludeTableOperation(currentResult, included, table.title || file.name,
+    Number.isInteger(comprimento) && comprimento > 0 ? { keyLength: comprimento } : {});
   commitTableOperation(operation);
 }
 
@@ -9289,7 +9399,17 @@ tabulationLogClear.addEventListener('click', () => {
 tabulationDiffClose.addEventListener('click', () => {
   tabulationDiffPanel.hidden = true;
 });
-tableOperationKind.addEventListener('change', updateTableOperationControls);
+tableOperationKind.addEventListener('change', () => {
+  // O total que o TabWin dá a cada operação (manual do curso, fev/2011):
+  // Produto e Quociente fazem a conta nos totais; Acumular repete a última
+  // parcela; Normalizar fica sem total. O resto soma.
+  const padrao: Record<string, string> = {
+    multiply: 'precalculated', divide: 'precalculated', percentage: 'precalculated',
+    cumulative: 'final', normalize: 'none', 'min-columns': 'none', 'max-columns': 'none', minimum: 'none', maximum: 'none',
+  };
+  tableOperationTotal.value = padrao[tableOperationKind.value] ?? 'sum';
+  updateTableOperationControls();
+});
 tableOperationApply.addEventListener('click', () => {
   try {
     applySelectedTableOperation();
@@ -9341,6 +9461,21 @@ tableColumnDelete.addEventListener('click', () => {
   try { commitTableOperation({ kind: 'delete-column', columnKey: tableEditColumn.value }); }
   catch (error) { showToast(error instanceof Error ? error.message : String(error), true); }
 });
+tableColumnTotalApply.addEventListener('click', () => {
+  try {
+    commitTableOperation({ kind: 'set-total-policy', columnKeys: [tableEditColumn.value], totalPolicy: tableColumnTotal.value as TotalPolicy });
+  } catch (error) { showToast(error instanceof Error ? error.message : String(error), true); }
+});
+tableColumnRecalculate.addEventListener('click', () => {
+  try { commitTableOperation({ kind: 'set-total-policy', columnKeys: [tableEditColumn.value], totalPolicy: 'sum' }); }
+  catch (error) { showToast(error instanceof Error ? error.message : String(error), true); }
+});
+tableColumnDecimalsApply.addEventListener('click', () => {
+  try {
+    const casas = Number(tableColumnDecimals.value);
+    commitTableOperation({ kind: 'set-decimals', columnKeys: [tableEditColumn.value], decimals: casas < 0 ? null : casas });
+  } catch (error) { showToast(error instanceof Error ? error.message : String(error), true); }
+});
 tableTranspose.addEventListener('click', () => {
   try { commitTableOperation({ kind: 'transpose' }); }
   catch (error) { showToast(error instanceof Error ? error.message : String(error), true); }
@@ -9351,6 +9486,37 @@ tableRowSuppress.addEventListener('click', () => {
     tableLocate.value = '';
     if (currentResult) renderTable(currentResult);
     updateRowEditButtons();
+  } catch (error) { showToast(error instanceof Error ? error.message : String(error), true); }
+});
+// "Suprimir/agregar linhas" do TabWin: escolhe as linhas por um critério
+// sobre os valores de uma coluna e, se pedido, junta tudo numa linha "Outras".
+tableCriterionApply.addEventListener('click', () => {
+  if (!currentResult) return;
+  try {
+    const index = currentResult.columns.findIndex((column) => column.key === tableCriterionColumn.value);
+    const limite = Number(tableCriterionValue.value);
+    if (index < 0 || !Number.isFinite(limite)) throw new Error('Escolha a coluna e um valor numérico');
+    const testa = (valor: number): boolean => {
+      switch (tableCriterionOperator.value) {
+        case 'eq': return valor === limite;
+        case 'gt': return valor > limite;
+        case 'lt': return valor < limite;
+        default: return valor !== limite;
+      }
+    };
+    const rowKeys = currentResult.rows
+      .filter((row, rowIndex) => !row.excludeFromTotal && testa(currentResult!.cells[rowIndex]?.[index] ?? 0))
+      .map((row) => row.key);
+    if (!rowKeys.length) throw new Error('Nenhuma linha atende ao critério');
+    if (tableCriterionAggregate.checked) {
+      commitTableOperation({
+        kind: 'aggregate-rows', rowKeys,
+        outputRow: { key: `__aggregate_${tableOperations.length + 1}`, label: tableCriterionLabel.value.trim() || 'Outras', excludeFromTotal: false },
+        removeSources: true,
+      });
+    } else {
+      commitTableOperation({ kind: 'suppress-rows', rowKeys });
+    }
   } catch (error) { showToast(error instanceof Error ? error.message : String(error), true); }
 });
 tableRowAggregate.addEventListener('click', () => {

@@ -376,8 +376,8 @@ export function validateTableOperation(value: unknown): asserts value is TableOp
   if (!value || typeof value !== 'object') throw new Error('invalid table operation in TabSis recipe');
   const operation = value as Partial<TableOperation> & Record<string, unknown> & { output?: Record<string, unknown> };
   const stringField = (key: string): boolean => typeof operation[key] === 'string' && String(operation[key]).length > 0;
-  const allowedKinds = new Set(['binary', 'factor', 'cumulative', 'percent-of-total', 'normalize', 'indicator', 'absolute', 'integer', 'sequence', 'constant', 'expression',
-    'rename-column', 'move-column', 'delete-column', 'transpose', 'include-table', 'suppress-rows', 'aggregate-rows']);
+  const allowedKinds = new Set(['binary', 'factor', 'cumulative', 'percent-of-total', 'normalize', 'indicator', 'aggregate-columns', 'absolute', 'integer', 'sequence', 'constant', 'expression',
+    'rename-column', 'move-column', 'delete-column', 'set-total-policy', 'set-decimals', 'transpose', 'include-table', 'suppress-rows', 'aggregate-rows']);
   if (!operation.kind || !allowedKinds.has(operation.kind)) {
     throw new Error('invalid table operation in TabSis recipe');
   }
@@ -386,7 +386,8 @@ export function validateTableOperation(value: unknown): asserts value is TableOp
     const rows = operation.rows as Array<Record<string, unknown>> | undefined;
     const columns = operation.columns as Array<Record<string, unknown>> | undefined;
     const cells = operation.cells as unknown[][] | undefined;
-    if (!stringField('sourceLabel') || String(operation.sourceLabel).length > 160
+    if ((operation.keyLength !== undefined && (typeof operation.keyLength !== 'number' || !Number.isInteger(operation.keyLength) || operation.keyLength < 1))
+      || !stringField('sourceLabel') || String(operation.sourceLabel).length > 160
       || typeof operation.requireMatchingLabels !== 'boolean'
       || !Array.isArray(rows) || !Array.isArray(columns) || !Array.isArray(cells)
       || rows.length !== cells.length || columns.length === 0
@@ -422,6 +423,18 @@ export function validateTableOperation(value: unknown): asserts value is TableOp
     if (!stringField('columnKey')) throw new Error('invalid delete-column operation in TabSis recipe');
     return;
   }
+  if (operation.kind === 'set-total-policy' || operation.kind === 'set-decimals') {
+    const keys = operation.columnKeys;
+    const places = operation.decimals;
+    if (!Array.isArray(keys) || !keys.length || !keys.every((key) => typeof key === 'string' && key.length > 0)
+      || (operation.kind === 'set-total-policy'
+        && !new Set(['none', 'sum', 'product', 'mean', 'initial', 'final', 'min', 'max', 'precalculated']).has(String(operation.totalPolicy)))
+      || (operation.kind === 'set-decimals' && places !== null
+        && (typeof places !== 'number' || !Number.isInteger(places) || places < 0 || places > 10))) {
+      throw new Error(`invalid ${operation.kind} operation in TabSis recipe`);
+    }
+    return;
+  }
   if (operation.kind === 'suppress-rows') {
     if (!Array.isArray(operation.rowKeys) || !operation.rowKeys.length || !operation.rowKeys.every((key) => typeof key === 'string')) {
       throw new Error('invalid suppress-rows operation in TabSis recipe');
@@ -440,8 +453,12 @@ export function validateTableOperation(value: unknown): asserts value is TableOp
   if (!operation.output
     || typeof operation.output.key !== 'string' || !operation.output.key.trim()
     || typeof operation.output.label !== 'string' || !operation.output.label.trim()
-    || !new Set(['none', 'sum', 'product', 'mean', 'initial', 'final', 'min', 'max']).has(String(operation.output.totalPolicy))) {
+    || !new Set(['none', 'sum', 'product', 'mean', 'initial', 'final', 'min', 'max', 'precalculated']).has(String(operation.output.totalPolicy))) {
     throw new Error('invalid table operation in TabSis recipe');
+  }
+  const places = operation.output.decimals;
+  if (places !== undefined && (typeof places !== 'number' || !Number.isInteger(places) || places < 0 || places > 10)) {
+    throw new Error('invalid decimal places in TabSis recipe');
   }
   const finiteField = (key: string): boolean => typeof operation[key] === 'number' && Number.isFinite(operation[key]);
   if (operation.kind === 'binary') {
@@ -449,6 +466,12 @@ export function validateTableOperation(value: unknown): asserts value is TableOp
       || !stringField('leftColumnKey') || !stringField('rightColumnKey')
       || !new Set(['error', 'zero']).has(String(operation.divisionByZero))) {
       throw new Error('invalid binary table operation in TabSis recipe');
+    }
+  } else if (operation.kind === 'aggregate-columns') {
+    const keys = operation.columnKeys;
+    if (!new Set(['add', 'minimum', 'maximum']).has(String(operation.operator))
+      || !Array.isArray(keys) || keys.length < 2 || !keys.every((key) => typeof key === 'string' && key.length > 0)) {
+      throw new Error('invalid aggregate-columns operation in TabSis recipe');
     }
   } else if (operation.kind === 'indicator') {
     const power = operation.scalePower;
@@ -466,7 +489,12 @@ export function validateTableOperation(value: unknown): asserts value is TableOp
       throw new Error('invalid integer operation in TabSis recipe');
     }
   } else if (operation.kind === 'sequence') {
-    if (!finiteField('start') || !finiteField('step')) throw new Error('invalid sequence operation in TabSis recipe');
+    const order = operation.order as Record<string, unknown> | undefined;
+    if (!finiteField('start') || !finiteField('step')
+      || (order !== undefined && (!order || typeof order.columnKey !== 'string' || !order.columnKey
+        || !new Set(['ascending', 'descending']).has(String(order.direction))))) {
+      throw new Error('invalid sequence operation in TabSis recipe');
+    }
   } else if (operation.kind === 'constant' && !finiteField('value')) {
     throw new Error('invalid constant operation in TabSis recipe');
   } else if (operation.kind === 'expression'

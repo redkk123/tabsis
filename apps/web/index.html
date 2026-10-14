@@ -629,7 +629,7 @@
                  moram nos menus Quadro e Operações, não na frente do número. -->
             <div class="table-tools">
               <details class="table-tool" id="tool-quadro" data-lembrar>
-                <summary>Quadro <span>título, ordenar, casas decimais, localizar, copiar</span></summary>
+                <summary>Quadro <span>título, ordenar (ou clique no título da coluna), casas decimais, localizar, copiar</span></summary>
             <div class="table-presentation" id="table-presentation" hidden aria-label="Apresentação da tabela">
               <label>Título<input id="table-title" type="text" maxlength="160" placeholder="Título da tabela"></label>
               <label>Subtítulo<input id="table-subtitle" type="text" maxlength="240" placeholder="Subtítulo opcional"></label>
@@ -639,6 +639,7 @@
               <label>Ordem<select id="table-sort-direction"><option value="original">Original</option><option value="ascending">Crescente</option><option value="descending">Decrescente</option></select></label>
               <label>Casas<select id="table-decimals"><option value="-1">Automático</option><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option></select></label>
               <label class="table-key-toggle"><input id="table-key-visible" type="checkbox" checked> Mostrar chave</label>
+              <label title="Quantos caracteres do código entram na comparação ao Incluir tabela. Ex.: 6 casa o código IBGE de 7 dígitos do TabNet com o de 6 do TabWin. Vazio = código inteiro.">Comprimento da chave<input id="table-key-length" type="number" min="1" max="40" step="1" placeholder="inteira"></label>
               <div class="table-presentation-actions"><button class="secondary-button" id="table-copy" type="button">Copiar</button><button class="secondary-button" id="table-print" type="button">Imprimir</button></div>
             </div>
               </details>
@@ -657,6 +658,7 @@
                   <option value="add">Somar colunas</option><option value="subtract">Subtrair colunas</option>
                   <option value="multiply">Multiplicar colunas</option><option value="divide">Dividir colunas</option>
                   <option value="minimum">Mínimo entre colunas</option><option value="maximum">Máximo entre colunas</option>
+                  <option value="sum-columns">Somar várias colunas (Soma)</option><option value="min-columns">Menor entre várias colunas</option><option value="max-columns">Maior entre várias colunas</option>
                   <option value="percentage">Percentual A ÷ B</option><option value="factor">Multiplicar por fator</option>
                   <option value="indicator">Calcular indicador (A ÷ B × escala)</option><option value="percent-of-total">% do total da coluna (%percentagem)</option><option value="normalize">Normalizar — escore z</option>
                   <option value="cumulative">Acumulado</option><option value="absolute">Valor absoluto</option>
@@ -665,9 +667,10 @@
                 </select></label>
                 <label id="table-operation-left-label">Coluna A<select id="table-operation-left"></select></label>
                 <label id="table-operation-right-label">Coluna B<select id="table-operation-right"></select></label>
+                <label id="table-operation-columns-label" hidden>Colunas (Ctrl+clique para várias)<select id="table-operation-columns" multiple size="4"></select></label>
                 <label id="table-operation-scale-label" hidden>Escala<select id="table-operation-scale">
-                  <option value="0">por 1</option><option value="1">por 10</option><option value="2">por 100</option><option value="3">por 1.000</option>
-                  <option value="4">por 10.000</option><option value="5" selected>por 100.000</option><option value="6">por 1.000.000</option>
+                  <option value="0" selected>por 1</option><option value="1">por 10</option><option value="2">por 100</option><option value="3">por 1.000</option>
+                  <option value="4">por 10.000</option><option value="5">por 100.000</option><option value="6">por 1.000.000</option>
                 </select></label>
                 <label id="table-operation-number-label" hidden>Fator/valor<input id="table-operation-number" type="number" step="any" value="1"></label>
                 <label id="table-operation-expression-label" hidden>Expressão<input id="table-operation-expression" type="text" spellcheck="false" list="table-operation-function-list" placeholder="=TAXA([Óbitos]; [População]; 100000)"></label>
@@ -675,9 +678,11 @@
                 <label>Nome da coluna<input id="table-operation-label" type="text" maxlength="80" placeholder="Gerado automaticamente"></label>
                 <label>Política do total<select id="table-operation-total">
                   <option value="sum">Soma</option><option value="none">Sem total</option><option value="mean">Média</option>
+                  <option value="precalculated">Pré-calculado (a conta feita nos totais)</option>
                   <option value="product">Produto</option><option value="initial">Inicial</option><option value="final">Final</option>
                   <option value="min">Mínimo</option><option value="max">Máximo</option>
                 </select></label>
+                <label title="Como “Casas decimais” do Calcular indicador do TabWin. Em Nova coluna, “Percentagem=c2/c1*100,00” já pede 2 casas.">Casas decimais<select id="table-operation-decimals"><option value="-1">Automático</option><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option></select></label>
                 <button class="primary-button table-operation-apply" id="table-operation-apply" type="button"><span>Aplicar</span><b>＋</b></button>
               </div>
               <datalist id="table-operation-function-list"></datalist>
@@ -692,7 +697,7 @@
             </section>
               </details>
               <details class="table-tool" id="tool-editar" data-lembrar>
-                <summary>Editar linhas e colunas <span>renomear, mover, agregar, suprimir, transpor</span></summary>
+                <summary>Editar linhas e colunas <span>renomear, mover, tipo de total, casas, agregar, suprimir, transpor</span></summary>
             <section class="table-editing" id="table-editing" hidden aria-label="Editar linhas e colunas">
               <div class="table-column-edit">
                 <label>Coluna<select id="table-edit-column"></select></label>
@@ -703,6 +708,29 @@
                   <button class="secondary-button" id="table-column-right" type="button" title="Mover à direita">→</button>
                   <button class="secondary-button danger-button" id="table-column-delete" type="button">Remover</button>
                 </div>
+                <label>Tipo de total<select id="table-column-total">
+                  <option value="sum">Soma</option><option value="none">Sem total</option><option value="product">Produto</option>
+                  <option value="mean">Média</option><option value="initial">Inicial</option><option value="final">Final</option>
+                  <option value="min">Mínimo</option><option value="max">Máximo</option>
+                  <option value="precalculated">Pré-calculado (congela o total de agora)</option>
+                </select></label>
+                <div class="table-edit-actions">
+                  <button class="secondary-button" id="table-column-total-apply" type="button">Aplicar total</button>
+                  <button class="secondary-button" id="table-column-recalculate" type="button" title="Volta a linha de total a ser a soma das linhas, como Operações → Recalcula total do TabWin">Recalcular total</button>
+                </div>
+                <label>Casas decimais<select id="table-column-decimals"><option value="-1">Da tabela</option><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option></select></label>
+                <div class="table-edit-actions">
+                  <button class="secondary-button" id="table-column-decimals-apply" type="button">Aplicar casas</button>
+                </div>
+              </div>
+              <div class="table-row-criterion" aria-label="Suprimir ou agregar linhas por valor, como no TabWin">
+                <strong>Suprimir/agregar linhas se a coluna</strong>
+                <label>Coluna<select id="table-criterion-column"></select></label>
+                <label>For<select id="table-criterion-operator"><option value="eq">igual a</option><option value="gt">maior que</option><option value="lt" selected>menor que</option><option value="ne">diferente de</option></select></label>
+                <label>Valor<input id="table-criterion-value" type="number" step="any" value="1"></label>
+                <label class="table-key-toggle"><input id="table-criterion-aggregate" type="checkbox" checked> Criar linha com o agregado</label>
+                <label>Rótulo<input id="table-criterion-label" type="text" maxlength="80" value="Outras"></label>
+                <button class="secondary-button" id="table-criterion-apply" type="button">Aplicar</button>
               </div>
               <div class="table-row-edit">
                 <label>Nome da agregação<input id="table-aggregate-label" type="text" maxlength="80" placeholder="Ex.: Demais categorias"></label>
