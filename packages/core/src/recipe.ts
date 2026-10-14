@@ -95,6 +95,8 @@ export interface AnalysisRecipeV1 {
     statisticsYColumnKey?: string;
     histogramBins?: number;
     histogramGaussian?: boolean;
+    /** TabWin: classes de intervalos iguais (padrão) ou de igual freqüência. */
+    histogramMode?: 'width' | 'frequency';
     /**
      * Epidemiology settings.
      *
@@ -328,6 +330,9 @@ export function parseRecipe(json: string): AnalysisRecipeV1 {
   if (parsed.view?.histogramBins !== undefined
     && (!Number.isInteger(parsed.view.histogramBins) || parsed.view.histogramBins < 1 || parsed.view.histogramBins > 50)) {
     throw new Error('invalid histogram bin count in TabSis recipe');
+  }
+  if (parsed.view?.histogramMode !== undefined && parsed.view.histogramMode !== 'width' && parsed.view.histogramMode !== 'frequency') {
+    throw new Error('invalid histogram mode in TabSis recipe');
   }
   if (parsed.view?.histogramGaussian !== undefined && typeof parsed.view.histogramGaussian !== 'boolean') {
     throw new Error('invalid histogram gaussian flag in TabSis recipe');

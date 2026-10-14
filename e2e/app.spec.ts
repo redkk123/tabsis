@@ -785,6 +785,57 @@ test('como no TabWin: clique no título ordena, Seqüência segue a ordem, "…*
   expect(numero((await total.textContent()) ?? '')).toBe(soma);
 });
 
+test('do Help do TabWin: Gerar DEF, Gerar CNV do campo, Numerar, igual freqüência e coluna estimada', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#file-input').setInputFiles('e2e/fixtures/investigate-e2e.csv');
+  await expect(page.locator('#run-button')).toBeEnabled();
+  await page.locator('#row-field').selectOption('MUNIC');
+  await page.locator('#analysis-form').evaluate((form: HTMLFormElement) => form.requestSubmit());
+  await expect(page.locator('#result-table tbody')).toContainText('M007');
+
+  // Gerar DEF: todos os campos marcados; UF vira X com UF.CNV.
+  const metadados = page.locator('#group-metadata');
+  if (!(await metadados.evaluate((element: HTMLDetailsElement) => element.open))) await metadados.locator('summary').click();
+  await page.locator('#def-generate-button').click();
+  const previa = page.locator('#def-generate-preview');
+  await expect(previa).toContainText('XUF');
+  await expect(previa).toContainText(',UF,1,UF.CNV');
+  await page.locator('#def-generate-invert').click();
+  await expect(previa).toContainText('marque ao menos um campo');
+  await page.locator('#def-generate-fields input[value="SEXO"]').check();
+  await expect(previa).toContainText(',SEXO,1,SEXO.CNV');
+  await page.locator('#def-generate-use').click();
+  await expect(page.locator('#toast')).toContainText('opções no painel');
+
+  // Gerar CNV do campo SEXO: uma categoria por código (F, M).
+  await page.locator('#cnv-editor-button').click();
+  await page.locator('#cnv-editor-preview-field').selectOption('SEXO');
+  await page.locator('#cnv-editor-generate').click();
+  await expect(page.locator('#cnv-editor-filename')).toHaveValue('SEXO.cnv');
+  await expect(page.locator('#cnv-editor-rows tr')).toHaveCount(2);
+  await page.locator('#cnv-editor-add-category').click();
+  await page.locator('#cnv-editor-rows tr').last().locator('input').first().fill('9');
+  await page.locator('#cnv-editor-renumber').click();
+  await expect(page.locator('#cnv-editor-rows tr').last().locator('input').first()).toHaveValue('3');
+  await page.locator('#cnv-editor-close').click();
+
+  // Coluna de estimados da regressão e histograma de igual freqüência.
+  await page.locator('#table-operation-kind').selectOption('sequence');
+  await page.locator('#table-operation-number').fill('1');
+  await page.locator('#table-operation-apply').click();
+  await page.locator('[data-view="statistics"]').click();
+  await page.locator('#statistics-operation').selectOption('regression');
+  await page.locator('#statistics-x').selectOption({ index: 0 });
+  await page.locator('#statistics-y').selectOption({ index: 1 });
+  await page.getByRole('button', { name: 'Inserir coluna com os valores estimados' }).click();
+  await page.locator('[data-view="table"]').click();
+  await expect(page.locator('#result-table thead')).toContainText('Estimado Seqüência');
+  await page.locator('[data-view="statistics"]').click();
+  await page.locator('#statistics-operation').selectOption('histogram');
+  await page.locator('#histogram-mode').selectOption('frequency');
+  await expect(page.locator('.histogram-row').first()).toBeVisible();
+});
+
 test('the transform pipeline computes a new field with the same formula language, over records', async ({ page }) => {
   await page.goto('/');
   await page.locator('#file-input').setInputFiles('e2e/fixtures/investigate-e2e.csv');

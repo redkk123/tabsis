@@ -358,6 +358,10 @@ manual do curso TabWin de fev/2011):
 | Quadro → Decimais | Casas decimais da coluna (Editar) ou da tabela inteira (Quadro). |
 | Quadro → Suprimir/agregar linhas | Mesmo critério (igual, maior, menor, diferente) e linha "Outras". |
 | Quadro → Fixar comprimento da chave | Quadro → Comprimento da chave, usado ao Incluir tabela. |
+| Editar → Editar arquivo DEF ou CNV → Gera DEF | Metadados → **Gerar DEF**: marque os campos; baixe ou use no painel. |
+| … → Gera CNV / Numera CNV | Editor de CNV → **Gerar do campo** / **Numerar**. |
+| Estatísticas → Regressão linear (coluna estimada) | Estatística → Regressão → "Inserir coluna com os valores estimados". |
+| Estatísticas → Histograma → Igual freqüência | Estatística → Histograma → Tipo de classe. |
 
 Valores negativos aparecem em vermelho, como no TabWin.
 

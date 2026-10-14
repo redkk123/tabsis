@@ -172,3 +172,34 @@ export function histogram(source: Iterable<number>, requestedBins?: number): His
   }
   return bins;
 }
+
+/**
+ * Classes de igual freqüência, a segunda opção do histograma do TabWin (Help
+ * do TabWin v2, "Analisar dados do histograma"): os limites são cortes da
+ * lista ordenada, para cada classe receber perto de n ÷ classes valores.
+ * Valores repetidos não se dividem entre duas classes, então as contagens
+ * podem sair desiguais e o número de classes pode diminuir.
+ */
+export function histogramEqualFrequency(source: Iterable<number>, requestedBins: number): HistogramBin[] {
+  const values = finite(source).sort((a, b) => a - b);
+  if (!values.length) return [];
+  const binCount = Math.min(50, Math.max(1, Math.round(requestedBins)));
+  const uppers: number[] = [];
+  for (let index = 1; index < binCount; index++) {
+    const cut = values[Math.ceil((index * values.length) / binCount) - 1]!;
+    if (!uppers.length || cut > uppers.at(-1)!) uppers.push(cut);
+  }
+  const max = values.at(-1)!;
+  if (!uppers.length || uppers.at(-1)! < max) uppers.push(max);
+  const bins: HistogramBin[] = uppers.map((upper, index) => ({
+    lower: index === 0 ? values[0]! : uppers[index - 1]!,
+    upper,
+    count: 0,
+  }));
+  let bin = 0;
+  for (const value of values) {
+    while (value > bins[bin]!.upper) bin++;
+    bins[bin]!.count++;
+  }
+  return bins;
+}

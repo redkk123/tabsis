@@ -100,6 +100,7 @@ import {
   type GeographicCandidate,
 } from '../../../packages/analysis/src/geographic-fields.ts';
 import { criarAbaConsulta, type AbaConsulta } from './aba-consulta.ts';
+import { criarGerarDef } from './gerar-def.ts';
 import { criarEditorCnv } from './editor-cnv.ts';
 import {
   catalogQueryKey,
@@ -211,6 +212,7 @@ import {
   fitGaussian,
   gaussianOverlay,
   histogram,
+  histogramEqualFrequency,
   pearsonCorrelation,
   simpleLinearRegression,
 } from '../../../packages/analysis/src/statistics.ts';
@@ -705,6 +707,8 @@ const epiStandardLabel = element<HTMLElement>('#epi-standard-label');
 const epiPer = element<HTMLSelectElement>('#epi-per');
 const epiPerLabel = element<HTMLElement>('#epi-per-label');
 const histogramBinsLabel = element<HTMLElement>('#histogram-bins-label');
+const histogramModeLabel = element<HTMLElement>('#histogram-mode-label');
+const histogramMode = element<HTMLSelectElement>('#histogram-mode');
 const histogramBins = element<HTMLInputElement>('#histogram-bins');
 const histogramGaussianLabel = element<HTMLElement>('#histogram-gaussian-label');
 const histogramGaussian = element<HTMLInputElement>('#histogram-gaussian');
@@ -4517,6 +4521,7 @@ function renderStatistics(): void {
   epiReferenceLabel.hidden = !indirect;
   epiPerLabel.hidden = !epidemiology;
   histogramBinsLabel.hidden = operation !== 'histogram';
+  histogramModeLabel.hidden = operation !== 'histogram';
   histogramGaussianLabel.hidden = operation !== 'histogram';
   if (epidemiology) populateEpiColumnPickers();
   statisticsResult.replaceChildren();
@@ -4560,11 +4565,31 @@ function renderStatistics(): void {
         statisticCard('Intercepto', numberFormat.format(result.intercept)),
         statisticCard('R²', numberFormat.format(result.rSquared)),
       );
-      statisticsResult.append(grid);
+      // Como no TabWin, a regressão pode deixar na tabela uma coluna com os
+      // valores estimados da variável dependente (intercepto + inclinação × X).
+      // Entra como Nova coluna por expressão: fica no histórico e na receita.
+      const estimar = document.createElement('button');
+      estimar.type = 'button';
+      estimar.className = 'secondary-button';
+      estimar.textContent = 'Inserir coluna com os valores estimados';
+      const xIndex = Number(statisticsX.value);
+      const yLabel = currentResult?.columns[Number(statisticsY.value)]?.label ?? 'Y';
+      estimar.addEventListener('click', () => {
+        try {
+          const numero = (valor: number): string => (/e/i.test(String(valor)) ? valor.toFixed(12) : String(valor));
+          commitTableOperation({
+            kind: 'expression',
+            expression: `(${numero(result.intercept)}) + (${numero(result.slope)}) * C${xIndex + 1}`,
+            divisionByZero: 'error',
+            output: { key: `__derived_${tableOperations.length + 1}`, label: `Estimado ${yLabel}`, totalPolicy: 'sum' },
+          });
+        } catch (error) { showToast(error instanceof Error ? error.message : String(error), true); }
+      });
+      statisticsResult.append(grid, estimar);
     } else {
       const requestedBins = Math.min(50, Math.max(1, Math.round(Number(histogramBins.value) || 8)));
       histogramBins.value = String(requestedBins);
-      const bins = histogram(x, requestedBins);
+      const bins = histogramMode.value === 'frequency' ? histogramEqualFrequency(x, requestedBins) : histogram(x, requestedBins);
       // The overlay is a descriptive reference curve ("what would normal look
       // like at this mean and spread"), never a claim that the data is or
       // isn't normal - the checkbox stays off by default and the fit simply
@@ -8593,6 +8618,7 @@ function saveRecipe(): void {
         : {}),
       histogramBins: Math.min(50, Math.max(1, Math.round(Number(histogramBins.value) || 8))),
       histogramGaussian: histogramGaussian.checked,
+      histogramMode: histogramMode.value as 'width' | 'frequency',
       epidemiologyMethod: epiMethod.value as 'direct' | 'indirect',
       epidemiologyPer: Number(epiPer.value) as 1000 | 10000 | 100000,
       // Por chave: a ordem das colunas pode mudar entre salvar e reabrir, e um
@@ -8925,6 +8951,7 @@ async function openRecipe(file: File): Promise<void> {
   if (recipe.view?.statisticsOperation) statisticsOperation.value = recipe.view.statisticsOperation;
   if (recipe.view?.histogramBins) histogramBins.value = String(recipe.view.histogramBins);
   if (recipe.view?.histogramGaussian !== undefined) histogramGaussian.checked = recipe.view.histogramGaussian;
+  if (recipe.view?.histogramMode) histogramMode.value = recipe.view.histogramMode;
   if (recipe.view?.epidemiologyMethod) epiMethod.value = recipe.view.epidemiologyMethod;
   if (recipe.view?.epidemiologyPer !== undefined) epiPer.value = String(recipe.view.epidemiologyPer);
   if (recipe.view?.tableSortDirection) tableSortDirection.value = recipe.view.tableSortDirection;
@@ -9585,7 +9612,7 @@ chart.addEventListener('keydown', (event) => {
 chartPrintButton.addEventListener('click', printChart);
 updateChartBindingControls();
 applyChartZoom();
-for (const control of [statisticsOperation, statisticsX, statisticsY, histogramBins, histogramGaussian, epiStandard, epiPer, epiMethod, epiReference]) {
+for (const control of [statisticsOperation, statisticsX, statisticsY, histogramBins, histogramMode, histogramGaussian, epiStandard, epiPer, epiMethod, epiReference]) {
   control.addEventListener('change', renderStatistics);
 }
 chartSvgButton.addEventListener('click', exportChartSvg);
@@ -9782,6 +9809,19 @@ const editorCnv = criarEditorCnv({
   aviso: showToast,
   baixar: downloadBlob,
 });
+const gerarDef = criarGerarDef({
+  campos: () => (dbfHeader ? dbfHeader.fields.map((field) => ({ name: field.name, type: field.type, label: fieldLabel(field.name) })) : null),
+  nomeDoArquivo: () => activeDatasetSources[0]?.name || datasetName || 'dados.dbf',
+  usar: (nome, texto) => {
+    const definition = parseDef(texto);
+    defByName.set(nome, definition);
+    populateDefPicker(nome);
+    showToast(`${nome}: ${definition.options.length} opções no painel. Faltam as CNVs dos campos codificados (Editor de CNV → Gerar do campo).`);
+  },
+  aviso: showToast,
+  baixar: downloadBlob,
+});
+element<HTMLButtonElement>('#def-generate-button').addEventListener('click', () => gerarDef.abrir());
 const cnvEditorButton = element<HTMLButtonElement>('#cnv-editor-button');
 cnvEditorButton.addEventListener('click', () => editorCnv.abrir(rowConversion.value || columnConversion.value || undefined));
 

@@ -134,6 +134,7 @@
           <div class="source-actions">
             <button class="secondary-button" id="cnv-editor-button" type="button">Editor de CNV</button>
             <button class="secondary-button" id="def-inspector-button" type="button" disabled>Inspetor de DEF</button>
+            <button class="secondary-button" id="def-generate-button" type="button" title="Como o Gera DEF do TabWin: um DEF a partir dos campos do arquivo aberto">Gerar DEF</button>
           </div>
           <p class="group-hint">
             DEF e CNV são o que transforma código em nome legível — <code>1</code> vira
@@ -911,6 +912,7 @@
                 <option value="100000" selected>100.000</option>
               </select></label>
               <label id="histogram-bins-label" hidden>Classes<input id="histogram-bins" type="number" min="1" max="50" value="8"></label>
+              <label id="histogram-mode-label" hidden>Tipo de classe<select id="histogram-mode"><option value="width">Intervalos iguais</option><option value="frequency">Igual freqüência</option></select></label>
               <label id="histogram-gaussian-label" class="check-label" hidden><input id="histogram-gaussian" type="checkbox"><span>Sobrepor gaussiana</span></label>
             </div>
             <div class="statistics-result" id="statistics-result">
@@ -1084,7 +1086,10 @@
           <tbody id="cnv-editor-rows"></tbody>
         </table>
       </div>
-      <button class="secondary-button" id="cnv-editor-add-category" type="button">+ Nova categoria</button>
+      <div class="cnv-editor-toolbar">
+        <button class="secondary-button" id="cnv-editor-add-category" type="button">+ Nova categoria</button>
+        <button class="secondary-button" id="cnv-editor-renumber" type="button" title="Numera as categorias 1, 2, 3… na ordem da tabela, como o botão Numera CNV do TabWin; os subtotais acompanham">Numerar</button>
+      </div>
 
       <div class="cnv-editor-diagnostics" id="cnv-editor-diagnostics"></div>
 
@@ -1092,6 +1097,7 @@
         <div class="cnv-editor-toolbar">
           <label><span>Prévia contra o campo</span><select id="cnv-editor-preview-field"></select></label>
           <button class="secondary-button" id="cnv-editor-preview-button" type="button">Atualizar prévia</button>
+          <button class="secondary-button" id="cnv-editor-generate" type="button" title="Como o Gera CNV do TabWin: uma categoria por código que existe no campo; falta só escrever a descrição de cada uma">Gerar do campo</button>
         </div>
         <div id="cnv-editor-preview-result" class="cnv-editor-preview-result"></div>
       </div>
@@ -1099,6 +1105,23 @@
       <div class="dialog-form-actions cnv-editor-actions">
         <button class="secondary-button" id="cnv-editor-download" type="button">Baixar .CNV</button>
         <button class="primary-button" id="cnv-editor-apply" type="button">Aplicar ao conjunto atual</button>
+      </div>
+    </dialog>
+
+    <dialog id="def-generate-dialog" class="cnv-editor-dialog">
+      <button class="dialog-close" id="def-generate-close" type="button" aria-label="Fechar">×</button>
+      <span class="eyebrow">Editor</span>
+      <h2>Gerar DEF</h2>
+      <p>Como o <b>Gera DEF</b> do TabWin: marque os campos que interessam tabular. Campo de texto entra em Linhas, Colunas e Seleções (<code>X</code>) com a CNV de mesmo nome do campo; campo numérico entra em Incremento (<code>I</code>). Depois é ajustar o que for preciso e, para os campos codificados, gerar as CNVs no Editor de CNV.</p>
+      <div class="cnv-editor-toolbar">
+        <button class="secondary-button" id="def-generate-invert" type="button">Inverter seleção</button>
+        <label><span>Nome do arquivo</span><input id="def-generate-filename" type="text" placeholder="novo.def" /></label>
+      </div>
+      <div class="def-generate-fields" id="def-generate-fields"></div>
+      <pre class="def-generate-preview" id="def-generate-preview"></pre>
+      <div class="dialog-form-actions cnv-editor-actions">
+        <button class="secondary-button" id="def-generate-download" type="button">Baixar .DEF</button>
+        <button class="primary-button" id="def-generate-use" type="button">Usar agora no painel</button>
       </div>
     </dialog>
 

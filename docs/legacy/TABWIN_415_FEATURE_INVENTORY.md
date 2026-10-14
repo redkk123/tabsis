@@ -179,3 +179,15 @@ authoring and accent conversion remain **Cataloged**; CRC testing is **Web**
 4. Complete legacy map classes, labels, layers and selection bridging.
 5. Establish focused goldens for statistics, saved `.TAB`, DBF subsets and
    origin–destination flow.
+
+
+## Help do TabWin v2 (versão impressa) — conferência de 2026-10-14
+
+| Função | Status |
+| --- | --- |
+| CNV de código curto (letra na 1ª posição, branco) | **Web, medido** — RE-003: o código vira número (A = 1 … Z = 26, não-dígito fora da 1ª posição = 0, branco = 000), igual para dado e CNV. O Help diz "A a J = 0 a 9"; o programa real faz diferente. |
+| Gera DEF a partir dos campos do DBF | **Web** — texto → `X` + CNV do campo, número → `I`. O texto exato que o TabWin gera não foi capturado. |
+| Gera CNV a partir dos campos / Numera CNV | **Web** — uma categoria por código existente; renumeração mantém subtotais. |
+| Regressão: coluna de estimados | **Web** — Nova coluna por expressão (intercepto + inclinação × X). |
+| Histograma: intervalos iguais / igual freqüência | **Web** — "Manual" (limites digitados) não reproduzido. |
+| Notas técnicas, colar tabela, `.LST` | **Cataloged** |

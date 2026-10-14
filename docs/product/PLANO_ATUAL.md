@@ -82,6 +82,18 @@ Do Help do TabWin v2 (versão impressa, Vigilância em Saúde de MG):
       000 — medido com quatro testes no TabWin 4.15
       ([RE-003](../reverse-engineering/RE_003_CNV_CODIGO_CURTO.md)); goldens e
       painel sem diferença.
+- [x] **Gera DEF** (Metadados → Gerar DEF): campos do arquivo aberto, todos
+      marcados, "Inverter seleção"; texto vira `X` com a CNV do campo, número
+      vira `I`; baixar ou usar no painel na hora.
+- [x] **Gera CNV** (Editor de CNV → Gerar do campo): uma categoria por código
+      que existe no campo; **Numerar** renumera 1, 2, 3… e os subtotais
+      acompanham.
+- [x] Regressão linear: botão que insere a coluna de valores estimados.
+- [x] Histograma com classes de **igual freqüência**, além de intervalos
+      iguais (fica na receita).
+- [ ] Notas técnicas em linha/coluna/célula; colar tabela da área de
+      transferência; arquivo `.LST` (lista de arquivos com PAUSE, pensado para
+      troca de CD-ROM — no navegador os arquivos já são escolhidos à mão).
 - [ ] Comprimir DBF → DBC (o TabWin comprime; o TabSis só expande).
 
 Próximos passos sugeridos para a tabulação:
