@@ -808,6 +808,9 @@ dialog p { color: #676d74; font-size: 13px; line-height: 1.6; }
 .painel-previa b { color: var(--tom); font-weight: 700; }
 .painel-previa small { display: block; color: var(--faint); font-size: 11px; }
 .painel-previa:empty { display: none; }
+.painel-previa-dicionario { display: block; margin-top: 4px; padding-top: 4px; border-top: 1px dashed var(--line); color: var(--muted); font-size: 11.5px; }
+.painel-previa-dicionario b { color: var(--ink); font-weight: 600; }
+.painel-registros-tabela th .painel-registros-oque { display: block; color: var(--muted); font-weight: 400; font-style: normal; }
 .painel-indisponiveis { align-self: flex-start; padding: 0; font-size: 11px; color: var(--muted); text-align: left; }
 .painel-bloco select optgroup { color: var(--faint); font-style: normal; font-size: 11px; }
 .painel-busca { width: 100%; min-height: 32px; padding: 5px 8px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--surface); font-size: 13px; }

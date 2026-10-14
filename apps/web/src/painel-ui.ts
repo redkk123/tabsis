@@ -20,6 +20,7 @@ import {
   serializeTabwinLog,
 } from '../../../packages/formats/src/tabwin-log.ts';
 import { describeDatasusFile } from '../../../packages/formats/src/datasus-file-names.ts';
+import { datasusFieldEntry } from '../../../packages/formats/src/datasus-field-dictionary.ts';
 import type {
   CompatibilityProfile,
   DimensionLookupDefinition,
@@ -354,6 +355,16 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
     if (botao) rotularIndisponiveis(botao, fora.length);
   }
 
+  /** O sistema dos arquivos abertos, pelo nome (`DOINF23.dbc` → SIM): escolhe o dicionário. */
+  function sistemaDosArquivos(): string | undefined {
+    return deps.arquivos().map((arquivo) => describeDatasusFile(arquivo.name)?.system).find(Boolean);
+  }
+
+  /** O que o dicionário oficial do DATASUS diz do campo, quando diz. */
+  function explicacao(campo: string): ReturnType<typeof datasusFieldEntry> {
+    return campo ? datasusFieldEntry(campo, sistemaDosArquivos()) : undefined;
+  }
+
   /** Amostra de categorias por tabela (CNV ou DBF já lido), feita uma vez só. */
   const amostras = new WeakMap<object, string>();
 
@@ -366,7 +377,12 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
       if (recurso) amostras.set(recurso, amostra);
     }
     const origem = [eixo.field && `campo ${eixo.field}`, eixo.resourceFile && `tabela ${eixo.resourceFile.replace(/\\/g, '/').split('/').pop()}`].filter(Boolean).join(', ');
-    return `${eixo.label}: ${amostra}${origem ? `\n${origem}` : ''}`;
+    const oficial = explicacao(eixo.field);
+    return [
+      `${eixo.label}: ${amostra}`,
+      oficial ? `${oficial.entry.label} — ${oficial.entry.description}` : '',
+      origem,
+    ].filter(Boolean).join('\n');
   }
 
   function amostraDe(eixo: PainelEixo): string {
@@ -392,6 +408,15 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
       destino.append(el('b', {}, `Uma ${papel === 'linhas' ? 'linha' : 'coluna'} para cada valor`), ' que aparecer no arquivo');
     }
     if (origem) destino.append(el('small', {}, origem));
+    // A explicação oficial do campo, quando o dicionário do DATASUS a tem:
+    // "STDONOVA" vira "DO nova — Se a declaração de óbito é do modelo novo".
+    const oficial = explicacao(eixo.field);
+    if (oficial) {
+      destino.append(el('span', {
+        className: 'painel-previa-dicionario',
+        title: [oficial.entry.values && `Valores: ${oficial.entry.values}`, `Fonte: ${oficial.source}`].filter(Boolean).join('\n'),
+      }, el('b', {}, `${oficial.entry.label}: `), oficial.entry.description));
+    }
   }
 
   function renderDef(): void {
@@ -843,7 +868,7 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
       el('header', { className: 'painel-registros-topo' },
         el('div', {}, el('h2', {}, 'Registros do arquivo'),
           el('p', {}, `${deps.arquivos().map((arquivo) => arquivo.name).join(' + ')} · ${campos.length} campos · primeiras ${LIMITE} linhas. `,
-            'Cada linha é um registro (uma internação, um óbito…); cada coluna, um campo do DBF. O nome em cima é o do arquivo; embaixo, o nome que o DEF dá.')),
+            'Cada linha é um registro (uma internação, um óbito…); cada coluna, um campo do DBF. O nome em cima é o do arquivo; embaixo, o nome que o DEF dá e, no SIM e no SINASC, o que o dicionário oficial diz (passe o mouse para a explicação completa).')),
         el('button', { type: 'button', className: 'secondary-button', onclick: () => registrosDialogo.close() }, 'Fechar'),
       ),
       el('p', { className: 'painel-vazio' }, 'Lendo…'),
@@ -856,10 +881,15 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
       cabeca.append(el('th', { scope: 'col' }, '#'));
       for (const campo of campos) {
         const rotulos = usados.get(campo.name.toUpperCase());
-        cabeca.append(el('th', { scope: 'col', title: rotulos?.join(' · ') ?? '' },
+        const oficial = explicacao(campo.name);
+        cabeca.append(el('th', {
+          scope: 'col',
+          title: [rotulos?.join(' · '), oficial && `${oficial.entry.label}: ${oficial.entry.description}`, oficial?.entry.values && `Valores: ${oficial.entry.values}`].filter(Boolean).join('\n'),
+        },
           el('b', {}, campo.name),
           el('small', {}, tipoDoCampo(campo)),
-          ...(rotulos ? [el('em', {}, rotulos[0]!)] : [])));
+          ...(rotulos ? [el('em', {}, rotulos[0]!)] : []),
+          ...(oficial ? [el('small', { className: 'painel-registros-oque' }, oficial.entry.label)] : [])));
       }
       const corpo = el('tbody');
       linhas.forEach((linha, indice) => {

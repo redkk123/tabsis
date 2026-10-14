@@ -216,6 +216,36 @@ neles, ou a CNV não foi aberta) ficam fora das listas. O link **+ N que não d�
 para usar com estes arquivos**, embaixo de cada lista, mostra quais são e por
 quê.
 
+### O que querem dizer os nomes do DEF
+
+Os nomes das listas são os que o **DEF oficial** escreve — os mesmos do
+TabWin, e por isso o TabSis não os troca. Muitos são abreviações do próprio
+DATASUS (*Fx.Etar.Infant.1*, *Oport invetig (120d)* — com o erro de digitação
+do original). Para quem não os conhece, o painel explica cada um de três
+jeitos:
+
+1. **As categorias**, embaixo da lista: o que a escolha vai virar na tabela.
+2. **O dicionário oficial**, logo abaixo, no SIM e no SINASC: o que o campo do
+   arquivo significa, transcrito da *Estrutura do SIM* (DATASUS, 07/2025) e da
+   *Estrutura do SINASC*. Passe o mouse para ver os valores válidos e a fonte.
+3. **A dica** ao passar o mouse sobre qualquer opção da lista, com os dois.
+
+Alguns exemplos do DEF de óbitos:
+
+| Nome no DEF | Campo | O que é |
+| --- | --- | --- |
+| Faixa Etaria pad(5-5) | `IDADE` | faixas de 5 em 5 anos: 00-04a, 05-09a… |
+| \*DO novo modelo | `STDONOVA` | se a declaração de óbito é do modelo novo (Sim/Não) |
+| \*DO epidemiologica | `STDOEPIDEM` | se a declaração de óbito é epidemiológica (Sim/Não) |
+| Oport notif (30d) | `DIFDATA` | dias entre o óbito e o recebimento da DO, em faixas: até 30 dias (oportuna), 31–60… |
+| Oport invetig (120d) | `NUDIASOBIN` | dias até a investigação, em faixas: até 120 dias (oportuna), 121–150… |
+
+O dicionário só diz o que os documentos oficiais dizem. O `NUDIASOBIN`, por
+exemplo, não está na *Estrutura do SIM*: para ele, o painel mostra só as
+categorias da CNV. Os campos do SIM e do SINASC também ganham nome legível em
+**Tabular por campos** e em **Ver registros do arquivo**; nas exportações
+continua indo o nome técnico do campo, para não quebrar planilhas e scripts.
+
 Embaixo dos blocos, uma frase diz o que vai ser tabulado — *Frequência por
 Sexo segundo Fx.Etar.Infant.1* — antes de você clicar em **Executar**.
 

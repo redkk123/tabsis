@@ -111,6 +111,7 @@ import {
 } from '../../../packages/export/src/tabwin-formats.ts';
 import { encodeWindows1252 } from '../../../packages/formats/src/windows-1252.ts';
 import { describeAuxiliaryFile, describeDatasusFile } from '../../../packages/formats/src/datasus-file-names.ts';
+import { datasusFieldEntry } from '../../../packages/formats/src/datasus-field-dictionary.ts';
 import { criarGerarDef } from './gerar-def.ts';
 import { criarEditorCnv } from './editor-cnv.ts';
 import {
@@ -1000,7 +1001,10 @@ function setControlsEnabled(enabled: boolean): void {
  * official layout still needs to see the real name.
  */
 function labelledFieldName(fieldName: string, defLabel?: string): string {
-  const label = defLabel ?? datasusFieldLabel(fieldName);
+  // Sem DEF: o rótulo curto conhecido, ou o do dicionário oficial do SIM/SINASC
+  // quando o arquivo é de um deles (STDONOVA → "DO nova").
+  const sistema = activeDatasetSources.map((source) => describeDatasusFile(source.name)?.system).find(Boolean);
+  const label = defLabel ?? datasusFieldLabel(fieldName) ?? datasusFieldEntry(fieldName, sistema)?.entry.label;
   if (!label) return fieldName;
   // A label that is the field name in prettier case ("Sexo" for SEXO) adds
   // nothing, and "Sexo · SEXO" reads as noise. Collapse to the technical name
@@ -1036,7 +1040,7 @@ function friendlyFieldLabel(fieldName: string, role: 'row' | 'column' = 'row'): 
 }
 
 function activeRowLabel(): string {
-  return currentRowLabel || fieldLabel(rowField.value) || currentPlan?.spec.rows.field || 'Linha';
+  return currentRowLabel || (rowField.value ? friendlyFieldLabel(rowField.value) : '') || currentPlan?.spec.rows.field || 'Linha';
 }
 
 /**
@@ -3670,7 +3674,9 @@ async function runAnalysis(measureOverride?: MeasureSpec, planOverride?: QueryPl
     baseResult = result;
     currentResult = result;
     tableOperations = [];
-    currentRowLabel = friendlyFieldLabel(rowField.value);
+    // Só o nome do DEF fica guardado (vai para a exportação); sem DEF a tela
+    // mostra o rótulo do dicionário e a exportação, o nome técnico.
+    currentRowLabel = defFieldLabel(rowField.value, 'row') ? friendlyFieldLabel(rowField.value) : '';
     resultKicker.textContent = measureKind.value === 'sum'
       ? `${datasetName} · soma de ${measureField.value}`
       : `${datasetName} · contagem de registros`;
