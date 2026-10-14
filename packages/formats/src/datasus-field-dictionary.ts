@@ -15,6 +15,7 @@
  */
 
 import { IT_LAYOUTS, IT_SOURCES } from './datasus-dictionary-it.js';
+import { sinanAgravoEntry } from './datasus-dictionary-sinan.js';
 
 export interface DatasusFieldEntry {
   /** Nome curto, para mostrar no lugar da sigla. */
@@ -163,8 +164,8 @@ const SINASC: Readonly<Record<string, DatasusFieldEntry>> = {
 /**
  * SINAN: os campos da ficha de notificação, comuns a todos os agravos
  * (NINDIN_DIC_DADOS.pdf, Dicionário de dados SINAN NET 5.0, revisado em
- * novembro/2018, em Docs_TAB_SINAN.zip). Os campos de cada agravo estão no
- * dicionário do agravo, que o app oferece em PDF.
+ * novembro/2018, em Docs_TAB_SINAN.zip). Os campos de cada agravo estão em
+ * `datasus-dictionary-sinan.ts` (os mais consultados) ou no PDF do agravo.
  */
 const SINAN_DATA_TRANSF = (nivel: string): DatasusFieldEntry => ({
   label: `Data de transferência (${nivel})`,
@@ -250,7 +251,8 @@ const DICTIONARIES: Readonly<Record<DatasusDictionarySystem, Readonly<Record<str
  * O que o dicionário oficial diz de um campo. Com o sistema (do nome do
  * arquivo: `DOINF23.dbc` é SIM), usa o dicionário dele — `SEXO` tem códigos
  * diferentes no SIM e no SINASC. Sem o sistema, só responde se os dois
- * dicionários não discordam.
+ * dicionários não discordam. No SINAN, o prefixo (HANS, DENG…) escolhe o
+ * dicionário do agravo, e a ficha de notificação cobre o resto.
  */
 export function datasusFieldEntry(
   fieldName: string,
@@ -259,6 +261,12 @@ export function datasusFieldEntry(
 ): { entry: DatasusFieldEntry; source: string } | undefined {
   const field = fieldName.trim().toUpperCase();
   if (system && IT_LAYOUTS[system]) return entradaDoInforme(field, system, prefix);
+  if (system === 'SINAN') {
+    // O dicionário do agravo vem antes: a ficha tem campos com o mesmo
+    // nome e menos detalhe (CLASSI_FIN, sem os códigos de cada agravo).
+    const doAgravo = sinanAgravoEntry(prefix, field);
+    if (doAgravo) return doAgravo;
+  }
   if (system === 'SIM' || system === 'SINASC' || system === 'SINAN') {
     const entry = DICTIONARIES[system][field];
     return entry ? { entry, source: DATASUS_DICTIONARY_SOURCES[system] } : undefined;
