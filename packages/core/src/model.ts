@@ -202,6 +202,27 @@ export type TableOperation =
       output: DerivedColumnSpec;
     }
   | {
+      /**
+       * TabWin "Operações → %percentagem": each value as a percentage of the
+       * column total (the total that skips CNV subtotal detail rows). Decompiled
+       * from percentagem1Click; TabWin heads the new column "%" + header.
+       */
+      kind: 'percent-of-total';
+      sourceColumnKey: string;
+      output: DerivedColumnSpec;
+    }
+  | {
+      /**
+       * TabWin "Operações → Normalizar": z-score over every row,
+       * (x − média) ÷ desvio padrão amostral (n − 1). Decompiled from
+       * Normalizar1Click; TabWin heads the new column "Z" + header and leaves
+       * its total at zero.
+       */
+      kind: 'normalize';
+      sourceColumnKey: string;
+      output: DerivedColumnSpec;
+    }
+  | {
       kind: 'absolute';
       sourceColumnKey: string;
       output: DerivedColumnSpec;

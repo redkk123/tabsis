@@ -4052,6 +4052,7 @@ function operationLabel(operation: TableOperation): string {
     add: 'soma', subtract: 'subtração', multiply: 'produto', divide: 'divisão',
     minimum: 'mínimo', maximum: 'máximo', percentage: 'percentual', factor: 'fator',
     cumulative: 'acumulado', absolute: 'absoluto', integer: 'inteiro', sequence: 'sequência', constant: 'constante',
+    'percent-of-total': 'percentual do total', normalize: 'normalizar (escore z)',
     expression: 'expressão',
   };
   if (operation.kind === 'rename-column') return `${operation.label} · renomear coluna`;
@@ -4146,6 +4147,8 @@ function suggestedOperationLabel(kind: string): string {
     divide: `${left} ÷ ${right}`, minimum: `Mínimo (${left}, ${right})`, maximum: `Máximo (${left}, ${right})`,
     percentage: `% ${left} / ${right}`, factor: `${left} × ${tableOperationNumber.value || '1'}`,
     cumulative: `Acumulado: ${left}`, absolute: `Absoluto: ${left}`, integer: `Inteiro: ${left}`,
+    // Os mesmos cabeçalhos que o TabWin dá: "%" e "Z" antes do nome da coluna.
+    'percent-of-total': `%${left}`, normalize: `Z${left}`,
     sequence: 'Sequência', constant: 'Nova coluna', expression: 'Coluna calculada',
   };
   return labels[kind] ?? 'Nova coluna';
@@ -4172,7 +4175,7 @@ function applySelectedTableOperation(): void {
     };
   } else if (kind === 'factor') {
     operation = { kind, sourceColumnKey: tableOperationLeft.value, factor: numeric, output };
-  } else if (kind === 'cumulative' || kind === 'absolute') {
+  } else if (kind === 'cumulative' || kind === 'absolute' || kind === 'percent-of-total' || kind === 'normalize') {
     operation = { kind, sourceColumnKey: tableOperationLeft.value, output };
   } else if (kind === 'integer') {
     operation = { kind, sourceColumnKey: tableOperationLeft.value, rounding: 'truncate', output };

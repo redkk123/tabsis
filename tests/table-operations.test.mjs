@@ -165,3 +165,19 @@ test('structural operations reject destructive or ambiguous requests', () => {
   assert.throws(() => applyTableOperation(base, { kind: 'move-column', columnKey: 'x', direction: 'left' }), /cannot move/);
   assert.throws(() => applyTableOperation(base, { kind: 'suppress-rows', rowKeys: [] }), /at least one/);
 });
+
+test('%percentagem e Normalizar fazem o que o TabWin faz (decompilado)', async () => {
+  const { applyTableOperation } = await import('../dist/packages/analysis/src/table-operations.js');
+  const base = {
+    rows: [{ key: 'N', label: 'Região Norte', source: 'conversion' }, { key: 'AC', label: '.. Acre', source: 'conversion', excludeFromTotal: true }, { key: 'X', label: 'Outra', source: 'conversion' }],
+    columns: [{ key: 'C', label: 'Freqüência', source: 'raw' }],
+    cells: [[30], [30], [10]],
+    warnings: [], recordsSeen: 40, recordsAccepted: 40,
+  };
+  const pct = applyTableOperation(base, { kind: 'percent-of-total', sourceColumnKey: 'C', output: { key: 'P', label: '%Freqüência', totalPolicy: 'sum' } }).result;
+  // O total da coluna pula a linha de detalhe de subtotal: 40, não 70.
+  assert.deepEqual(pct.cells.map((row) => row[1]), [75, 75, 25]);
+  const z = applyTableOperation({ ...base, cells: [[1], [2], [3]] }, { kind: 'normalize', sourceColumnKey: 'C', output: { key: 'Z', label: 'ZFreqüência', totalPolicy: 'none' } }).result;
+  assert.deepEqual(z.cells.map((row) => row[1]), [-1, 0, 1]);
+  assert.throws(() => applyTableOperation({ ...base, cells: [[2], [2], [2]] }, { kind: 'normalize', sourceColumnKey: 'C', output: { key: 'Z', label: 'Z', totalPolicy: 'none' } }), /not all equal/);
+});

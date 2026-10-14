@@ -376,7 +376,7 @@ export function validateTableOperation(value: unknown): asserts value is TableOp
   if (!value || typeof value !== 'object') throw new Error('invalid table operation in TabSis recipe');
   const operation = value as Partial<TableOperation> & Record<string, unknown> & { output?: Record<string, unknown> };
   const stringField = (key: string): boolean => typeof operation[key] === 'string' && String(operation[key]).length > 0;
-  const allowedKinds = new Set(['binary', 'factor', 'cumulative', 'absolute', 'integer', 'sequence', 'constant', 'expression',
+  const allowedKinds = new Set(['binary', 'factor', 'cumulative', 'percent-of-total', 'normalize', 'absolute', 'integer', 'sequence', 'constant', 'expression',
     'rename-column', 'move-column', 'delete-column', 'transpose', 'include-table', 'suppress-rows', 'aggregate-rows']);
   if (!operation.kind || !allowedKinds.has(operation.kind)) {
     throw new Error('invalid table operation in TabSis recipe');
@@ -452,7 +452,8 @@ export function validateTableOperation(value: unknown): asserts value is TableOp
     }
   } else if (operation.kind === 'factor') {
     if (!stringField('sourceColumnKey') || !finiteField('factor')) throw new Error('invalid factor operation in TabSis recipe');
-  } else if (operation.kind === 'cumulative' || operation.kind === 'absolute') {
+  } else if (operation.kind === 'cumulative' || operation.kind === 'absolute'
+    || operation.kind === 'percent-of-total' || operation.kind === 'normalize') {
     if (!stringField('sourceColumnKey')) throw new Error('invalid unary table operation in TabSis recipe');
   } else if (operation.kind === 'integer') {
     if (!stringField('sourceColumnKey') || !new Set(['truncate', 'round', 'floor', 'ceil']).has(String(operation.rounding))) {

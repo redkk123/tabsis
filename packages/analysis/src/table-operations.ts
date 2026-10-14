@@ -79,8 +79,24 @@ export function applyTableOperation(
   const rightIndex = operation.kind === 'binary' ? columnIndex(source, operation.rightColumnKey) : -1;
   const sourceIndex = operation.kind === 'factor' || operation.kind === 'cumulative'
     || operation.kind === 'absolute' || operation.kind === 'integer'
+    || operation.kind === 'percent-of-total' || operation.kind === 'normalize'
     ? columnIndex(source, operation.sourceColumnKey)
     : -1;
+  const columnTotal = operation.kind === 'percent-of-total'
+    ? calculateColumnTotal(source, operation.sourceColumnKey, 'sum') ?? 0
+    : 0;
+  if (operation.kind === 'percent-of-total' && columnTotal === 0) {
+    throw new Error('percent of total needs a column whose total is not zero');
+  }
+  let zMean = 0;
+  let zDeviation = 0;
+  if (operation.kind === 'normalize') {
+    const all = source.cells.map((cells) => cells[sourceIndex] ?? 0);
+    if (all.length < 2) throw new Error('normalizing needs at least two rows');
+    zMean = all.reduce((sum, value) => sum + value, 0) / all.length;
+    zDeviation = Math.sqrt(all.reduce((sum, value) => sum + (value - zMean) ** 2, 0) / (all.length - 1));
+    if (!(zDeviation > 0)) throw new Error('normalizing needs a column whose values are not all equal');
+  }
   const expression = operation.kind === 'expression'
     ? parseTableExpression(source, operation.expression) : undefined;
 
@@ -103,6 +119,10 @@ export function applyTableOperation(
     } else if (operation.kind === 'cumulative') {
       running += cells[sourceIndex] ?? 0;
       value = running;
+    } else if (operation.kind === 'percent-of-total') {
+      value = ((cells[sourceIndex] ?? 0) / columnTotal) * 100;
+    } else if (operation.kind === 'normalize') {
+      value = ((cells[sourceIndex] ?? 0) - zMean) / zDeviation;
     } else if (operation.kind === 'absolute') {
       value = Math.abs(cells[sourceIndex] ?? 0);
     } else if (operation.kind === 'integer') {
