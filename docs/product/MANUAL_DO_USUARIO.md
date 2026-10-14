@@ -442,7 +442,7 @@ manual do curso TabWin de fev/2011):
 | Quadro → Decimais | Casas decimais da coluna (Editar) ou da tabela inteira (Quadro). |
 | Quadro → Suprimir/agregar linhas | Mesmo critério (igual, maior, menor, diferente) e linha "Outras". |
 | Quadro → Fixar comprimento da chave | Quadro → Comprimento da chave, usado ao Incluir tabela. |
-| Editar → Editar arquivo DEF ou CNV → Gera DEF | Metadados → **Gerar DEF**: marque os campos; baixe ou use no painel. |
+| Editar → Editar arquivo DEF ou CNV → Gera DEF | Definições e conversões → **Gerar DEF**: marque os campos; baixe ou use no painel. |
 | … → Gera CNV / Numera CNV | Editor de CNV → **Gerar do campo** / **Numerar**. |
 | Estatísticas → Regressão linear (coluna estimada) | Estatística → Regressão → "Inserir coluna com os valores estimados". |
 | Estatísticas → Histograma → Igual freqüência | Estatística → Histograma → Tipo de classe. |
@@ -553,9 +553,9 @@ suficientes para provar quais campos são estáveis.
 Para a barra lateral não ser uma pilha de botões de peso igual, as ações que
 não fazem parte do fluxo principal ficam em seções recolhíveis:
 
-- **Exportar o arquivo** — extrair o DBF original, salvar a seleção em DBF,
-  CSV para o `microdatasus`;
-- **Metadados** — Editor de CNV e Inspetor de DEF;
+- **Baixar os dados abertos** — extrair o DBF original, salvar a seleção em
+  DBF, CSV para o `microdatasus`;
+- **Definições e conversões** — Editor de CNV, Inspetor de DEF e Gerar DEF;
 - **Análises e tabelas salvas** — abrir e salvar receitas e tabelas.
 
 Nada foi removido; tudo está a um clique no cabeçalho da seção.
@@ -610,8 +610,10 @@ memória da aba. O resto do pacote abre normalmente; use **Baixar arquivo** para
 salvar aquele item e usá-lo fora do navegador.
 
 **Rótulo aparecendo como código** — falta a CNV correspondente, ou ela ficou de
-fora do pacote. Verifique em **Definição (DEF) ativa** qual DEF está mandando,
-e se as conversões dele foram abertas.
+fora do pacote. Veja no seletor **Definição (DEF)**, no alto do painel, qual
+DEF está mandando, e se as conversões dele foram abertas: a opção mostra embaixo
+da lista qual tabela usa, e as que faltam aparecem em **+ N que não dá para usar
+com estes arquivos**.
 
 **Números diferentes do TabNet** — o TabNet aplica filtros próprios (por
 exemplo, só casos confirmados) que não estão no microdado cru. Compare o que
