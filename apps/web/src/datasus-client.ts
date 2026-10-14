@@ -631,6 +631,27 @@ export function extractSupportedArchiveFiles(archive: Uint8Array): ExtractedArch
 }
 
 /**
+ * Os documentos (PDF) que um pacote oficial traz, sem expandir nenhum: os
+ * pacotes auxiliares (TAB_SIH.zip, TAB_SIA.zip, TAB_CNES.zip) têm uma pasta
+ * Docs com o Informe Técnico, que é o dicionário dos campos. Só os nomes; o
+ * conteúdo é expandido quando alguém pede (`extractOneArchiveEntry`).
+ */
+export function listArchiveDocuments(archive: Uint8Array): string[] {
+  const names: string[] = [];
+  try {
+    unzipSync(archive, {
+      filter: (entry) => {
+        if (extensionOf(entry.name) === 'PDF') names.push(entry.name);
+        return false;
+      },
+    });
+  } catch {
+    // Listar é um extra: um pacote estranho não pode impedir a abertura.
+  }
+  return names;
+}
+
+/**
  * Expands exactly one named entry, ignoring the per-file eager limit.
  *
  * The limit exists so a huge member is not expanded *automatically* into a tab

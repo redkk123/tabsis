@@ -24,3 +24,17 @@ test('campo que o dicionário oficial não descreve fica sem explicação, não 
   assert.ok(datasusDictionaryCount('SIM') > 80);
   assert.ok(datasusDictionaryCount('SINASC') >= 30);
 });
+
+test('SIH, SIA e CNES: o layout do Informe Técnico de cada arquivo, pelo prefixo', () => {
+  assert.equal(datasusFieldEntry('VAL_TOT', 'SIH', 'RD')?.entry.label, 'Valor total da AIH');
+  // O informe escreve DI_INTER; o arquivo tem DT_INTER.
+  assert.equal(datasusFieldEntry('DT_INTER', 'SIH', 'RD')?.entry.label, 'Data de internação');
+  const orgao = datasusFieldEntry('ORGEXPED', 'CNES', 'ST');
+  assert.equal(orgao?.entry.label, 'Órgão expedidor do alvará');
+  assert.equal(orgao?.entry.values, '1-SES 2-SMS');
+  assert.match(orgao?.source ?? '', /Informe Técnico CNES/);
+  assert.equal(datasusFieldEntry('PA_INDICA', 'SIA', 'PA')?.entry.values, '0 = não aprovado; 5 = aprovado total; 6 = aprovado parcial');
+  // SEQUENCIA quer dizer coisas diferentes no RD e no SP: sem o arquivo, não responde.
+  assert.equal(datasusFieldEntry('SEQUENCIA', 'SIH'), undefined);
+  assert.ok(datasusFieldEntry('SEQUENCIA', 'SIH', 'SP'));
+});

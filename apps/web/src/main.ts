@@ -175,6 +175,7 @@ import { retryAttempts, retryCause } from '../../../packages/acquisition/src/ret
 import {
   chooseVerifiedAuxiliaryBundle,
   extractOneArchiveEntry,
+  listArchiveDocuments,
   extractSupportedArchive,
   extractSupportedArchiveAsync,
   readLastDownloadTransport,
@@ -886,6 +887,28 @@ function rememberSource(source: LoadedSource): void {
   renderFileList();
 }
 
+/**
+ * PDFs que vieram nos pacotes auxiliares oficiais (o Informe Técnico de cada
+ * sistema descreve os campos). Guarda só onde estão: o PDF sai do pacote no
+ * cache quando alguém clica, sem segurar o pacote inteiro na memória.
+ */
+const documentosOficiais = new Map<string, { cacheKey: string; entry: string }>();
+
+async function abrirDocumentoOficial(nome: string): Promise<void> {
+  const documento = documentosOficiais.get(nome);
+  if (!documento) return;
+  try {
+    const cached = await readCachedArchive(documento.cacheKey, Number.POSITIVE_INFINITY);
+    if (!cached) throw new Error('O pacote não está mais no cache deste aparelho; busque os auxiliares de novo.');
+    const bytes = extractOneArchiveEntry(cached.bytes, documento.entry);
+    const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'application/pdf' }));
+    if (!window.open(url, '_blank', 'noopener')) downloadBlob(new Blob([bytes as BlobPart], { type: 'application/pdf' }), nome);
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), true);
+  }
+}
+
 function renderFileList(): void {
   // Dados primeiro, cada um com o nome original e o que ele é ("Internações ·
   // SIH · Acre · jan/2024"); DEF e CNV viram um resumo, porque 126 nomes de
@@ -927,6 +950,16 @@ function renderFileList(): void {
       ? `${integerFormat.format(cnvs)} ${cnvs === 1 ? 'tabela' : 'tabelas'} de conversão (CNV)`
       : `${integerFormat.format(others.length)} arquivos auxiliares`;
     fileList.append(chip(title, 'trocam códigos por nomes (1 → Masculino)', others.map((source) => source.name).join(', ')));
+  }
+  // O dicionário oficial do sistema, que veio junto no pacote auxiliar.
+  for (const nome of documentosOficiais.keys()) {
+    const documento = chip(nome, 'documentação oficial do DATASUS: o que é cada campo · abrir', 'Informe técnico que veio no pacote auxiliar oficial');
+    documento.classList.add('file-chip-documento');
+    documento.setAttribute('role', 'button');
+    documento.tabIndex = 0;
+    documento.addEventListener('click', () => void abrirDocumentoOficial(nome));
+    documento.addEventListener('keydown', (evento) => { if (evento.key === 'Enter' || evento.key === ' ') { evento.preventDefault(); void abrirDocumentoOficial(nome); } });
+    fileList.append(documento);
   }
 }
 
@@ -1003,8 +1036,8 @@ function setControlsEnabled(enabled: boolean): void {
 function labelledFieldName(fieldName: string, defLabel?: string): string {
   // Sem DEF: o rótulo curto conhecido, ou o do dicionário oficial do SIM/SINASC
   // quando o arquivo é de um deles (STDONOVA → "DO nova").
-  const sistema = activeDatasetSources.map((source) => describeDatasusFile(source.name)?.system).find(Boolean);
-  const label = defLabel ?? datasusFieldLabel(fieldName) ?? datasusFieldEntry(fieldName, sistema)?.entry.label;
+  const tipo = activeDatasetSources.map((source) => describeDatasusFile(source.name)).find(Boolean);
+  const label = defLabel ?? datasusFieldLabel(fieldName) ?? datasusFieldEntry(fieldName, tipo?.system, tipo?.prefix)?.entry.label;
   if (!label) return fieldName;
   // A label that is the field name in prettier case ("Sexo" for SEXO) adds
   // nothing, and "Sexo · SEXO" reads as noise. Collapse to the technical name
@@ -7186,6 +7219,10 @@ async function downloadCatalogEntries(
   }
   const archiveSha256 = summary?.sha256 || await sha256(archive);
   const extracted = await extractSupportedArchiveAsync(archive);
+  if (role === 'auxiliary') {
+    for (const name of listArchiveDocuments(archive)) documentosOficiais.set(displayBaseName(name), { cacheKey, entry: name });
+    renderFileList();
+  }
   return {
     files: extracted.files,
     skipped: extracted.skipped,

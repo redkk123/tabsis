@@ -225,9 +225,12 @@ do original). Para quem não os conhece, o painel explica cada um de três
 jeitos:
 
 1. **As categorias**, embaixo da lista: o que a escolha vai virar na tabela.
-2. **O dicionário oficial**, logo abaixo, no SIM e no SINASC: o que o campo do
-   arquivo significa, transcrito da *Estrutura do SIM* (DATASUS, 07/2025) e da
-   *Estrutura do SINASC*. Passe o mouse para ver os valores válidos e a fonte.
+2. **O dicionário oficial**, logo abaixo: o que o campo do arquivo significa,
+   transcrito dos documentos do DATASUS — *Estrutura do SIM* (07/2025),
+   *Estrutura do SINASC* e os Informes Técnicos do **SIH** (2016-03), do
+   **SIA** (2019-07) e do **CNES** (2017-06), com o layout de cada tipo de
+   arquivo (RD, SP, PA, as APACs, ST, LT…). Passe o mouse para ver os valores
+   válidos e a fonte.
 3. **A dica** ao passar o mouse sobre qualquer opção da lista, com os dois.
 
 Alguns exemplos do DEF de óbitos:
@@ -239,6 +242,12 @@ Alguns exemplos do DEF de óbitos:
 | \*DO epidemiologica | `STDOEPIDEM` | se a declaração de óbito é epidemiológica (Sim/Não) |
 | Oport notif (30d) | `DIFDATA` | dias entre o óbito e o recebimento da DO, em faixas: até 30 dias (oportuna), 31–60… |
 | Oport invetig (120d) | `NUDIASOBIN` | dias até a investigação, em faixas: até 120 dias (oportuna), 121–150… |
+
+**Documentação oficial com um clique.** Os pacotes auxiliares do DATASUS
+(`TAB_SIH.zip`, `TAB_SIA.zip`, `TAB_CNES.zip`) trazem o Informe Técnico do
+sistema numa pasta `Docs`. Quando o TabSis baixa um desses pacotes, o PDF
+aparece na barra lateral — *documentação oficial do DATASUS: o que é cada
+campo* — e abre com um toque, direto do pacote guardado no aparelho.
 
 O dicionário só diz o que os documentos oficiais dizem. O `NUDIASOBIN`, por
 exemplo, não está na *Estrutura do SIM*: para ele, o painel mostra só as

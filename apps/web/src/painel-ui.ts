@@ -355,14 +355,15 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
     if (botao) rotularIndisponiveis(botao, fora.length);
   }
 
-  /** O sistema dos arquivos abertos, pelo nome (`DOINF23.dbc` → SIM): escolhe o dicionário. */
-  function sistemaDosArquivos(): string | undefined {
-    return deps.arquivos().map((arquivo) => describeDatasusFile(arquivo.name)?.system).find(Boolean);
+  /** Sistema e tipo dos arquivos abertos, pelo nome (`RDAC2401.dbc` → SIH, RD): escolhem o dicionário. */
+  function tipoDosArquivos(): { system?: string; prefix?: string } {
+    return deps.arquivos().map((arquivo) => describeDatasusFile(arquivo.name)).find(Boolean) ?? {};
   }
 
   /** O que o dicionário oficial do DATASUS diz do campo, quando diz. */
   function explicacao(campo: string): ReturnType<typeof datasusFieldEntry> {
-    return campo ? datasusFieldEntry(campo, sistemaDosArquivos()) : undefined;
+    const { system, prefix } = tipoDosArquivos();
+    return campo ? datasusFieldEntry(campo, system, prefix) : undefined;
   }
 
   /** Amostra de categorias por tabela (CNV ou DBF já lido), feita uma vez só. */
@@ -380,7 +381,7 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
     const oficial = explicacao(eixo.field);
     return [
       `${eixo.label}: ${amostra}`,
-      oficial ? `${oficial.entry.label} — ${oficial.entry.description}` : '',
+      oficial ? (mesmoTexto(oficial.entry.label, oficial.entry.description) ? oficial.entry.label : `${oficial.entry.label} — ${oficial.entry.description}`) : '',
       origem,
     ].filter(Boolean).join('\n');
   }
@@ -388,8 +389,14 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
   function amostraDe(eixo: PainelEixo): string {
     const categorias = categoriasDe(eixo);
     return categorias?.length
-      ? `${categorias.slice(0, 5).map((categoria) => categoria.label.trim()).join(' · ')}${categorias.length > 5 ? ` … (${categorias.length.toLocaleString('pt-BR')} ao todo)` : ''}`
+      ? `${categorias.slice(0, 5).map((categoria) => categoria.label.replace(/^[.\s]+/, '').trim()).join(' · ')}${categorias.length > 5 ? ` … (${categorias.length.toLocaleString('pt-BR')} ao todo)` : ''}`
       : 'um item para cada valor do campo';
+  }
+
+  /** A descrição só repete o nome ("Valor total da AIH." / "Valor total da AIH")? */
+  function mesmoTexto(a: string, b: string): boolean {
+    const limpo = (texto: string) => texto.replace(/[.\s]+$/, '').trim().toLowerCase();
+    return limpo(a) === limpo(b);
   }
 
   /** "5 linhas: < 7d · 07-27 · 28d-<1 · Ign <1 · Ign", e de onde vêm. */
@@ -402,7 +409,7 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
     const categorias = categoriasDe(eixo);
     const origem = [eixo.field && `campo ${eixo.field}`, eixo.resourceFile && `tabela ${eixo.resourceFile.replace(/\\/g, '/').split('/').pop()}`].filter(Boolean).join(', ');
     if (categorias?.length) {
-      const amostra = categorias.slice(0, 6).map((categoria) => categoria.label.trim()).join(' · ');
+      const amostra = categorias.slice(0, 6).map((categoria) => categoria.label.replace(/^[.\s]+/, '').trim()).join(' · ');
       destino.append(el('b', {}, `${categorias.length.toLocaleString('pt-BR')} ${papel}: `), amostra, categorias.length > 6 ? ' …' : '');
     } else {
       destino.append(el('b', {}, `Uma ${papel === 'linhas' ? 'linha' : 'coluna'} para cada valor`), ' que aparecer no arquivo');
@@ -415,7 +422,9 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
       destino.append(el('span', {
         className: 'painel-previa-dicionario',
         title: [oficial.entry.values && `Valores: ${oficial.entry.values}`, `Fonte: ${oficial.source}`].filter(Boolean).join('\n'),
-      }, el('b', {}, `${oficial.entry.label}: `), oficial.entry.description));
+      }, ...(mesmoTexto(oficial.entry.label, oficial.entry.description)
+        ? [el('b', {}, oficial.entry.label)]
+        : [el('b', {}, `${oficial.entry.label}: `), oficial.entry.description])));
     }
   }
 

@@ -14,6 +14,8 @@
  * número, um filtro ou uma exportação.
  */
 
+import { IT_LAYOUTS, IT_SOURCES } from './datasus-dictionary-it.js';
+
 export interface DatasusFieldEntry {
   /** Nome curto, para mostrar no lugar da sigla. */
   label: string;
@@ -168,8 +170,10 @@ const DICTIONARIES: Readonly<Record<DatasusDictionarySystem, Readonly<Record<str
 export function datasusFieldEntry(
   fieldName: string,
   system?: string,
+  prefix?: string,
 ): { entry: DatasusFieldEntry; source: string } | undefined {
   const field = fieldName.trim().toUpperCase();
+  if (system && IT_LAYOUTS[system]) return entradaDoInforme(field, system, prefix);
   if (system === 'SIM' || system === 'SINASC') {
     const entry = DICTIONARIES[system][field];
     return entry ? { entry, source: DATASUS_DICTIONARY_SOURCES[system] } : undefined;
@@ -180,6 +184,35 @@ export function datasusFieldEntry(
   if (sim) return { entry: sim, source: DATASUS_DICTIONARY_SOURCES.SIM };
   if (sinasc) return { entry: sinasc, source: DATASUS_DICTIONARY_SOURCES.SINASC };
   return undefined;
+}
+
+/**
+ * SIH, SIA e CNES: o layout do arquivo no Informe Técnico (gerado em
+ * `datasus-dictionary-it.ts`). Com o prefixo (RD, PA, ST…), o layout daquele
+ * arquivo; sem ele, só responde se todos os layouts do sistema concordam.
+ */
+function entradaDoInforme(field: string, system: string, prefix?: string): { entry: DatasusFieldEntry; source: string } | undefined {
+  const layouts = IT_LAYOUTS[system]!;
+  let descricao = prefix ? layouts[prefix.toUpperCase()]?.[field] : undefined;
+  if (descricao === undefined && !(prefix && layouts[prefix.toUpperCase()])) {
+    const todas = new Set(Object.values(layouts).map((campos) => campos[field]).filter((valor): valor is string => Boolean(valor)));
+    if (todas.size === 1) descricao = [...todas][0];
+  }
+  if (!descricao) return undefined;
+  return { entry: entradaDeDescricao(descricao), source: IT_SOURCES[system] ?? system };
+}
+
+/** "Órgão expedidor do alvará, onde: 1-SES 2-SMS" → nome curto, descrição e valores. */
+function entradaDeDescricao(descricao: string): DatasusFieldEntry {
+  // Valores depois de "onde:" ou de dois-pontos seguidos de códigos ("0 = não aprovado; 5 = …").
+  const valores = /,?\s*onde:\s*(.+)$/i.exec(descricao)?.[1]
+    ?? /:\s*((?:\w{1,3}\s*[-=–]\s*\S.*))$/.exec(descricao)?.[1];
+  let label = (valores ? descricao.slice(0, descricao.lastIndexOf(valores)) : descricao)
+    .replace(/,?\s*onde:\s*$/i, '').replace(/:\s*$/, '')
+    .split(/\.\s/)[0]!.replace(/\.$/, '')
+    .replace(/,?\s*no formato\s+\S+$/i, '').trim();
+  if (label.length > 70) label = `${label.slice(0, 67).replace(/\s+\S*$/, '')}…`;
+  return { label, description: descricao, ...(valores ? { values: valores } : {}) };
 }
 
 /** Quantos campos cada dicionário cobre, para a interface dizer o alcance. */
