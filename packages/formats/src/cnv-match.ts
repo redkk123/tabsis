@@ -71,38 +71,85 @@ function shortTable(definition: CnvDefinition): { table: Int32Array; categories:
   return built;
 }
 
-/** CNV literal: código e faixas em largura fixa, comparados como texto; quem vem depois ganha. */
-const literalTables = new WeakMap<CnvDefinition, {
-  exact: Map<string, { position: number; order: number }>;
-  ranges: Array<{ from: string; to: string; position: number; order: number }>;
-}>();
+/**
+ * CNV literal como o TabWin 4.15 guarda e procura (decompilado: inserção em
+ * 0x474120, faixa em 0x4742ac, busca em 0x473f64; confirmado nos testes
+ * T5–T8 do RE-003). Uma lista ordenada de códigos, cada um com a categoria e
+ * duas marcas, `start` e `end`:
+ *
+ * - código que já existe só troca de categoria (por isso quem vem depois ganha);
+ * - código novo herda as marcas se os vizinhos formam uma faixa
+ *   (`anterior.start === seguinte.end`, não zero);
+ * - faixa = insere o início e o fim, depois marca `início.start` e `fim.end`
+ *   com a categoria — sem percorrer o que fica no meio;
+ * - busca: código exato devolve a categoria dele; senão, cai entre dois
+ *   vizinhos, e é da faixa se `anterior.start === seguinte.end`.
+ *
+ * É isso que faz faixas sobrepostas dependerem da ordem (nudosePB.cnv do
+ * SINAN). Códigos em largura fixa (`codeLength`), comparados como texto.
+ */
+interface LiteralEntry { key: string; value: number; start: number; end: number }
 
-function literalTable(definition: CnvDefinition) {
+const literalTables = new WeakMap<CnvDefinition, LiteralEntry[]>();
+
+function lowerBound(entries: readonly LiteralEntry[], key: string): number {
+  let low = 0; let high = entries.length;
+  while (low < high) {
+    const middle = (low + high) >> 1;
+    if (entries[middle]!.key < key) low = middle + 1; else high = middle;
+  }
+  return low;
+}
+
+function literalInsert(entries: LiteralEntry[], key: string, value: number): void {
+  const at = lowerBound(entries, key);
+  const found = entries[at];
+  if (found && found.key === key) { found.value = value; return; }
+  const entry: LiteralEntry = { key, value, start: 0, end: 0 };
+  entries.splice(at, 0, entry);
+  const previous = entries[at - 1];
+  const next = entries[at + 1];
+  if (previous && next && previous.start !== 0 && previous.start === next.end) {
+    entry.start = previous.start;
+    entry.end = previous.start;
+  }
+}
+
+function literalTable(definition: CnvDefinition): LiteralEntry[] {
   const cached = literalTables.get(definition);
   if (cached) return cached;
   const length = definition.codeLength;
   const fixed = (code: string): string => code.padEnd(length, ' ').slice(0, length);
-  const positions = new Map<number, number>();
-  definition.categories.forEach((category, position) => {
-    if (!positions.has(category.sequence)) positions.set(category.sequence, position);
-  });
-  const exact = new Map<string, { position: number; order: number }>();
-  const ranges: Array<{ from: string; to: string; position: number; order: number }> = [];
-  definition.rules.forEach((rule, order) => {
-    const position = positions.get(rule.categorySequence);
-    if (position === undefined) return;
-    for (const code of rule.exactCodes) {
-      if (code.trimStart().startsWith('-')) continue;
-      exact.set(fixed(code), { position, order });
+  const entries: LiteralEntry[] = [];
+  for (const rule of definition.rules) {
+    const category = rule.categorySequence;
+    const tokens = rule.literalTokens ?? [...rule.exactCodes, ...rule.ranges];
+    for (const token of tokens) {
+      if (typeof token === 'string') {
+        if (token.trimStart().startsWith('-')) continue;
+        literalInsert(entries, fixed(token), category);
+      } else {
+        if (!token.from.trim() || !token.to.trim()) continue;
+        const from = fixed(token.from); const to = fixed(token.to);
+        literalInsert(entries, from, category);
+        literalInsert(entries, to, category);
+        entries[lowerBound(entries, from)]!.start = category;
+        entries[lowerBound(entries, to)]!.end = category;
+      }
     }
-    for (const range of rule.ranges) {
-      if (!range.from.trim() || !range.to.trim()) continue;
-      ranges.push({ from: fixed(range.from), to: fixed(range.to), position, order });
-    }
-  });
-  const built = { exact, ranges };
-  literalTables.set(definition, built);
-  return built;
+  }
+  literalTables.set(definition, entries);
+  return entries;
+}
+
+function literalLookup(definition: CnvDefinition, code: string): number | undefined {
+  const entries = literalTable(definition);
+  const at = lowerBound(entries, code);
+  const found = entries[at];
+  if (found && found.key === code) return found.value;
+  const previous = entries[at - 1];
+  if (previous && found && previous.start !== 0 && previous.start === found.end) return previous.start;
+  return undefined;
 }
 
 export interface ClassifyCnvOptions {
@@ -139,17 +186,11 @@ export function classifyCnv(definition: CnvDefinition, raw: unknown, options: Cl
   }
 
   if (definition.mode === 'literal' && typeof raw !== 'number' && raw !== undefined) {
-    const { exact, ranges } = literalTable(definition);
     const code = (raw === null ? '' : String(raw)).padEnd(definition.codeLength, ' ').slice(0, definition.codeLength);
-    const firstWins = definition.precedence === 'first-match-wins';
-    let best = exact.get(code);
-    for (const range of ranges) {
-      if (code < range.from || code > range.to) continue;
-      if (!best || (firstWins ? range.order < best.order : range.order > best.order)) best = range;
-    }
-    if (!best) return undefined;
-    const category = definition.categories[best.position]!;
-    return { sequence: category.sequence, label: category.label };
+    const sequence = literalLookup(definition, code);
+    if (sequence === undefined) return undefined;
+    const category = definition.categories.find((candidate) => candidate.sequence === sequence);
+    return category ? { sequence: category.sequence, label: category.label } : undefined;
   }
 
   const code = normalizeCode(raw, definition.codeLength);

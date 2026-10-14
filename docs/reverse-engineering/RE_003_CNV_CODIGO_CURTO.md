@@ -280,10 +280,26 @@ CNV (T6):
 E lista que começa com vírgula (`,00-99`) tem o código em branco também no
 literal.
 
-**A diferença que fica.** `nudosePB.cnv` (SINAN) é literal e tem, na mesma
-linha, três faixas que se sobrepõem (`07-48,7 -48, 7-48`). Sobrepostas, o
-resultado do TabWin depende da ordem (T7: `07-48` antes de `" 7-48"` deixa 8 a
-20 sem classificação; na ordem inversa, tudo classifica) — efeito da estrutura
-de busca dele, não uma regra documentável. O Help diz que CNV literal não
-aceita faixas. Reproduzir exigiria decompilar a rotina; está marcado no
-verificador como diferença conhecida (H1).
+**Faixas sobrepostas: resolvido pela decompilação.** O `nudosePB.cnv`
+(SINAN) tem três faixas sobrepostas na mesma linha (`07-48,7 -48, 7-48`), e o
+TabWin dava um resultado que dependia da ordem das linhas (T7). Decompilado
+com o rea + Ghidra (sementes em `ferramentas/ghidra-seeds.tsv`):
+
+- `0x476f70` classifica um código: modo curto (índice), literal (lista) ou
+  faixas numéricas;
+- a CNV literal é uma **lista ordenada** de códigos, cada um com a categoria
+  e duas marcas, início e fim de faixa;
+- inserir (`0x474120`): código que já existe só troca a categoria (é por isso
+  que **quem vem depois ganha**); código novo herda as marcas se os vizinhos
+  formam uma faixa (`anterior.início = seguinte.fim`, não zero);
+- faixa (`0x4742ac`): insere o início e o fim e marca **só as duas pontas**;
+- busca (`0x473f64`): código exato devolve a categoria dele; senão, olha os
+  vizinhos e é da faixa se `anterior.início = seguinte.fim`.
+
+Previsões do modelo conferidas no TabWin (T8): com a faixa `" 1-20"` antes do
+exato `" 5"`, a faixa pega 1 a 20 menos o 5 (o exato herda a faixa); com o
+exato **antes** da faixa, a faixa só pega as pontas, 1 e 20 — o resto fica sem
+classificação. O TabSis passou a montar a mesma lista
+(`packages/formats/src/cnv-match.ts`), guardando a ordem dos códigos de cada
+linha (`literalTokens`). Com isso, "Nº DOSES PB" bateu e o verificador ficou em
+**27 de 27**.

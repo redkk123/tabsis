@@ -184,3 +184,49 @@ test('CNV literal: lista que começa com vírgula tem o código em branco; l min
   assert.equal(classifyCnv(longo, '120040')?.label, 'Segunda');
   assert.equal(classifyCnv(longo, '120050')?.label, 'Primeira');
 });
+
+// RE-003, T7/T8 e nudosePB.cnv do SINAN: a estrutura da CNV literal do TabWin
+// (decompilada) explica faixas sobrepostas dependerem da ordem.
+test('CNV literal com faixas sobrepostas: igual ao TabWin, inclusive a ordem (T7, T8, nudosePB)', () => {
+  const numero = (v) => (v === null ? '  ' : String(v).padStart(2));
+  const valores = [null, ...Array.from({ length: 21 }, (_, v) => v)];
+  const tabela = (lines, header = '2 2 L') => {
+    const cnv = parseCnv([header, ...lines].join('\n'));
+    const out = {};
+    for (const v of valores) { const label = classifyCnv(cnv, numero(v))?.label ?? 'NC'; (out[label] ??= []).push(v); }
+    return out;
+  };
+  const de = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
+  // K1: "07-48" antes de " 7-48": só o 7 (exato, ponta da faixa) classifica.
+  assert.deepEqual(tabela([row(1, 'A', '07-48'), row(2, 'B', ' 7-48')]).B, [7]);
+  assert.equal(tabela([row(1, 'A', '07-48'), row(2, 'B', ' 7-48')]).A, undefined);
+  // K2: ordem inversa, tudo classifica.
+  const k2 = tabela([row(1, 'A', ' 7-48'), row(2, 'B', '07-48')]);
+  assert.deepEqual(k2.A, [7, 8, 9]);
+  assert.deepEqual(k2.B, de(10, 20));
+  // K4: três faixas na mesma linha.
+  assert.deepEqual(tabela([row(1, 'Tres', '07-48,7 -48, 7-48')], '1 2 L').Tres, [7, ...de(10, 20)]);
+  // M1: exato dentro de faixa já existente herda a faixa; o resto da faixa continua.
+  const m1 = tabela([row(1, 'A', ' 1-20'), row(2, 'C', ' 5')]);
+  assert.deepEqual(m1.A, [...de(1, 4), ...de(6, 20)]);
+  assert.deepEqual(m1.C, [5]);
+  // M2: exato antes da faixa quebra a faixa: só as pontas.
+  const m2 = tabela([row(1, 'C', ' 5'), row(2, 'A', ' 1-20')]);
+  assert.deepEqual(m2.A, [1, 20]);
+  assert.deepEqual(m2.C, [5]);
+  // nudosePB.cnv (SINAN), como veio: 1..5, 6, só o 7, e 8..20 sem classificação.
+  const pb = tabela([row(1, 'não preenchido/Ign', ',00-99'), row(2, 'nenhuma dose', '00, 0,0 ,'),
+    row(3, 'menor que 6', '01-05,1 -5 , 1- 5,'), row(4, '6 doses', '06, 6,6 ,'), row(5, 'maior que 6', '07-48,7 -48, 7-48')], '5 2 l');
+  assert.deepEqual(pb['não preenchido/Ign'], [null]);
+  assert.deepEqual(pb['nenhuma dose'], [0]);
+  assert.deepEqual(pb['menor que 6'], de(1, 5));
+  assert.deepEqual(pb['6 doses'], [6]);
+  assert.deepEqual(pb['maior que 6'], [7]);
+  assert.deepEqual(pb.NC, de(8, 20));
+});
+
+test('CNV literal salva de volta mantém a ordem dos códigos na linha', async () => {
+  const { serializeCnv } = await import('../dist/packages/formats/src/index.js');
+  const cnv = parseCnv(['1 2 L', row(1, 'Tres', '07-48,7 -48, 7-48,AB')].join('\n'));
+  assert.match(serializeCnv(cnv), /07-48,7 -48, 7-48,AB/);
+});

@@ -4834,8 +4834,7 @@
      ],
      "total": [
       30114
-     ],
-     "knownDifference": "nudosePB.cnv é literal e tem faixas que se sobrepõem na mesma linha (\"07-48,7 -48, 7-48\"). Isoladas, as faixas literais são comparação de texto e o TabSis bate (testes RA–RH, K2); sobrepostas, o resultado do TabWin depende da ordem das linhas (K1: com 07-48 antes de \" 7-48\", 8 a 20 ficam sem classificação), efeito da estrutura de busca dele. O Help diz que CNV literal não aceita faixas. Fica documentado; reproduzir exigiria decompilar a rotina."
+     ]
     },
     {
      "id": "H2",

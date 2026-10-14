@@ -151,6 +151,7 @@ function parseRuleLine(
     ...(excludeFromTotal ? { excludeFromTotal: true } : {}),
   };
 
+  const literalTokens: Array<string | CnvCodeRange> = [];
   const exactCodes: string[] = [];
   const ranges: CnvCodeRange[] = [];
   let numericUpperInclusive: number | undefined;
@@ -163,7 +164,7 @@ function parseRuleLine(
     }
     numericUpperInclusive = value;
   } else if (codesRaw || blankCode) {
-    if (blankCode) exactCodes.push(' ');
+    if (blankCode) { exactCodes.push(' '); if (literal) literalTokens.push(' '); }
     for (const rawToken of codesList.split(',')) {
       const token = literal ? rawToken : rawToken.trim();
       if (!token.trim()) continue;
@@ -172,11 +173,14 @@ function parseRuleLine(
       const begin = token.length - token.trimStart().length;
       const hyphen = token.indexOf('-', begin);
       if (hyphen > begin && hyphen < token.length - 1) {
-        ranges.push(literal
+        const range = literal
           ? { from: token.slice(0, hyphen), to: token.slice(hyphen + 1) }
-          : { from: token.slice(0, hyphen).trim(), to: token.slice(hyphen + 1).trim() });
+          : { from: token.slice(0, hyphen).trim(), to: token.slice(hyphen + 1).trim() };
+        ranges.push(range);
+        if (literal) literalTokens.push(range);
       } else {
         exactCodes.push(token);
+        if (literal) literalTokens.push(token);
       }
     }
   }
@@ -185,6 +189,7 @@ function parseRuleLine(
     categorySequence: sequence,
     exactCodes,
     ranges,
+    ...(literal && literalTokens.length ? { literalTokens } : {}),
     ...(numericUpperInclusive !== undefined ? { numericUpperInclusive } : {}),
     sourceOrder,
     sourceLine,

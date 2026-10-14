@@ -89,8 +89,8 @@ Do Help do TabWin v2 (versão impressa, Vigilância em Saúde de MG):
 - [x] **SIA e SINAN conferidos** (`verify:sim-sinasc` 26/27 + 1 diferença
       documentada): DEF do SIA com linha de 3 campos não derruba mais o
       arquivo; campo de data classifica; CNV literal com a última ocorrência e
-      faixas comparadas com espaços. Em aberto: faixas literais sobrepostas
-      (decompilar a rotina do TabWin).
+      faixas comparadas com espaços. Faixas literais sobrepostas resolvidas
+      decompilando a lista literal do TabWin (27/27).
 - [x] **SIM e SINASC conferidos** com os DEF/CNV oficiais e dados do Acre
       (`verify:sim-sinasc` 16/16): código "em branco" na CNV, recuo dos
       rótulos, Total com linha-subtotal que tem códigos próprios, subtotal com
