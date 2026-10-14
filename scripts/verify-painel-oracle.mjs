@@ -21,13 +21,18 @@ const expected = JSON.parse(await readFile(new URL('../fixtures/oracle/painel-20
 const cp1252 = new TextDecoder('windows-1252');
 const cnvs = new Map([
   ['RACA1.CNV', parseCnv(expected.raca1Cnv)],
+  ['RACAL.CNV', parseCnv(expected.racalCnv)],
   ['SEXO.CNV', parseCnv(cp1252.decode(await readFile(path.join(dir, 'SEXO.CNV'))))],
   ['CARINT.CNV', parseCnv(cp1252.decode(await readFile(path.join(dir, 'CARINT.CNV'))))],
 ]);
-const cat = catalogoDoDef(parseDef(expected.defText), {
+const recursos = {
   conversao: (f) => [...cnvs.keys()].find((n) => nomeBaseDoRecurso(n) === nomeBaseDoRecurso(f)),
   lookup: () => undefined,
-});
+};
+const catalogos = {
+  defText: catalogoDoDef(parseDef(expected.defText), recursos),
+  def2Text: catalogoDoDef(parseDef(expected.def2Text), recursos),
+};
 const records = [];
 for await (const r of readDbfRecords(dbcToDbf(new Uint8Array(await readFile(path.join(dir, 'RDAC2401.dbc')))))) records.push(r);
 
@@ -35,6 +40,7 @@ const byLabel = (list, label) => { const e = list.find((x) => x.label === label)
 const round2 = (v) => Math.round(v * 100) / 100;
 for (const c of expected.cases) {
   const p = c.panel;
+  const cat = catalogos[c.def ?? 'defText'];
   const estado = {
     ...estadoInicial(cat),
     linha: byLabel(cat.linhas, p.linha).id,

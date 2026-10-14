@@ -71,7 +71,9 @@ function dimensionBlockers(plan: QueryPlan): string[] {
     if (dimension.conversionId) blockers.push(`${label} dimension uses CNV conversion ${dimension.conversionId}`);
     if (dimension.lookupId) blockers.push(`${label} dimension uses DBF lookup ${dimension.lookupId}`);
     if (dimension.startPosition !== undefined) blockers.push(`${label} dimension uses startPosition`);
-    if (dimension.unclassifiedPolicy === 'discriminate') blockers.push(`${label} dimension discriminates unclassified values`);
+    if (dimension.unclassifiedPolicy === 'discriminate' || dimension.unclassifiedPolicy === 'discriminate-codes') {
+      blockers.push(`${label} dimension discriminates unclassified values`);
+    }
   }
   return blockers;
 }

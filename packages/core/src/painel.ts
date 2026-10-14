@@ -19,9 +19,10 @@
  *   "Múltiplas colunas é incompatível com múltiplos incrementos".
  * - An active selection with no category marked is refused with
  *   "Nenhuma categoria selecionada em <selection>".
- * - "Não classificados → Incluir" adds one "Não classificados" row; "Ignorar"
- *   drops those records. "Discriminar" did not change the rows in the observed
- *   case and is not reproduced until a case shows what it does.
+ * - "Não classificados → Incluir" adds one "Não classificados" row (and
+ *   column); "Ignorar" drops those records; "Discriminar" lists each
+ *   unclassified code on its own row when the CNV is literal, keeps a single
+ *   "Não classificados" column, and with a short CNV behaves like Ignorar.
  */
 
 import type { CnvDefinition } from '../../formats/src/cnv-model.js';
@@ -73,7 +74,7 @@ export interface PainelCatalogo {
   incrementos: PainelIncremento[];
 }
 
-export type NaoClassificados = 'ignorar' | 'incluir';
+export type NaoClassificados = 'ignorar' | 'incluir' | 'discriminar';
 
 export interface PainelSelecao {
   eixo: string;
@@ -253,13 +254,17 @@ function exigirEixo(lista: readonly PainelEixo[], id: string, papel: string): Pa
   return eixo;
 }
 
-function dimensao(eixo: PainelEixo, naoClassificados: NaoClassificados): DimensionSpec {
+function dimensao(eixo: PainelEixo, naoClassificados: NaoClassificados, papel: 'linha' | 'coluna'): DimensionSpec {
+  const classifica = Boolean(eixo.conversionId || eixo.lookupId);
+  // Nas colunas o TabWin trata Discriminar como Incluir: uma coluna só.
+  const politica = !classifica || naoClassificados === 'ignorar'
+    ? undefined
+    : naoClassificados === 'discriminar' && papel === 'linha' ? 'discriminate-codes' as const : 'discriminate' as const;
   return {
     field: eixo.field,
     ...(eixo.conversionId ? { conversionId: eixo.conversionId, startPosition: eixo.startPosition ?? 1 } : {}),
     ...(eixo.lookupId ? { lookupId: eixo.lookupId } : {}),
-    ...(naoClassificados === 'incluir' && (eixo.conversionId || eixo.lookupId)
-      ? { unclassifiedPolicy: 'discriminate' as const } : {}),
+    ...(politica ? { unclassifiedPolicy: politica } : {}),
   };
 }
 
@@ -294,8 +299,8 @@ export function specDoPainel(
   const [primeira] = incrementos;
   return {
     compatibilityProfile: perfil,
-    rows: dimensao(linha, estado.naoClassificados),
-    ...(coluna ? { columns: dimensao(coluna, estado.naoClassificados) } : {}),
+    rows: dimensao(linha, estado.naoClassificados, 'linha'),
+    ...(coluna ? { columns: dimensao(coluna, estado.naoClassificados, 'coluna') } : {}),
     measure: primeira!.measure,
     ...(incrementos.length > 1 ? { measures: incrementos.map((incremento) => incremento.measure) } : {}),
     filters,
@@ -375,7 +380,7 @@ export function logDoPainel(
       .map((incremento) => rotuloDoIncremento(incremento, perfil)),
     suppressZeroRows: estado.suprimirLinhasZeradas,
     suppressZeroColumns: estado.suprimirColunasZeradas,
-    unclassified: estado.naoClassificados === 'incluir' ? 1 : 0,
+    unclassified: estado.naoClassificados === 'incluir' ? 1 : estado.naoClassificados === 'discriminar' ? 2 : 0,
     selections: estado.selecoes.flatMap((selecao) => {
       const eixo = catalogo.selecoes.find((candidate) => candidate.id === selecao.eixo);
       return eixo ? [{ label: eixo.label, categories: selecao.categorias.map((id) => rotuloDaCategoria(eixo, id)) }] : [];
@@ -431,7 +436,7 @@ export function estadoDoLog(
   if (log.suppressZeroRows !== undefined) estado.suprimirLinhasZeradas = log.suppressZeroRows;
   if (log.suppressZeroColumns !== undefined) estado.suprimirColunasZeradas = log.suppressZeroColumns;
   if (log.unclassified === 1) estado.naoClassificados = 'incluir';
-  if (log.unclassified === 2) avisos.push('"Não classificados: Discriminar" ainda não é reproduzido; usado "Ignorar".');
+  if (log.unclassified === 2) estado.naoClassificados = 'discriminar';
 
   for (const selecao of log.selections) {
     const eixo = acha(catalogo.selecoes, selecao.label);

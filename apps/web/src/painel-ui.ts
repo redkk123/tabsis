@@ -152,6 +152,7 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
   const suprimirColunas = el('input', { type: 'checkbox', id: 'painel-suprimir-colunas' });
   const naoClassIgnorar = el('input', { type: 'radio', name: 'painel-nao-classificados', value: 'ignorar', id: 'painel-nc-ignorar' });
   const naoClassIncluir = el('input', { type: 'radio', name: 'painel-nao-classificados', value: 'incluir', id: 'painel-nc-incluir' });
+  const naoClassDiscriminar = el('input', { type: 'radio', name: 'painel-nao-classificados', value: 'discriminar', id: 'painel-nc-discriminar' });
 
   const resumo = el('p', { className: 'painel-resumo', id: 'painel-resumo', ariaLive: 'polite' });
   const erro = el('p', { className: 'painel-erro', id: 'painel-erro', role: 'alert' });
@@ -200,7 +201,8 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
     el('fieldset', { className: 'painel-nao-classificados', title: 'Como tratar os registros cujos códigos não estão previstos na tabela de conversão (CNV)' },
       el('legend', {}, 'Não classificados'),
       el('label', { className: 'check-label' }, naoClassIgnorar, el('span', {}, 'Ignorar')),
-      el('label', { className: 'check-label' }, naoClassIncluir, el('span', {}, 'Incluir numa linha')),
+      el('label', { className: 'check-label', title: 'Junta os códigos sem correspondência numa linha "Não classificados"' }, naoClassIncluir, el('span', {}, 'Incluir')),
+      el('label', { className: 'check-label', title: 'Uma linha para cada código sem correspondência (só em CNV literal, como no TabWin)' }, naoClassDiscriminar, el('span', {}, 'Discriminar')),
     ),
   );
 
@@ -425,6 +427,7 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
     suprimirColunas.checked = estado.suprimirColunasZeradas;
     naoClassIgnorar.checked = estado.naoClassificados === 'ignorar';
     naoClassIncluir.checked = estado.naoClassificados === 'incluir';
+    naoClassDiscriminar.checked = estado.naoClassificados === 'discriminar';
     renderResumo();
   }
 
@@ -524,8 +527,8 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
   });
   suprimirLinhas.addEventListener('change', () => { if (estado) estado.suprimirLinhasZeradas = suprimirLinhas.checked; });
   suprimirColunas.addEventListener('change', () => { if (estado) estado.suprimirColunasZeradas = suprimirColunas.checked; });
-  for (const radio of [naoClassIgnorar, naoClassIncluir]) {
-    radio.addEventListener('change', () => { if (estado && radio.checked) estado.naoClassificados = radio.value as 'ignorar' | 'incluir'; });
+  for (const radio of [naoClassIgnorar, naoClassIncluir, naoClassDiscriminar]) {
+    radio.addEventListener('change', () => { if (estado && radio.checked) estado.naoClassificados = radio.value as PainelEstado['naoClassificados']; });
   }
 
   function rotuloDaCategoria(eixo: PainelEixo, id: string): string {

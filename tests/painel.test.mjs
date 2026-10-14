@@ -209,3 +209,33 @@ test('without a DEF the panel lists the file fields and numeric ones as incremen
   const spec = specDoPainel(cat, { ...estadoInicial(cat), selecoes: [{ eixo: 'campo:SEXO', categorias: ['1'] }] });
   assert.deepEqual(spec.filters, [{ field: 'SEXO', acceptedCategories: ['1'] }]);
 });
+
+test('Discriminar: uma linha por código só em CNV literal; em CNV curta os códigos ficam fora', () => {
+  const literal = parseCnv(['2 2 L', row(1, 'Branca', '01'), row(2, 'Parda', '03')].join('\n'));
+  const cnvs = new Map([...CNVS, ['RACAL.CNV', literal]]);
+  const def = parseDef(['; literal', 'A*.DBC', 'LRaça literal,RACA_COR,1,RACAL.CNV', 'LRaça curta,RACA_COR,1,RACA1.CNV', 'CRaça literal,RACA_COR,1,RACAL.CNV', 'LSexo,SEXO,1,SEXO.CNV'].join('\n'));
+  const cat = catalogoDoDef(def, {
+    conversao: (file) => [...cnvs.keys()].find((name) => nomeBaseDoRecurso(name) === nomeBaseDoRecurso(file)),
+    lookup: () => undefined,
+  });
+  const dados = [
+    ...Array.from({ length: 3 }, () => ({ RACA_COR: '05', SEXO: '1' })),
+    { RACA_COR: '01', SEXO: '1' },
+    ...Array.from({ length: 2 }, () => ({ RACA_COR: '02', SEXO: '3' })),
+    { RACA_COR: '05', SEXO: '3' },
+  ];
+  const rodar = (estado) => executeInMemory(dados, compileQueryPlan(specDoPainel(cat, estado)), Object.fromEntries(cnvs));
+  const base = { ...estadoInicial(cat), naoClassificados: 'discriminar', suprimirLinhasZeradas: true };
+
+  const lit = rodar({ ...base, linha: cat.linhas[0].id });
+  assert.deepEqual(lit.rows.map((r) => r.label), ['Branca', '05', '02']);
+  assert.deepEqual(lit.cells.map((c) => c[0]), [1, 4, 2]);
+
+  const curta = rodar({ ...base, linha: cat.linhas[1].id });
+  assert.deepEqual(curta.rows.map((r) => r.label), ['Branca']);
+  assert.equal(curta.recordsAccepted, 1);
+
+  // Na coluna, Discriminar vira uma coluna "Não classificados" só, como no TabWin.
+  const coluna = rodar({ ...base, linha: cat.linhas[2].id, coluna: cat.colunas[0].id });
+  assert.deepEqual(coluna.columns.map((c) => c.label), ['Branca', 'Não classificados']);
+});

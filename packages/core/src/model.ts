@@ -15,8 +15,21 @@ export interface DimensionSpec {
   lookupId?: string;
   /** 1-based initial character position inside the source field, as in DEF Campo D. */
   startPosition?: number;
-  /** Explicit handling when a raw value is empty or has no CNV match. */
-  unclassifiedPolicy?: 'omit' | 'discriminate';
+  /**
+   * Explicit handling when a raw value is empty or has no CNV match.
+   *
+   * TabWin 4.15's "Não classificados" radio maps as follows (oracle and
+   * decompiled classification routine, 2026-10-13, RE_002):
+   * - Ignorar → `omit` (the default);
+   * - Incluir → `discriminate`: ONE extra "Não classificados" row/column;
+   * - Discriminar → `discriminate-codes` on rows: one extra row per distinct
+   *   unclassified code, labelled with the code itself, in order of first
+   *   appearance — but only when the CNV is literal (`L`, or codes longer than
+   *   four characters) or the axis is a DBF lookup. A short CNV ignores them,
+   *   exactly as TabWin did with RACA1.CNV. On columns TabWin treats
+   *   Discriminar like Incluir, so callers pass `discriminate` there.
+   */
+  unclassifiedPolicy?: 'omit' | 'discriminate' | 'discriminate-codes';
 }
 
 /** Immutable, renderer-independent lookup table loaded from a DEF-related DBF. */

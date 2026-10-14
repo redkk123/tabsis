@@ -5,42 +5,228 @@
   "referenceEngine": "TabWin 4.15 (TabWin415.exe, SHA-256 0E29A44D...3F02) under Wine 10.0, Ubuntu 26.04",
   "evidence": "docs/reverse-engineering/RE_002_PAINEL_TABULA.md (screenshots in docs/reverse-engineering/telas/)",
   "inputs": {
-    "data": { "name": "RDAC2401.dbc", "sha256": "41B7AD58932CD56D6C60455CBF67E7995F5FD2E64375D0CC440631A191638429" },
+    "data": {
+      "name": "RDAC2401.dbc",
+      "sha256": "41B7AD58932CD56D6C60455CBF67E7995F5FD2E64375D0CC440631A191638429"
+    },
     "def": "TESTE.DEF (inline below)",
-    "cnv": ["SEXO.CNV and CARINT.CNV from the G001 asset folder", "RACA1.CNV (inline below)"]
+    "cnv": [
+      "SEXO.CNV and CARINT.CNV from the G001 asset folder",
+      "RACA1.CNV (inline below)"
+    ]
   },
   "defText": ";Teste TabSis oraculo\r\nAC:\\TabWin\\G001\\RD*.DBC\r\nIValor Total,VAL_TOT\r\nIÓbitos,MORTE\r\nLRaça parcial,RACA_COR,1,RACA1.CNV\r\nLSexo,SEXO,1,SEXO.CNV\r\nCCaráter,CAR_INT,1,CARINT.CNV\r\nCRaça parcial,RACA_COR,1,RACA1.CNV\r\nSRaça parcial,RACA_COR,1,RACA1.CNV\r\nXSexo X,SEXO,1,SEXO.CNV\r\n",
   "raca1Cnv": "2 2\r\n      1  Branca                                             01\r\n      2  Parda                                              03\r\n",
   "cases": [
     {
       "id": "T1-ignorar",
-      "panel": { "linha": "Raça parcial", "incrementos": ["Frequência"], "naoClassificados": "ignorar", "suprimirLinhasZeradas": false },
-      "rows": [["Branca", 260], ["Parda", 3040]],
-      "total": [3300]
+      "panel": {
+        "linha": "Raça parcial",
+        "incrementos": [
+          "Frequência"
+        ],
+        "naoClassificados": "ignorar",
+        "suprimirLinhasZeradas": false
+      },
+      "rows": [
+        [
+          "Branca",
+          260
+        ],
+        [
+          "Parda",
+          3040
+        ]
+      ],
+      "total": [
+        3300
+      ]
     },
     {
       "id": "T2-incluir",
-      "panel": { "linha": "Raça parcial", "incrementos": ["Frequência"], "naoClassificados": "incluir", "suprimirLinhasZeradas": false },
-      "rows": [["Branca", 260], ["Parda", 3040], ["Não classificados", 1015]],
-      "total": [4315]
+      "panel": {
+        "linha": "Raça parcial",
+        "incrementos": [
+          "Frequência"
+        ],
+        "naoClassificados": "incluir",
+        "suprimirLinhasZeradas": false
+      },
+      "rows": [
+        [
+          "Branca",
+          260
+        ],
+        [
+          "Parda",
+          3040
+        ],
+        [
+          "Não classificados",
+          1015
+        ]
+      ],
+      "total": [
+        4315
+      ]
+    },
+    {
+      "id": "T3-discriminar-cnv-curta",
+      "panel": {
+        "linha": "Raça parcial",
+        "incrementos": [
+          "Frequência"
+        ],
+        "naoClassificados": "discriminar",
+        "suprimirLinhasZeradas": false
+      },
+      "rows": [
+        [
+          "Branca",
+          260
+        ],
+        [
+          "Parda",
+          3040
+        ]
+      ],
+      "total": [
+        3300
+      ],
+      "note": "CNV curta (RACA1.CNV): Discriminar não cria linhas; os códigos sem correspondência ficam fora, como em Ignorar."
     },
     {
       "id": "T5-coluna-com-selecao",
-      "panel": { "linha": "Sexo", "coluna": "Caráter", "incrementos": ["Frequência"], "selecoes": [["Raça parcial", ["Branca"]]], "suprimirLinhasZeradas": false, "suprimirColunasZeradas": true },
-      "columns": ["Eletiva", "Urg/Emerg (Hosp referência)"],
-      "rows": [["Masculino", 52, 72], ["Feminino", 52, 84], ["Ignorado", 0, 0]],
+      "panel": {
+        "linha": "Sexo",
+        "coluna": "Caráter",
+        "incrementos": [
+          "Frequência"
+        ],
+        "selecoes": [
+          [
+            "Raça parcial",
+            [
+              "Branca"
+            ]
+          ]
+        ],
+        "suprimirLinhasZeradas": false,
+        "suprimirColunasZeradas": true
+      },
+      "columns": [
+        "Eletiva",
+        "Urg/Emerg (Hosp referência)"
+      ],
+      "rows": [
+        [
+          "Masculino",
+          52,
+          72
+        ],
+        [
+          "Feminino",
+          52,
+          84
+        ],
+        [
+          "Ignorado",
+          0,
+          0
+        ]
+      ],
       "subtitle": "Freqüência por Caráter segundo Sexo"
     },
     {
       "id": "T6-tres-incrementos",
-      "panel": { "linha": "Sexo", "incrementos": ["Frequência", "Valor Total", "Óbitos"], "selecoes": [["Raça parcial", ["Branca", "Parda"]]], "suprimirLinhasZeradas": true },
-      "rows": [["Masculino", 1219, 1502906.63, 39], ["Feminino", 2081, 1857309.27, 47]],
-      "total": [3300, 3360215.90, 86],
+      "panel": {
+        "linha": "Sexo",
+        "incrementos": [
+          "Frequência",
+          "Valor Total",
+          "Óbitos"
+        ],
+        "selecoes": [
+          [
+            "Raça parcial",
+            [
+              "Branca",
+              "Parda"
+            ]
+          ]
+        ],
+        "suprimirLinhasZeradas": true
+      },
+      "rows": [
+        [
+          "Masculino",
+          1219,
+          1502906.63,
+          39
+        ],
+        [
+          "Feminino",
+          2081,
+          1857309.27,
+          47
+        ]
+      ],
+      "total": [
+        3300,
+        3360215.9,
+        86
+      ],
       "subtitle": "Freqüência Valor Total Óbitos segundo Sexo"
+    },
+    {
+      "id": "T7-discriminar-cnv-literal",
+      "def": "def2Text",
+      "panel": {
+        "linha": "Raça literal",
+        "incrementos": [
+          "Frequência"
+        ],
+        "naoClassificados": "discriminar",
+        "suprimirLinhasZeradas": true
+      },
+      "rows": [
+        [
+          "Branca",
+          260
+        ],
+        [
+          "Parda",
+          3040
+        ],
+        [
+          "05",
+          118
+        ],
+        [
+          "02",
+          72
+        ],
+        [
+          "04",
+          825
+        ]
+      ],
+      "total": [
+        4315
+      ],
+      "note": "CNV literal (RACAL.CNV, '2 2 L'): uma linha por código sem correspondência, rotulada pelo código, na ordem em que aparece no arquivo."
     }
   ],
   "refusals": [
-    { "panel": "Coluna Caráter + incrementos Frequência e Valor Total", "message": "Múltiplas colunas é incompatível com múltiplos incrementos" },
-    { "panel": "Seleção Raça parcial ativa sem categoria", "message": "Nenhuma categoria selecionada em Raça parcial" }
-  ]
+    {
+      "panel": "Coluna Caráter + incrementos Frequência e Valor Total",
+      "message": "Múltiplas colunas é incompatível com múltiplos incrementos"
+    },
+    {
+      "panel": "Seleção Raça parcial ativa sem categoria",
+      "message": "Nenhuma categoria selecionada em Raça parcial"
+    }
+  ],
+  "def2Text": ";Teste TabSis literal\r\nAC:\\TabWin\\G001\\RD*.DBC\r\nLRaça literal,RACA_COR,1,RACAL.CNV\r\nLRaça curta,RACA_COR,1,RACA1.CNV\r\nCRaça literal,RACA_COR,1,RACAL.CNV\r\nLSexo,SEXO,1,SEXO.CNV\r\n",
+  "racalCnv": "2 2 L\r\n      1  Branca                                             01\r\n      2  Parda                                              03\r\n"
 }
