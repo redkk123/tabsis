@@ -31,7 +31,8 @@ Depois que o arquivo abriu, nem internet é necessária.
 
 | | |
 | --- | --- |
-| **Tabular** | linha × coluna, medidas, filtros, DEF/CNV executáveis, múltiplos arquivos e períodos |
+| **Tabular** | o painel do TabWin — **Linhas, Colunas, Incremento e Seleções** — montado do DEF, com Não classificados, log e "Restaurar consulta"; conferido contra o TabWin 4.15 real |
+| **Formato leve** | DBC → Parquet: metade do tamanho, leitura só das colunas usadas, mesmos números (paridade registro a registro) |
 | **Transformar** | pipeline de 11 verbos no estilo dplyr — inclusive semana epidemiológica (MMWR/MS) e código IBGE de município |
 | **Calcular** | fórmulas estilo Excel, 57 funções, com nomes em português e inglês |
 | **Visualizar** | gráficos editáveis e mapas temáticos, com exportação SVG/PNG |
@@ -41,6 +42,10 @@ Depois que o arquivo abriu, nem internet é necessária.
 
 O **manual do usuário** cobre tudo isso com o passo a passo:
 [`docs/product/MANUAL_DO_USUARIO.md`](./docs/product/MANUAL_DO_USUARIO.md).
+Para entender os arquivos (DBC, DBF, DEF, CNV, Parquet):
+[`docs/product/GUIA_ARQUIVOS_DATASUS.md`](./docs/product/GUIA_ARQUIVOS_DATASUS.md).
+Engenharia reversa do painel do TabWin (Wine + rea/Ghidra):
+[`docs/reverse-engineering/RE_002_PAINEL_TABULA.md`](./docs/reverse-engineering/RE_002_PAINEL_TABULA.md).
 
 ## Compatibilidade que se pode conferir
 
@@ -48,8 +53,10 @@ Este projeto distingue três coisas, e diz qual é qual:
 
 - **Compatível** — verificado contra o **TabWin 4.15 real**, com arquivo real,
   resultado capturado do programa original e comparação com **tolerância zero**.
-  São **16 casos** hoje, em [`fixtures/golden/`](./fixtures/golden), cada um com
-  manifesto, evidência e hashes.
+  São **16 casos** em [`fixtures/golden/`](./fixtures/golden), cada um com
+  manifesto, evidência e hashes, e mais **6 casos do painel** em
+  [`fixtures/oracle/painel-2026-10-13/`](./fixtures/oracle/painel-2026-10-13)
+  (`npm run verify:painel`).
 - **Moderno** — funcionalidade nova, que o TabWin 4.15 não tinha. Não afirma
   equivalência com nada.
 - **Não verificado** — existe e funciona, mas ninguém conferiu contra o
@@ -78,6 +85,9 @@ npm run web:dev
 | `npm run e2e` | testes ponta a ponta (Playwright) |
 | `npm run web:build` | build de produção em `dist-web/` |
 | `npm run seed:differential` | gera casos determinísticos para conferir contra o TabWin real |
+| `npm run verify:painel -- <pasta>` | confere o painel contra as capturas do TabWin real |
+| `npm run parquet:converter -- <arquivo.dbc>` | converte para o formato leve (`.parquet`, mesmo nome-base) |
+| `npm run verify:parquet -- <arquivo.dbc> <arquivo.parquet>` | prova que os registros são idênticos |
 | `npm run bridge:start` | sobe o auxiliar local de download ([o que é](./apps/tabwin-bridge/README.md)) |
 
 ## Estrutura
@@ -106,7 +116,7 @@ resultados de referência, não os arquivos de origem.
 
 ## Sobre o que este projeto se apoia
 
-Três dependências de runtime, e vale nomear o que cada uma faz:
+Cinco dependências de runtime, e vale nomear o que cada uma faz:
 
 - **[`@precisa-saude/datasus-dbc`](https://www.npmjs.com/package/@precisa-saude/datasus-dbc)**
   decodifica o formato `.DBC` — xBase DBF comprimido com PKWARE DCL Implode.
@@ -116,6 +126,9 @@ Três dependências de runtime, e vale nomear o que cada uma faz:
   que o portal do DATASUS monta.
 - **[`@duckdb/duckdb-wasm`](https://duckdb.org/docs/api/wasm/overview)** move a
   aba de consulta SQL, carregado sob demanda.
+- **[`hyparquet`](https://github.com/hyparam/hyparquet)** e
+  **[`fzstd`](https://github.com/101arrowz/fzstd)** leem o formato leve
+  (Parquet com ZSTD) coluna por coluna, em JavaScript puro.
 
 ## Licença
 

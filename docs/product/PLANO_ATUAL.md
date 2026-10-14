@@ -1,5 +1,63 @@
 # Plano atual
 
+## Bloco 6 — TabSis: os pedidos do professor (2026-10-13) ✅ no código, ⏳ publicação
+
+Pedidos, na ordem em que vieram: foco em **tabulação** (dashboard é fácil),
+converter o DBC para algo mais leve e guardar na Cloudflare, entender CNV, DBC,
+DBF e DEF, deixar amigável para quem sempre usou e para quem é novo, cuidado
+com o cache do navegador, trocar o nome para **TabSis**, licença GPLv3 ou
+AGPLv3, interface difícil, prioridade para **Incremento, Seleções, Colunas e
+Linhas**, e **nomes originais dos arquivos**. Tudo na branch `tabsis`.
+
+- [x] **Engenharia reversa do TabWin 4.15** com Wine (sem sudo) + rea/Ghidra:
+      [RE_002](../reverse-engineering/RE_002_PAINEL_TABULA.md). Achados que
+      mudaram o código: `X` = Linha+Coluna+Seleção (47 opções do RD2008 sumiam),
+      recusas com as palavras do TabWin, "Não classificados" (Incluir /
+      Discriminar decompilado), formato do log, `%percentagem`, `Normalizar`,
+      CRC do DBC.
+- [x] **Painel de tabulação** como tela principal: Linhas, Colunas,
+      Incremento e Seleções em quatro blocos numerados, com os nomes do DEF na
+      ordem do arquivo, padrões do TabWin, frase dizendo o que vai ser tabulado,
+      log do TabWin com "Restaurar consulta" (log colado ou `.TAB`).
+      Conferido: `npm run verify:painel` → 6/6 casos iguais ao TabWin real.
+- [x] Tabela logo depois das abas; Quadro, Operações e Editar recolhidos
+      embaixo; coluna Total quando há Colunas; canto com o nome da Linha.
+- [x] Nomes originais: `RDAC2401.dbc` sem caixa alta forçada; busca por texto
+      mostra `DOINF*.dbc` primeiro; Parquet herda o nome-base.
+- [x] **Formato leve**: DBC → Parquet (metade do tamanho, leitura por coluna),
+      paridade registro a registro (RDAC2401, DOINF23, DENGBR25), app abre
+      `.parquet`, espelho declara e prefere a versão leve.
+      [FORMATO_LEVE_PARQUET](./FORMATO_LEVE_PARQUET.md).
+- [x] **Cache do navegador**: teto em bytes pela cota do navegador, índice de
+      metadados (banco v2), uso visível; downloads do espelho guardados.
+- [x] **TabSis + AGPL-3.0-or-later** (identificadores de formato mantidos, para
+      receitas e tabelas antigas continuarem abrindo).
+- [x] Guia dos arquivos para iniciantes e veteranos:
+      [GUIA_ARQUIVOS_DATASUS](./GUIA_ARQUIVOS_DATASUS.md); "Ver registros do
+      arquivo" e "Testar CRC" no painel.
+- [x] Correção: a manchete somava subtotal e detalhe de CNV (8.630 em vez de
+      4.315).
+
+Pendências que dependem do dono do projeto:
+
+- [ ] **Publicar**: a branch `tabsis` não foi enviada ao GitHub. O push na
+      `main` publica o site e o Worker sozinho.
+- [ ] **Espelho**: `npx wrangler login` e `npm run mirror:sync` (ver
+      FORMATO_LEVE_PARQUET). O manifesto atual é de 2026-09-03 e já passou dos
+      30 dias: hoje o app ignora o espelho e baixa tudo do DATASUS.
+- [ ] Renomear o repositório no GitHub (`tabwin-web` → `tabsis`) e decidir se
+      o domínio `tabweb.me` continua.
+
+Próximos passos sugeridos para a tabulação:
+
+- [ ] Arquivos: escolher no painel quais dos arquivos abertos entram (o TabWin
+      tem a lista com seleção múltipla; hoje entram todos os combinados).
+- [ ] Seleção por tabela DBF (ex.: "Hospital AC (CNES)") conferida contra o
+      TabWin real.
+- [ ] Assistente para criar DEF (o TabWin tem o formulário `TFFAZDEF`).
+
+---
+
 Escrito em 2026-09-02. A ordem é de prioridade: cada bloco só começa quando o
 anterior passa no portão (`npm run check:all`). Erros relatados pelo usuário
 entram na frente de tudo — o resto da fila espera.
