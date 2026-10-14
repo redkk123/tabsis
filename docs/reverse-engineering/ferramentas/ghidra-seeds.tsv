@@ -4,3 +4,8 @@
 0x5652c4	function	Normalizar1Click
 0x5651cc	function	percentagem1Click
 0x564f44	function	Acumula1Click
+0x476f70	function	CnvClassifica
+0x473f64	function	LiteralBusca
+0x47405c	function	LiteralAcha
+0x474120	function	LiteralInsere
+0x4742ac	function	LiteralInsereFaixa

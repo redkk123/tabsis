@@ -62,6 +62,10 @@ function codesToken(rule: CnvRuleLine, mode: CnvDefinition['mode'], categorySequ
     }
     return String(rule.numericUpperInclusive);
   }
+  // CNV literal: na ordem original da linha, que muda o resultado no TabWin.
+  if (rule.literalTokens?.length) {
+    return rule.literalTokens.map((token) => (typeof token === 'string' ? token : `${token.from}-${token.to}`)).join(',');
+  }
   return [...rule.exactCodes, ...rule.ranges.map((range) => `${range.from}-${range.to}`)].join(',');
 }
 

@@ -1,4 +1,4 @@
-"""RE-003, testes T5 a T7: CNV literal (L), faixas literais e código repetido.
+"""RE-003, testes T5 a T8: CNV literal (L), faixas literais e código repetido.
 
 Uso: python3 re003-cnv-literal.py <pasta de dados do TabWin> <nudosePB.cnv do TAB_SINANNET>
 
@@ -74,6 +74,11 @@ def main(folder, nudose):
     open(f'{folder}/K5.CNV', 'wb').write(original.replace(b'07-48,7 -48, 7-48', b' 7-48'))
     write(f'{folder}/RE3T7.DEF', [';RE-003 T7 faixas literais combinadas', 'AC:\\TabWin\\G001\\RE3T6*.DBF', 'GQTD']
           + [f'L{key},N2,1,{key}.CNV' for key in ['K1', 'K2', 'K3', 'K4', 'K5']])
+
+    # T8: código exato dentro de uma faixa, antes e depois dela.
+    write(f'{folder}/M1.CNV', ['2 2 L', line(1, 'A faixa _1-20', ' 1-20'), line(2, 'C exato _5', ' 5')])
+    write(f'{folder}/M2.CNV', ['2 2 L', line(1, 'C exato _5', ' 5'), line(2, 'A faixa _1-20', ' 1-20')])
+    write(f'{folder}/RE3T8.DEF', [';RE-003 T8 busca literal', 'AC:\\TabWin\\G001\\RE3T6*.DBF', 'GQTD', 'LM1,N2,1,M1.CNV', 'LM2,N2,1,M2.CNV'])
 
 
 if __name__ == '__main__':

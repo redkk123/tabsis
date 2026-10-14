@@ -29,6 +29,13 @@ export interface CnvRuleLine {
   ranges: CnvCodeRange[];
   /** Numeric-ranges mode uses one inclusive upper bound per source line. */
   numericUpperInclusive?: number;
+  /**
+   * CNV literal: os códigos e faixas da linha na ordem em que aparecem. Na CNV
+   * literal do TabWin a ordem de inserção muda o resultado (faixas sobrepostas;
+   * RE-003, decompilação de 0x474120/0x4742ac), então ela não pode se perder
+   * na separação entre `exactCodes` e `ranges`.
+   */
+  literalTokens?: Array<string | CnvCodeRange>;
   sourceOrder: number;
   sourceLine: number;
 }
