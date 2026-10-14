@@ -9,6 +9,7 @@
 import {
   classifyCnv,
   encodeWindows1252,
+  generateCnvFromValues,
   serializeCnv,
   validateCnvDefinition,
   type CnvCategory,
@@ -71,6 +72,8 @@ const cnvEditorPreviewButton = element<HTMLButtonElement>('#cnv-editor-preview-b
 const cnvEditorPreviewResult = element<HTMLElement>('#cnv-editor-preview-result');
 const cnvEditorDownload = element<HTMLButtonElement>('#cnv-editor-download');
 const cnvEditorApply = element<HTMLButtonElement>('#cnv-editor-apply');
+const cnvEditorRenumber = element<HTMLButtonElement>('#cnv-editor-renumber');
+const cnvEditorGenerate = element<HTMLButtonElement>('#cnv-editor-generate');
 
 /** Editor state, independent of any loaded CnvDefinition until "Aplicar" or "Baixar". */
 let cnvEditorRows: CnvEditorRow[] = [];
@@ -326,10 +329,12 @@ function populateCnvEditorPreviewField(): void {
     cnvEditorPreviewField.add(new Option('Abra um conjunto de dados para pré-visualizar', ''));
     cnvEditorPreviewField.disabled = true;
     cnvEditorPreviewButton.disabled = true;
+    cnvEditorGenerate.disabled = true;
     return;
   }
   cnvEditorPreviewField.disabled = false;
   cnvEditorPreviewButton.disabled = false;
+  cnvEditorGenerate.disabled = false;
   for (const field of deps.campos() ?? []) cnvEditorPreviewField.add(new Option(deps.rotuloDoCampo(field), field));
 }
 
@@ -455,6 +460,46 @@ cnvEditorAddCategory.addEventListener('click', () => {
   renderCnvEditorTable();
 });
 cnvEditorPreviewButton.addEventListener('click', () => { void updateCnvEditorPreview(); });
+// "Numera CNV" do TabWin: 1, 2, 3… na ordem da tabela. Linhas que repetem o
+// mesmo número (continuação da lista de códigos) continuam juntas, e os
+// subtotais passam a apontar para o número novo.
+cnvEditorRenumber.addEventListener('click', () => {
+  if (cnvEditorReadOnly) return;
+  const novo = new Map<number, number>();
+  for (const row of cnvEditorRows) if (!novo.has(row.sequence)) novo.set(row.sequence, novo.size + 1);
+  cnvEditorRows = cnvEditorRows.map((row) => {
+    const alvo = row.subtotal.trim();
+    const subtotal = /^\d+$/.test(alvo) && novo.has(Number(alvo)) ? String(novo.get(Number(alvo))) : row.subtotal;
+    return { ...row, sequence: novo.get(row.sequence)!, subtotal };
+  });
+  renderCnvEditorTable();
+  showToast(`Categorias numeradas de 1 a ${novo.size}`);
+});
+// "Gera CNV" do TabWin: uma categoria por código que existe no campo.
+cnvEditorGenerate.addEventListener('click', () => {
+  const field = cnvEditorPreviewField.value;
+  if (!field) return;
+  void (async () => {
+    try {
+      const { values, truncated } = await deps.valoresDistintos(field, 5000);
+      const definition = generateCnvFromValues(values);
+      setCnvEditorReadOnly(false);
+      cnvEditorRows = rowsFromDefinition(definition);
+      cnvEditorMode = definition.mode;
+      cnvEditorCodeLength = definition.codeLength;
+      cnvEditorModeSelect.value = cnvEditorMode;
+      cnvEditorCodeLengthInput.value = String(cnvEditorCodeLength);
+      cnvEditorFilename.value = `${field}.cnv`;
+      cnvEditorSource.value = '';
+      renderCnvEditorTable();
+      showToast(truncated
+        ? `${field}: ${integerFormat.format(values.length)} códigos (o campo tem mais; a lista parou aí). Escreva a descrição de cada um.`
+        : `${field}: ${integerFormat.format(values.length)} códigos. Escreva a descrição de cada um.`, truncated);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error), true);
+    }
+  })();
+});
 cnvEditorApply.addEventListener('click', applyCnvEditor);
 cnvEditorDownload.addEventListener('click', downloadCnvEditorFile);
 

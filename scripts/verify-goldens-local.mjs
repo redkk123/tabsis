@@ -25,6 +25,7 @@ import path from 'node:path';
 import {
   dbcToDbf,
   readDbcMetadata,
+  readDbfHeader,
   readDbfRecords,
 } from '@precisa-saude/datasus-dbc';
 import {
@@ -32,6 +33,7 @@ import {
   compileQueryPlan,
   dimensionFromDefOption,
   executeInMemory,
+  withRecordLayout,
 } from '../dist/packages/core/src/index.js';
 import {
   optionsForRole,
@@ -231,7 +233,10 @@ const CASES = [
 
 const metadata = readDbcMetadata(dbcBytes);
 const records = [];
-for await (const record of readDbfRecords(dbcToDbf(dbcBytes))) records.push(record);
+const dbf = dbcToDbf(dbcBytes);
+for await (const record of readDbfRecords(dbf)) records.push(record);
+// Compila como o app (withRecordLayout, RE-003).
+const layout = readDbfHeader(dbf).fields.map((field) => ({ field: field.name, type: field.type, length: field.length, decimals: field.decimalCount }));
 assert.equal(records.length, metadata.recordCount, 'decoded record count mismatch');
 
 const report = { tolerance: 0, records: { declared: metadata.recordCount, decoded: records.length }, cases: [] };
@@ -242,7 +247,7 @@ for (const testCase of CASES) {
   const exportBytes = await readFile(exportPath);
   const { golden, evidence } = normalizeTabWinExport(exportBytes, testCase.id);
 
-  const plan = compileQueryPlan({ compatibilityProfile: 'tabwin-4.15', ...testCase.spec });
+  const plan = compileQueryPlan(withRecordLayout({ compatibilityProfile: 'tabwin-4.15', ...testCase.spec }, layout, conversions));
   const actual = executeInMemory(records, plan, conversions);
   const comparison = compareWithGolden(actual, golden, {
     absoluteTolerance: 0,

@@ -86,3 +86,13 @@ test('gaussian overlay draws a curve over the same bins the histogram already pr
   assert.ok(overlay[meanBinIndex].expectedCount > overlay[0].expectedCount);
   assert.ok(overlay[meanBinIndex].expectedCount > overlay.at(-1).expectedCount);
 });
+
+test('histograma de igual freqüência: cortes na lista ordenada, sem dividir valores repetidos', async () => {
+  const { histogramEqualFrequency } = await import('../dist/packages/analysis/src/statistics.js');
+  const bins = histogramEqualFrequency([10, 9, 8, 7, 6, 5, 4, 3, 2, 1], 5);
+  assert.deepEqual(bins.map((bin) => [bin.lower, bin.upper, bin.count]), [[1, 2, 2], [2, 4, 2], [4, 6, 2], [6, 8, 2], [8, 10, 2]]);
+  const ties = histogramEqualFrequency([1, 1, 1, 1, 2], 2);
+  assert.deepEqual(ties.map((bin) => bin.count), [4, 1]);
+  assert.equal(histogramEqualFrequency([3, 3, 3], 4).length, 1);
+  assert.deepEqual(histogramEqualFrequency([Number.NaN], 3), []);
+});

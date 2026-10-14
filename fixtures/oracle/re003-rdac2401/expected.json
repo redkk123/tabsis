@@ -1,0 +1,3661 @@
+{
+ "schema": "tabsis.re003-oracle",
+ "version": 1,
+ "capturedAt": "2026-10-14",
+ "referenceEngine": "TabWin 4.15 (TabWin415.exe) under Wine 10.0",
+ "evidence": "docs/reverse-engineering/RE_003_CNV_CODIGO_CURTO.md — tabelas salvas pelo próprio TabWin (Arquivo → Salvar como, .TAB)",
+ "inputs": {
+  "data": {
+   "name": "RDAC2401.dbc",
+   "sha256": "41B7AD58932CD56D6C60455CBF67E7995F5FD2E64375D0CC440631A191638429"
+  },
+  "cnv": "pasta CNV dos auxiliares do SIH (IDADEBAS, IDADEPUB, IDADE18, IDADEDET, SENSIVEISATB01-03)"
+ },
+ "defText": ";RE-003 dado real RDAC2401\nAC:\\TabWin\\G001\\RD*.DBC\nLFaixa etária (5)  ,COD_IDADE     ,1     ,CNV\\IDADEBAS.CNV\nLFaixa etária (9)  ,COD_IDADE     ,1     ,CNV\\IDADEPUB.CNV\nLFaixa etária (18) ,COD_IDADE     ,1     ,CNV\\IDADE18.CNV\nLIdade detalhada   ,COD_IDADE     ,1     ,CNV\\IDADEDET.CNV\nLSensíveis Atenção Básica 1,DIAG_PRINC    ,1        ,CNV\\SENSIVEISATB01.CNV\nLSensíveis Atenção Básica 2,DIAG_PRINC    ,1        ,CNV\\SENSIVEISATB02.CNV\nLSensíveis Atenção Básica 3,DIAG_PRINC    ,1        ,CNV\\SENSIVEISATB03.CNV\n",
+ "cases": [
+  {
+   "id": "r5",
+   "linha": "Faixa etária (5)",
+   "naoClassificados": "incluir",
+   "rows": [
+    [
+     "< 1 ano",
+     184
+    ],
+    [
+     "1-4 anos",
+     168
+    ],
+    [
+     "5-14 anos",
+     251
+    ],
+    [
+     "15-49 anos",
+     2546
+    ],
+    [
+     "50e + anos",
+     1166
+    ],
+    [
+     "Ignorados",
+     0
+    ]
+   ],
+   "total": 4315
+  },
+  {
+   "id": "r9",
+   "linha": "Faixa etária (9)",
+   "naoClassificados": "incluir",
+   "rows": [
+    [
+     "< 1      ano",
+     184
+    ],
+    [
+     "1-4     anos",
+     168
+    ],
+    [
+     "5-14   anos",
+     251
+    ],
+    [
+     "15-24 anos",
+     833
+    ],
+    [
+     "25-34 anos",
+     855
+    ],
+    [
+     "35-44 anos",
+     610
+    ],
+    [
+     "45-54 anos",
+     446
+    ],
+    [
+     "55-64 anos",
+     359
+    ],
+    [
+     "65 e+ anos",
+     609
+    ],
+    [
+     "Ignorados",
+     0
+    ]
+   ],
+   "total": 4315
+  },
+  {
+   "id": "r18",
+   "linha": "Faixa etária (18)",
+   "naoClassificados": "incluir",
+   "rows": [
+    [
+     "<1a",
+     184
+    ],
+    [
+     "1-4a",
+     168
+    ],
+    [
+     "5-9a",
+     130
+    ],
+    [
+     "10-14a",
+     121
+    ],
+    [
+     "15-19a",
+     348
+    ],
+    [
+     "20-24a",
+     485
+    ],
+    [
+     "25-29a",
+     455
+    ],
+    [
+     "30-34a",
+     400
+    ],
+    [
+     "35-39a",
+     318
+    ],
+    [
+     "40-44a",
+     292
+    ],
+    [
+     "45-49a",
+     248
+    ],
+    [
+     "50-54a",
+     198
+    ],
+    [
+     "55-59a",
+     195
+    ],
+    [
+     "60-64a",
+     164
+    ],
+    [
+     "65-69a",
+     151
+    ],
+    [
+     "70-74a",
+     142
+    ],
+    [
+     "75-79a",
+     129
+    ],
+    [
+     "80e+a",
+     187
+    ],
+    [
+     "Ign",
+     0
+    ]
+   ],
+   "total": 4315
+  },
+  {
+   "id": "rdet",
+   "linha": "Idade detalhada",
+   "naoClassificados": "incluir",
+   "rows": [
+    [
+     "0 dias",
+     51
+    ],
+    [
+     "1 dia",
+     11
+    ],
+    [
+     "2 dias",
+     7
+    ],
+    [
+     "3 dias",
+     7
+    ],
+    [
+     "4 dias",
+     3
+    ],
+    [
+     "5 dias",
+     0
+    ],
+    [
+     "6 dias",
+     3
+    ],
+    [
+     "7 dias",
+     2
+    ],
+    [
+     "8 dias",
+     1
+    ],
+    [
+     "9 dias",
+     0
+    ],
+    [
+     "10 dias",
+     0
+    ],
+    [
+     "11 dias",
+     1
+    ],
+    [
+     "12 dias",
+     0
+    ],
+    [
+     "13 dias",
+     0
+    ],
+    [
+     "14 dias",
+     1
+    ],
+    [
+     "15 dias",
+     0
+    ],
+    [
+     "16 dias",
+     0
+    ],
+    [
+     "17 dias",
+     1
+    ],
+    [
+     "18 dias",
+     0
+    ],
+    [
+     "19 dias",
+     0
+    ],
+    [
+     "20 dias",
+     0
+    ],
+    [
+     "21 dias",
+     0
+    ],
+    [
+     "22 dias",
+     0
+    ],
+    [
+     "23 dias",
+     0
+    ],
+    [
+     "24 dias",
+     0
+    ],
+    [
+     "25 dias",
+     2
+    ],
+    [
+     "26 dias",
+     1
+    ],
+    [
+     "27 dias",
+     0
+    ],
+    [
+     "28 dias",
+     0
+    ],
+    [
+     "29 dias",
+     1
+    ],
+    [
+     "1 mês",
+     12
+    ],
+    [
+     "2 meses",
+     13
+    ],
+    [
+     "3 meses",
+     9
+    ],
+    [
+     "4 meses",
+     12
+    ],
+    [
+     "5 meses",
+     2
+    ],
+    [
+     "6 meses",
+     7
+    ],
+    [
+     "7 meses",
+     7
+    ],
+    [
+     "8 meses",
+     10
+    ],
+    [
+     "9 meses",
+     7
+    ],
+    [
+     "10 meses",
+     6
+    ],
+    [
+     "11 meses",
+     7
+    ],
+    [
+     "1 ano",
+     63
+    ],
+    [
+     "2 anos",
+     45
+    ],
+    [
+     "3 anos",
+     34
+    ],
+    [
+     "4 anos",
+     26
+    ],
+    [
+     "5 anos",
+     30
+    ],
+    [
+     "6 anos",
+     20
+    ],
+    [
+     "7 anos",
+     22
+    ],
+    [
+     "8 anos",
+     27
+    ],
+    [
+     "9 anos",
+     31
+    ],
+    [
+     "10 anos",
+     26
+    ],
+    [
+     "11 anos",
+     9
+    ],
+    [
+     "12 anos",
+     25
+    ],
+    [
+     "13 anos",
+     33
+    ],
+    [
+     "14 anos",
+     28
+    ],
+    [
+     "15 anos",
+     51
+    ],
+    [
+     "16 anos",
+     61
+    ],
+    [
+     "17 anos",
+     58
+    ],
+    [
+     "18 anos",
+     84
+    ],
+    [
+     "19 anos",
+     94
+    ],
+    [
+     "20 anos",
+     77
+    ],
+    [
+     "21 anos",
+     92
+    ],
+    [
+     "22 anos",
+     101
+    ],
+    [
+     "23 anos",
+     109
+    ],
+    [
+     "24 anos",
+     106
+    ],
+    [
+     "25 anos",
+     86
+    ],
+    [
+     "26 anos",
+     98
+    ],
+    [
+     "27 anos",
+     91
+    ],
+    [
+     "28 anos",
+     96
+    ],
+    [
+     "29 anos",
+     84
+    ],
+    [
+     "30 anos",
+     77
+    ],
+    [
+     "31 anos",
+     85
+    ],
+    [
+     "32 anos",
+     79
+    ],
+    [
+     "33 anos",
+     90
+    ],
+    [
+     "34 anos",
+     69
+    ],
+    [
+     "35 anos",
+     61
+    ],
+    [
+     "36 anos",
+     48
+    ],
+    [
+     "37 anos",
+     75
+    ],
+    [
+     "38 anos",
+     65
+    ],
+    [
+     "39 anos",
+     69
+    ],
+    [
+     "40 anos",
+     72
+    ],
+    [
+     "41 anos",
+     59
+    ],
+    [
+     "42 anos",
+     48
+    ],
+    [
+     "43 anos",
+     51
+    ],
+    [
+     "44 anos",
+     62
+    ],
+    [
+     "45 anos",
+     64
+    ],
+    [
+     "46 anos",
+     37
+    ],
+    [
+     "47 anos",
+     53
+    ],
+    [
+     "48 anos",
+     41
+    ],
+    [
+     "49 anos",
+     53
+    ],
+    [
+     "50 anos",
+     38
+    ],
+    [
+     "51 anos",
+     45
+    ],
+    [
+     "52 anos",
+     38
+    ],
+    [
+     "53 anos",
+     34
+    ],
+    [
+     "54 anos",
+     43
+    ],
+    [
+     "55 anos",
+     43
+    ],
+    [
+     "56 anos",
+     36
+    ],
+    [
+     "57 anos",
+     42
+    ],
+    [
+     "58 anos",
+     34
+    ],
+    [
+     "59 anos",
+     40
+    ],
+    [
+     "60 anos",
+     28
+    ],
+    [
+     "61 anos",
+     34
+    ],
+    [
+     "62 anos",
+     37
+    ],
+    [
+     "63 anos",
+     28
+    ],
+    [
+     "64 anos",
+     37
+    ],
+    [
+     "65 anos",
+     39
+    ],
+    [
+     "66 anos",
+     27
+    ],
+    [
+     "67 anos",
+     30
+    ],
+    [
+     "68 anos",
+     30
+    ],
+    [
+     "69 anos",
+     25
+    ],
+    [
+     "70 anos",
+     33
+    ],
+    [
+     "71 anos",
+     34
+    ],
+    [
+     "72 anos",
+     22
+    ],
+    [
+     "73 anos",
+     34
+    ],
+    [
+     "74 anos",
+     19
+    ],
+    [
+     "75 anos",
+     38
+    ],
+    [
+     "76 anos",
+     26
+    ],
+    [
+     "77 anos",
+     24
+    ],
+    [
+     "78 anos",
+     16
+    ],
+    [
+     "79 anos",
+     25
+    ],
+    [
+     "80 anos",
+     18
+    ],
+    [
+     "81 anos",
+     23
+    ],
+    [
+     "82 anos",
+     19
+    ],
+    [
+     "83 anos",
+     30
+    ],
+    [
+     "84 anos",
+     16
+    ],
+    [
+     "85 anos",
+     14
+    ],
+    [
+     "86 anos",
+     9
+    ],
+    [
+     "87 anos",
+     10
+    ],
+    [
+     "88 anos",
+     7
+    ],
+    [
+     "89 anos",
+     5
+    ],
+    [
+     "90 anos",
+     7
+    ],
+    [
+     "91 anos",
+     4
+    ],
+    [
+     "92 anos",
+     2
+    ],
+    [
+     "93 anos",
+     5
+    ],
+    [
+     "94 anos",
+     6
+    ],
+    [
+     "95 anos",
+     6
+    ],
+    [
+     "96 anos",
+     2
+    ],
+    [
+     "97 anos",
+     0
+    ],
+    [
+     "98 anos",
+     1
+    ],
+    [
+     "99 anos",
+     0
+    ],
+    [
+     "100 anos",
+     1
+    ],
+    [
+     "101 anos",
+     0
+    ],
+    [
+     "102 anos",
+     0
+    ],
+    [
+     "103 anos",
+     0
+    ],
+    [
+     "104 anos",
+     1
+    ],
+    [
+     "105 anos",
+     0
+    ],
+    [
+     "106 anos",
+     0
+    ],
+    [
+     "107 anos",
+     0
+    ],
+    [
+     "108 anos",
+     0
+    ],
+    [
+     "109 anos",
+     0
+    ],
+    [
+     "110 anos",
+     0
+    ],
+    [
+     "111 anos",
+     0
+    ],
+    [
+     "112 anos",
+     0
+    ],
+    [
+     "113 anos",
+     0
+    ],
+    [
+     "114 anos",
+     0
+    ],
+    [
+     "115 anos",
+     0
+    ],
+    [
+     "116 anos",
+     0
+    ],
+    [
+     "117 anos",
+     0
+    ],
+    [
+     "118 anos",
+     0
+    ],
+    [
+     "119 anos",
+     0
+    ],
+    [
+     "120 anos",
+     0
+    ],
+    [
+     "121 anos",
+     0
+    ],
+    [
+     "122 anos",
+     0
+    ],
+    [
+     "123 anos",
+     1
+    ],
+    [
+     "124 anos",
+     0
+    ],
+    [
+     "125 anos",
+     0
+    ],
+    [
+     "126 anos",
+     0
+    ],
+    [
+     "127 anos",
+     0
+    ],
+    [
+     "128 anos",
+     0
+    ],
+    [
+     "129 anos",
+     0
+    ],
+    [
+     "130 anos",
+     0
+    ],
+    [
+     "Idade inválida",
+     0
+    ]
+   ],
+   "total": 4315
+  },
+  {
+   "id": "rs1",
+   "linha": "Sensíveis Atenção Básica 1",
+   "naoClassificados": "incluir",
+   "rows": [
+    [
+     "1. Doenças preveníveis p/imuniz/condições sensív",
+     19
+    ],
+    [
+     "1.01 Coqueluche",
+     0
+    ],
+    [
+     "1.02 Difteria",
+     0
+    ],
+    [
+     "1.03 Tétano",
+     0
+    ],
+    [
+     "1.04 Parotidite",
+     0
+    ],
+    [
+     "1.05 Rubéola",
+     0
+    ],
+    [
+     "1.06 Sarampo",
+     0
+    ],
+    [
+     "1.07 Febre Amarela",
+     0
+    ],
+    [
+     "1.08 Hepatite B",
+     1
+    ],
+    [
+     "1.09 Meningite por Haemophilus",
+     0
+    ],
+    [
+     "1.10 Meningite Tuberculosa",
+     0
+    ],
+    [
+     "1.11 Tuberculose Miliar",
+     0
+    ],
+    [
+     "1.12 Tuberculose Pulmonar",
+     5
+    ],
+    [
+     "1.16 Outras Tuberculoses",
+     0
+    ],
+    [
+     "1.17 Febre Reumática",
+     0
+    ],
+    [
+     "1.18 Sífilis",
+     3
+    ],
+    [
+     "1.19 Malária",
+     10
+    ],
+    [
+     "1.20 Ascaridíase",
+     0
+    ],
+    [
+     "2. Gastroenterites Infecciosas e complicações",
+     86
+    ],
+    [
+     "2.01 Desidratação",
+     0
+    ],
+    [
+     "2.02 Gastroenterites",
+     86
+    ],
+    [
+     "3. Anemia",
+     15
+    ],
+    [
+     "3.01 Anemia por deficiência de ferro",
+     15
+    ],
+    [
+     "4. Deficiências nutricionais",
+     10
+    ],
+    [
+     "4.01 Kwashiokor/out.formas desnut. prot. calórica",
+     10
+    ],
+    [
+     "4.02 Outras deficiências nutricionais",
+     0
+    ],
+    [
+     "5. Infecções de ouvido, nariz e garganta",
+     8
+    ],
+    [
+     "5.01 Otite média supurativa",
+     2
+    ],
+    [
+     "5.02 Nasofaringite aguda [resfriado comum]",
+     0
+    ],
+    [
+     "5.03 Sinusite aguda",
+     0
+    ],
+    [
+     "5.04 Faringite aguda",
+     2
+    ],
+    [
+     "5.05 Amigdalite aguda",
+     2
+    ],
+    [
+     "5.06 Infecção aguda VAS",
+     2
+    ],
+    [
+     "5.07 Rinite, nasofaringite e faringite crônicas",
+     0
+    ],
+    [
+     "6. Pneumonias bacterianas",
+     44
+    ],
+    [
+     "6.01 Pneumonia pneumocócica",
+     1
+    ],
+    [
+     "6.02 Pneumonia por Haemophilus infuenzae",
+     0
+    ],
+    [
+     "6.03 Pneumonia por Streptococus",
+     0
+    ],
+    [
+     "6.04 Pneumonia bacteriana NE",
+     42
+    ],
+    [
+     "6.05 Pneumonia lobar NE",
+     1
+    ],
+    [
+     "7. Asma",
+     2
+    ],
+    [
+     "8. Doencas pulmonares",
+     67
+    ],
+    [
+     "8.01 Bronquite aguda",
+     38
+    ],
+    [
+     "8.02 Bronquite ñ especif como aguda ou crônica",
+     2
+    ],
+    [
+     "8.03 Bronquite crônica simples e a mucopurulenta",
+     0
+    ],
+    [
+     "8.04 Bronquite crônica não especificada",
+     0
+    ],
+    [
+     "8.05 Enfisema",
+     1
+    ],
+    [
+     "8.06 Bronquectasia",
+     2
+    ],
+    [
+     "8.07 Outras doenças pulmonares obstrutiv crônicas",
+     24
+    ],
+    [
+     "9. Hipertensão",
+     13
+    ],
+    [
+     "9.01 Hipertensão essencial",
+     7
+    ],
+    [
+     "9.02 Doença cardíaca hipertensiva",
+     6
+    ],
+    [
+     "10. Angina",
+     34
+    ],
+    [
+     "10.1 Angina pectoris",
+     34
+    ],
+    [
+     "11. Insuficiência cardíaca",
+     51
+    ],
+    [
+     "11.1 Insuficiência cardíaca",
+     45
+    ],
+    [
+     "11.2 Edema agudo de pulmão",
+     6
+    ],
+    [
+     "12. Doenças cerebrovasculares",
+     80
+    ],
+    [
+     "13. Diabetes melitus",
+     59
+    ],
+    [
+     "13.1 Com coma ou cetoacidose",
+     6
+    ],
+    [
+     "13.2 Com complicações (renais,oftalm. etc.)",
+     35
+    ],
+    [
+     "13.3 Sem complicações específicas",
+     18
+    ],
+    [
+     "14. Epilepsias",
+     13
+    ],
+    [
+     "15. Infecção no rim e trato urinário",
+     110
+    ],
+    [
+     "15.1 Nefrite túbulo-intersticial aguda",
+     1
+    ],
+    [
+     "15.2 Nefrite túbulo-intersticial crônica",
+     4
+    ],
+    [
+     "15.3 Nefrite túbulo-intersticial NE aguda crônica",
+     0
+    ],
+    [
+     "15.4 Cistite",
+     5
+    ],
+    [
+     "15.5 Uretrite",
+     1
+    ],
+    [
+     "15.6 Infecção do trato urinário de localização NE",
+     99
+    ],
+    [
+     "16. Infecção da pele e tecido subcutâneo",
+     48
+    ],
+    [
+     "16.1 Erisipela",
+     6
+    ],
+    [
+     "16.2 Impetigo",
+     1
+    ],
+    [
+     "16.3 Abscesso cutâneo furúnculo e carbúnculo",
+     10
+    ],
+    [
+     "16.4 Celulite",
+     23
+    ],
+    [
+     "16.5 Linfadenite aguda",
+     0
+    ],
+    [
+     "16.6 Outras infecções local. pele e tec.subcutâneo",
+     8
+    ],
+    [
+     "17. Doença Inflamatória órgãos pélvicos femininos",
+     21
+    ],
+    [
+     "17.1 Salpingite e ooforite",
+     1
+    ],
+    [
+     "17.2 Doença inflamatória do útero exceto o colo",
+     0
+    ],
+    [
+     "17.3 Doença inflamatória do colo do útero",
+     0
+    ],
+    [
+     "17.4 Outras doenças inflamatórias pélvicas feminin",
+     8
+    ],
+    [
+     "17.5 Doenças da glândula de Bartholin",
+     10
+    ],
+    [
+     "17.6 Outras afecções inflam. da vagina e da vulva",
+     2
+    ],
+    [
+     "18. Úlcera gastrointestinal",
+     10
+    ],
+    [
+     "19. Doenças relacionadas ao pré-natal e parto",
+     25
+    ],
+    [
+     "19.1 Infecção no trato urinário na gravidez",
+     20
+    ],
+    [
+     "19.2 Sífilis congênita",
+     5
+    ],
+    [
+     "19.3 Síndrome da rubéola congênita",
+     0
+    ],
+    [
+     "Não classificados",
+     3600
+    ]
+   ],
+   "total": 4315
+  },
+  {
+   "id": "rs2",
+   "linha": "Sensíveis Atenção Básica 2",
+   "naoClassificados": "incluir",
+   "rows": [
+    [
+     "Doenças preveníveis por imuniz/condições sensíveis",
+     19
+    ],
+    [
+     "A15.0 Tuberc pulm c/conf p/ex micr expec c/s/cult",
+     2
+    ],
+    [
+     "A15.1 Tuberc pulmonar c/conf somente p/cultura",
+     0
+    ],
+    [
+     "A15.2 Tuberc pulmonar c/conf histolog",
+     0
+    ],
+    [
+     "A15.3 Tuberc pulmonar c/conf p/meio NE",
+     2
+    ],
+    [
+     "A15.4 Tuberc gangl intrator c/conf bacter e histol",
+     0
+    ],
+    [
+     "A15.5 Tuberc laring traq bronq c/conf bact e hist",
+     0
+    ],
+    [
+     "A15.6 Pleuris tuberc c/conf bacteriol e histolog",
+     0
+    ],
+    [
+     "A15.7 Tuberc prim vias respir c/conf bact e histol",
+     0
+    ],
+    [
+     "A15.8 Outr form tuberc via resp c/conf bact hist",
+     0
+    ],
+    [
+     "A15.9 Tuberc NE vias respir c/conf bacter histol",
+     1
+    ],
+    [
+     "A16.0 Tuberc pulmonar c/exames bact e hist negat",
+     0
+    ],
+    [
+     "A16.1 Tuberc pulmonar s/exame bacter ou histolog",
+     0
+    ],
+    [
+     "A16.2 Tuberc pulmonar s/menc conf bact ou hist",
+     0
+    ],
+    [
+     "A16.3 Tuberc gangl intrat s/menc conf bact hist",
+     0
+    ],
+    [
+     "A16.4 Tuberc laring traq bronq s/menc bact hist",
+     0
+    ],
+    [
+     "A16.5 Pleurisia tuberc s/menc conf bact ou histol",
+     0
+    ],
+    [
+     "A16.7 Tuberc respir prim s/menc conf bact ou hist",
+     0
+    ],
+    [
+     "A16.8 Outr tuber via resp s/menc conf bact hist",
+     0
+    ],
+    [
+     "A16.9 Tuberc respirat NE s/menc conf bact ou hist",
+     0
+    ],
+    [
+     "A17.1 Tuberculoma meningeo",
+     0
+    ],
+    [
+     "A17.8 Outr tuberc do sist nervoso",
+     0
+    ],
+    [
+     "A17.9 Tuberc NE do sist nervoso",
+     0
+    ],
+    [
+     "A17.0 Meningite tuberc",
+     0
+    ],
+    [
+     "A18.0 Tuberc ossea e das articulacoes",
+     0
+    ],
+    [
+     "A18.1 Tuberc do aparelho geniturinario",
+     0
+    ],
+    [
+     "A18.2 Linfadenopatia tuberc periferica",
+     0
+    ],
+    [
+     "A18.3 Tuberc intestino peritonio gangl mesenter",
+     0
+    ],
+    [
+     "A18.4 Tuberc de pele e tec celular subcutaneo",
+     0
+    ],
+    [
+     "A18.5 Tuberc do olho",
+     0
+    ],
+    [
+     "A18.6 Tuberc do ouvido",
+     0
+    ],
+    [
+     "A18.7 Tuberc das supra-renais",
+     0
+    ],
+    [
+     "A18.8 Tuberc de outr orgaos espec",
+     0
+    ],
+    [
+     "A19.0 Tuberc miliar aguda de localiz unica espec",
+     0
+    ],
+    [
+     "A19.1 Tuberc miliar aguda de mult localiz",
+     0
+    ],
+    [
+     "A19.2 Tuberc miliar aguda NE",
+     0
+    ],
+    [
+     "A19.8 Outr tuberc miliares",
+     0
+    ],
+    [
+     "A19.9 Tuberc miliar NE",
+     0
+    ],
+    [
+     "A33   Tetano do recem-nascido",
+     0
+    ],
+    [
+     "A34   Tetano obstetrico",
+     0
+    ],
+    [
+     "A35   Outr tipos de tetano",
+     0
+    ],
+    [
+     "A36.0 Difteria faringea",
+     0
+    ],
+    [
+     "A36.1 Difteria nasofaringea",
+     0
+    ],
+    [
+     "A36.2 Difteria laringea",
+     0
+    ],
+    [
+     "A36.3 Difteria cutanea",
+     0
+    ],
+    [
+     "A36.8 Outr form de difteria",
+     0
+    ],
+    [
+     "A36.9 Difteria NE",
+     0
+    ],
+    [
+     "A37.0 Coqueluche p/Bordetella pertussis",
+     0
+    ],
+    [
+     "A37.1 Coqueluche p/Bordetella parapertussis",
+     0
+    ],
+    [
+     "A37.8 Coqueluche p/outr especies da Bordetella",
+     0
+    ],
+    [
+     "A37.9 Coqueluche NE",
+     0
+    ],
+    [
+     "A51.0 Sifilis genital prim",
+     0
+    ],
+    [
+     "A51.1 Sifilis anal prim",
+     0
+    ],
+    [
+     "A51.2 Sifilis prim de outr localiz",
+     0
+    ],
+    [
+     "A51.3 Sifilis secund da pele e das mucosas",
+     0
+    ],
+    [
+     "A51.4 Outr form de sifilis secund",
+     0
+    ],
+    [
+     "A51.5 Sifilis precoce latente",
+     0
+    ],
+    [
+     "A51.9 Sifilis precoce NE",
+     0
+    ],
+    [
+     "A52.0 Sifilis cardiovascular",
+     0
+    ],
+    [
+     "A52.1 Neurossifilis sintomatica",
+     0
+    ],
+    [
+     "A52.2 Neurossifilis assintomatica",
+     0
+    ],
+    [
+     "A52.3 Neurossifilis NE",
+     0
+    ],
+    [
+     "A52.7 Outr form de sifilis tard sintomatica",
+     1
+    ],
+    [
+     "A52.8 Sifilis tard latente",
+     0
+    ],
+    [
+     "A52.9 Sifilis tard NE",
+     0
+    ],
+    [
+     "A53.0 Sifilis latente NE se recente ou tard",
+     0
+    ],
+    [
+     "A53.9 Sifilis NE",
+     2
+    ],
+    [
+     "A95.0 Febre amarela silvestre",
+     0
+    ],
+    [
+     "A95.1 Febre amarela urbana",
+     0
+    ],
+    [
+     "A95.9 Febre amarela NE",
+     0
+    ],
+    [
+     "B05.0 Sarampo complicado p/encefalite",
+     0
+    ],
+    [
+     "B05.1 Sarampo complicado p/meningite",
+     0
+    ],
+    [
+     "B05.2 Sarampo complicado p/pneumonia",
+     0
+    ],
+    [
+     "B05.3 Sarampo complicado p/otite media",
+     0
+    ],
+    [
+     "B05.4 Sarampo c/complic intestinais",
+     0
+    ],
+    [
+     "B05.8 Sarampo c/outr complic",
+     0
+    ],
+    [
+     "B05.9 Sarampo s/complic",
+     0
+    ],
+    [
+     "B06.0 Rubeola c/complic neurologicas",
+     0
+    ],
+    [
+     "B06.8 Rubeola c/outr complic",
+     0
+    ],
+    [
+     "B06.9 Rubeola s/complic",
+     0
+    ],
+    [
+     "B16.0 Hepatite aguda B c/ag. Delta c/coma hepatico",
+     0
+    ],
+    [
+     "B16.1 Hepatite aguda B c/ag. Delta s/coma hepatico",
+     1
+    ],
+    [
+     "B16.2 Hepatite aguda B s/ag. Delta c/coma hepatico",
+     0
+    ],
+    [
+     "B16.9 Hepatite aguda B s/ag. Delta s/coma hepatico",
+     0
+    ],
+    [
+     "B26.0 Orquite p/caxumba",
+     0
+    ],
+    [
+     "B26.1 Meningite p/caxumba",
+     0
+    ],
+    [
+     "B26.2 Encefalite p/caxumba",
+     0
+    ],
+    [
+     "B26.3 Pancreatite p/caxumba",
+     0
+    ],
+    [
+     "B26.8 Caxumba c/outr complic",
+     0
+    ],
+    [
+     "B26.9 Caxumba s/complic",
+     0
+    ],
+    [
+     "B50.0 Malaria p/P.falciparum c/complic cerebrais",
+     0
+    ],
+    [
+     "B50.1 Outr form grav compl malaria p/P.falciparum",
+     0
+    ],
+    [
+     "B50.9 Malaria NE p/Plasmodium falciparum",
+     1
+    ],
+    [
+     "B51.0 Malaria p/Plasmodium vivax c/rotura do baco",
+     0
+    ],
+    [
+     "B51.8 Malaria p/Plasmodium vivax c/outr complic",
+     1
+    ],
+    [
+     "B51.9 Malaria p/Plasmodium vivax s/complic",
+     6
+    ],
+    [
+     "B52.0 Malaria p/Plasmodium malariae c/nefropatia",
+     0
+    ],
+    [
+     "B52.8 Malaria p/Plasmodium malariae c/outr complic",
+     0
+    ],
+    [
+     "B52.9 Malaria p/Plasmodium malariae s/complic",
+     0
+    ],
+    [
+     "B53.0 Malaria p/Plasmodium ovale",
+     0
+    ],
+    [
+     "B53.1 Malaria p/plasmodios de macacos",
+     0
+    ],
+    [
+     "B53.8 Outr form malarias c/conf parasitolog NCOP",
+     1
+    ],
+    [
+     "B54   Malaria NE",
+     1
+    ],
+    [
+     "B77.0 Ascaridiase c/complic intestinais",
+     0
+    ],
+    [
+     "B77.8 Ascaridiase c/outr complic",
+     0
+    ],
+    [
+     "B77.9 Ascaridiase NE",
+     0
+    ],
+    [
+     "G00.0 Meningite p/Haemophilus",
+     0
+    ],
+    [
+     "I00   Febre reumatica s/mencao de compr do coracao",
+     0
+    ],
+    [
+     "I01.0 Pericardite reumatica aguda",
+     0
+    ],
+    [
+     "I01.1 Endocardite reumatica aguda",
+     0
+    ],
+    [
+     "I01.2 Miocardite reumatica aguda",
+     0
+    ],
+    [
+     "I01.8 Outr form de doenc cardiaca reumatica aguda",
+     0
+    ],
+    [
+     "I01.9 Doenc cardiaca reumatica aguda NE",
+     0
+    ],
+    [
+     "I02.0 Coreia reumatica c/compr cardiaco",
+     0
+    ],
+    [
+     "I02.9 Coreia reumatica s/compr cardiaco",
+     0
+    ],
+    [
+     "Gastroenterites Infecciosas e complicações",
+     86
+    ],
+    [
+     "E86   Deplecao de volume",
+     0
+    ],
+    [
+     "A00.0 Colera dev Vibrio cholerae 01 biot cholerae",
+     0
+    ],
+    [
+     "A00.1 Colera dev Vibrio cholerae 01 biot El Tor",
+     0
+    ],
+    [
+     "A00.9 Colera NE",
+     0
+    ],
+    [
+     "A01.0 Febre tifoide",
+     0
+    ],
+    [
+     "A01.1 Febre paratifoide A",
+     0
+    ],
+    [
+     "A01.2 Febre paratifoide B",
+     0
+    ],
+    [
+     "A01.3 Febre paratifoide C",
+     0
+    ],
+    [
+     "A01.4 Febre paratifoide NE",
+     0
+    ],
+    [
+     "A02.0 Enterite p/salmonela",
+     0
+    ],
+    [
+     "A02.1 Septicemia p/salmonela",
+     0
+    ],
+    [
+     "A02.2 Infecc localizadas p/salmonela",
+     0
+    ],
+    [
+     "A02.8 Outr infecc espec p/salmonela",
+     0
+    ],
+    [
+     "A02.9 Infecc NE p/salmonela",
+     1
+    ],
+    [
+     "A03.0 Shiguelose dev Shigella dysenteriae",
+     0
+    ],
+    [
+     "A03.1 Shiguelose dev Shigella flexneri",
+     0
+    ],
+    [
+     "A03.2 Shiguelose dev Shigella boydii",
+     0
+    ],
+    [
+     "A03.3 Shiguelose dev Shigella sonnei",
+     0
+    ],
+    [
+     "A03.8 Outr shigueloses",
+     0
+    ],
+    [
+     "A03.9 Shiguelose NE",
+     0
+    ],
+    [
+     "A04.0 Infecc p/Escherichia coli enteropatogenica",
+     0
+    ],
+    [
+     "A04.1 Infecc p/Escherichia coli enterotoxigenica",
+     0
+    ],
+    [
+     "A04.2 Infecc p/Escherichia coli enteroinvasiva",
+     0
+    ],
+    [
+     "A04.3 Infecc p/Escherichia coli enterohemorragica",
+     0
+    ],
+    [
+     "A04.4 Outr infecc intestinais p/Escherichia coli",
+     0
+    ],
+    [
+     "A04.5 Enterite p/Campylobacter",
+     0
+    ],
+    [
+     "A04.6 Enterite dev Yersinia enterocolitica",
+     0
+    ],
+    [
+     "A04.7 Enterocolite dev Clostridium difficile",
+     0
+    ],
+    [
+     "A04.8 Outr infecc bacter intestinais espec",
+     3
+    ],
+    [
+     "A04.9 Infecc intestinal bacter NE",
+     5
+    ],
+    [
+     "A05.0 Intox alimentar estafilococica",
+     0
+    ],
+    [
+     "A05.1 Botulismo",
+     0
+    ],
+    [
+     "A05.2 Intox alimentar dev Clostridium perfringens",
+     0
+    ],
+    [
+     "A05.3 Intox alimentar dev Vibrio parahemolyticus",
+     0
+    ],
+    [
+     "A05.4 Intox alimentar dev Bacillus cereus",
+     0
+    ],
+    [
+     "A05.8 Outr intox alimentares bacter espec",
+     0
+    ],
+    [
+     "A05.9 Intox alimentar bacter NE",
+     0
+    ],
+    [
+     "A06.0 Disenteria amebiana aguda",
+     0
+    ],
+    [
+     "A06.1 Amebiase intestinal cronica",
+     0
+    ],
+    [
+     "A06.2 Colite amebiana nao-disenterica",
+     0
+    ],
+    [
+     "A06.3 Ameboma intestinal",
+     0
+    ],
+    [
+     "A06.4 Abscesso amebiano do figado",
+     0
+    ],
+    [
+     "A06.5 Abscesso amebiano do pulmao",
+     0
+    ],
+    [
+     "A06.6 Abscesso amebiano do cerebro",
+     0
+    ],
+    [
+     "A06.7 Amebiase cutanea",
+     0
+    ],
+    [
+     "A06.8 Infecc amebiana de outr localiz",
+     0
+    ],
+    [
+     "A06.9 Amebiase NE",
+     0
+    ],
+    [
+     "A07.0 Balantidiase",
+     0
+    ],
+    [
+     "A07.1 Giardiase",
+     0
+    ],
+    [
+     "A07.2 Criptosporidiose",
+     0
+    ],
+    [
+     "A07.3 Isosporiase",
+     0
+    ],
+    [
+     "A07.8 Outr doenc intestinais espec p/protozoarios",
+     0
+    ],
+    [
+     "A07.9 Doenc intestinal NE p/protozoarios",
+     0
+    ],
+    [
+     "A08.0 Enterite p/rotavirus",
+     0
+    ],
+    [
+     "A08.1 Gastroenteropatia aguda p/agente de Norwalk",
+     0
+    ],
+    [
+     "A08.2 Enterite p/adenovirus",
+     0
+    ],
+    [
+     "A08.3 Outr enterites virais",
+     3
+    ],
+    [
+     "A08.4 Infecc intestinal dev virus NE",
+     21
+    ],
+    [
+     "A08.5 Outr infecc intestinais espec",
+     8
+    ],
+    [
+     "A09   Diarreia e gastroenterite orig infecc presum",
+     45
+    ],
+    [
+     "Anemia",
+     15
+    ],
+    [
+     "D50.0 Anemia p/defic ferro secund perda de sangue",
+     2
+    ],
+    [
+     "D50.1 Disfagia sideropenica",
+     0
+    ],
+    [
+     "D50.8 Outr anemias p/defic de ferro",
+     2
+    ],
+    [
+     "D50.9 Anemia p/defic de ferro NE",
+     11
+    ],
+    [
+     "Deficiências Nutricionais",
+     10
+    ],
+    [
+     "E40   Kwashiorkor",
+     0
+    ],
+    [
+     "E41   Marasmo nutricional",
+     1
+    ],
+    [
+     "E42   Kwashiorkor marasmatico",
+     0
+    ],
+    [
+     "E43   Desnutric proteico-calorica grave NE",
+     3
+    ],
+    [
+     "E44.0 Desnutric proteico-calorica moderada",
+     3
+    ],
+    [
+     "E44.1 Desnutric proteico-calorica leve",
+     0
+    ],
+    [
+     "E45   Atraso desenv dev desnutric proteico-caloric",
+     0
+    ],
+    [
+     "E46   Desnutric proteico-calorica NE",
+     3
+    ],
+    [
+     "E50.0 Defic de vitamina A c/xerose conjuntival",
+     0
+    ],
+    [
+     "E50.1 Defic vitamina c/mancha de Bitot xerose conj",
+     0
+    ],
+    [
+     "E50.2 Defic de vitamina A c/xerose da cornea",
+     0
+    ],
+    [
+     "E50.3 Defic vitamina A c/ulceracao e xerose cornea",
+     0
+    ],
+    [
+     "E50.4 Defic de vitamina A c/ceratomalacia",
+     0
+    ],
+    [
+     "E50.5 Defic de vitamina A c/cegueira noturna",
+     0
+    ],
+    [
+     "E50.6 Defic vitamina A cicatrizes xeroft cornea",
+     0
+    ],
+    [
+     "E50.7 Outr manif oculares dev defic vitamina A",
+     0
+    ],
+    [
+     "E50.8 Outr manifestacoes dev defic de vitamina A",
+     0
+    ],
+    [
+     "E50.9 Defic NE de vitamina A",
+     0
+    ],
+    [
+     "E51.1 Beriberi",
+     0
+    ],
+    [
+     "E51.2 Encefalopatia de Wernicke",
+     0
+    ],
+    [
+     "E51.8 Outr manifestacoes da defic de tiamina",
+     0
+    ],
+    [
+     "E51.9 Defic NE de tiamina",
+     0
+    ],
+    [
+     "E52   Defic de niacina",
+     0
+    ],
+    [
+     "E53.0 Defic de riboflavina",
+     0
+    ],
+    [
+     "E53.1 Defic de piridoxina",
+     0
+    ],
+    [
+     "E53.8 Defic de outr vitaminas espec do grupo B",
+     0
+    ],
+    [
+     "E53.9 Defic NE de vitamina B",
+     0
+    ],
+    [
+     "E54   Defic de acido ascorbico",
+     0
+    ],
+    [
+     "E55.0 Raquitismo ativo",
+     0
+    ],
+    [
+     "E55.9 Defic NE de vitamina D",
+     0
+    ],
+    [
+     "E56.0 Defic de vitamina E",
+     0
+    ],
+    [
+     "E56.1 Defic de vitamina K",
+     0
+    ],
+    [
+     "E56.8 Defic de outr vitaminas",
+     0
+    ],
+    [
+     "E56.9 Defic vitaminica NE",
+     0
+    ],
+    [
+     "E58   Defic de calcio da dieta",
+     0
+    ],
+    [
+     "E59   Defic de selenio da dieta",
+     0
+    ],
+    [
+     "E60   Defic de zinco da dieta",
+     0
+    ],
+    [
+     "E61.0 Defic de cobre",
+     0
+    ],
+    [
+     "E61.1 Defic de ferro",
+     0
+    ],
+    [
+     "E61.2 Defic de magnesio",
+     0
+    ],
+    [
+     "E61.3 Defic de manganes",
+     0
+    ],
+    [
+     "E61.4 Defic de cromo",
+     0
+    ],
+    [
+     "E61.5 Defic de molibdenio",
+     0
+    ],
+    [
+     "E61.6 Defic de vanadio",
+     0
+    ],
+    [
+     "E61.7 Defic de mult elementos nutrientes",
+     0
+    ],
+    [
+     "E61.8 Defic de outr elementos nutrientes espec",
+     0
+    ],
+    [
+     "E61.9 Defic de elementos nutrientes NE",
+     0
+    ],
+    [
+     "E63.0 Defic de acido graxo essencial",
+     0
+    ],
+    [
+     "E63.1 Desequilibrio constituintes ingest alimentos",
+     0
+    ],
+    [
+     "E63.8 Outr defic nutricionais espec",
+     0
+    ],
+    [
+     "E63.9 Defic nutricional NE",
+     0
+    ],
+    [
+     "E64.0 Sequelas de desnutric proteico-calorica",
+     0
+    ],
+    [
+     "E64.1 Sequelas da defic de vitamina A",
+     0
+    ],
+    [
+     "E64.2 Sequelas da defic de vitamina C",
+     0
+    ],
+    [
+     "E64.3 Sequelas do raquitismo",
+     0
+    ],
+    [
+     "E64.8 Sequelas de outr defic nutricionais",
+     0
+    ],
+    [
+     "E64.9 Sequelas de defic nutricional NE",
+     0
+    ],
+    [
+     "Infecções de ouvido, nariz e garganta",
+     8
+    ],
+    [
+     "H66.0 Otite media aguda supurativa",
+     0
+    ],
+    [
+     "H66.1 Otite media tubotimpanica supurativa cronica",
+     0
+    ],
+    [
+     "H66.2 Otite media atico-antral supurativa cronica",
+     0
+    ],
+    [
+     "H66.3 Outr otites medias supurativas cronicas",
+     1
+    ],
+    [
+     "H66.4 Otite media supurativa NE",
+     0
+    ],
+    [
+     "H66.9 Otite media NE",
+     1
+    ],
+    [
+     "J00   Nasofaringite aguda",
+     0
+    ],
+    [
+     "J01.0 Sinusite maxilar aguda",
+     0
+    ],
+    [
+     "J01.1 Sinusite frontal aguda",
+     0
+    ],
+    [
+     "J01.2 Sinusite etmoidal aguda",
+     0
+    ],
+    [
+     "J01.3 Sinusite esfenoidal aguda",
+     0
+    ],
+    [
+     "J01.4 Pansinusite aguda",
+     0
+    ],
+    [
+     "J01.8 Outr sinusites agudas",
+     0
+    ],
+    [
+     "J01.9 Sinusite aguda NE",
+     0
+    ],
+    [
+     "J02.0 Faringite estreptococica",
+     1
+    ],
+    [
+     "J02.8 Faringite aguda dev outr microorg espec",
+     0
+    ],
+    [
+     "J02.9 Faringite aguda NE",
+     1
+    ],
+    [
+     "J03.0 Amigdalite estreptococica",
+     1
+    ],
+    [
+     "J03.8 Amigdalite aguda dev outr microorg espec",
+     0
+    ],
+    [
+     "J03.9 Amigdalite aguda NE",
+     1
+    ],
+    [
+     "J06.0 Laringofaringite aguda",
+     0
+    ],
+    [
+     "J06.8 Outr infecc agudas vias aereas sup loc mult",
+     2
+    ],
+    [
+     "J06.9 Infecc aguda das vias aereas super NE",
+     0
+    ],
+    [
+     "J31.0 Rinite cronica",
+     0
+    ],
+    [
+     "J31.1 Nasofaringite cronica",
+     0
+    ],
+    [
+     "J31.2 Faringite cronica",
+     0
+    ],
+    [
+     "Pneumonias bacterianas",
+     44
+    ],
+    [
+     "J13   Pneumonia dev Streptococcus pneumoniae",
+     1
+    ],
+    [
+     "J14   Pneumonia dev Haemophilus infuenzae",
+     0
+    ],
+    [
+     "J15.3 Pneumonia dev Streptococcus do grupo B",
+     0
+    ],
+    [
+     "J15.4 Pneumonia dev outr estreptococos",
+     0
+    ],
+    [
+     "J15.8 Outr pneumonias bacter",
+     18
+    ],
+    [
+     "J15.9 Pneumonia bacter NE",
+     24
+    ],
+    [
+     "J18.1 Pneumonia lobar NE",
+     1
+    ],
+    [
+     "Asma",
+     2
+    ],
+    [
+     "J45.0 Asma predom alergica",
+     0
+    ],
+    [
+     "J45.1 Asma nao-alergica",
+     0
+    ],
+    [
+     "J45.8 Asma mista",
+     0
+    ],
+    [
+     "J45.9 Asma NE",
+     2
+    ],
+    [
+     "J46   Estado de mal asmatico",
+     0
+    ],
+    [
+     "Doencas pulmonares",
+     67
+    ],
+    [
+     "J20.0 Bronquite aguda dev Mycoplasma pneumoniae",
+     0
+    ],
+    [
+     "J20.1 Bronquite aguda dev Haemophilus influenzae",
+     0
+    ],
+    [
+     "J20.2 Bronquite aguda dev estreptococos",
+     0
+    ],
+    [
+     "J20.3 Bronquite aguda dev virus Coxsackie",
+     0
+    ],
+    [
+     "J20.4 Bronquite aguda dev virus parainfluenza",
+     0
+    ],
+    [
+     "J20.5 Bronquite aguda dev virus sincicial respirat",
+     0
+    ],
+    [
+     "J20.6 Bronquite aguda dev rinovirus",
+     0
+    ],
+    [
+     "J20.7 Bronquite aguda dev echovirus",
+     0
+    ],
+    [
+     "J20.8 Bronquite aguda dev outr microorg espec",
+     0
+    ],
+    [
+     "J20.9 Bronquite aguda NE",
+     0
+    ],
+    [
+     "J21.0 Bronquiolite aguda dev virus sincicial resp",
+     4
+    ],
+    [
+     "J21.8 Bronquiolite aguda dev outr microorg espec",
+     13
+    ],
+    [
+     "J21.9 Bronquite aguda NE",
+     21
+    ],
+    [
+     "J40   Bronquite NE como aguda ou cronica",
+     2
+    ],
+    [
+     "J41.0 Bronquite cronica simples",
+     0
+    ],
+    [
+     "J41.1 Bronquite cronica mucopurulenta",
+     0
+    ],
+    [
+     "J41.8 Bronquite cron mista simples e mucopurulenta",
+     0
+    ],
+    [
+     "J42   Bronquite cronica NE",
+     0
+    ],
+    [
+     "J43.0 Sindr de MacLeod",
+     0
+    ],
+    [
+     "J43.1 Enfisema panlobular",
+     1
+    ],
+    [
+     "J43.2 Enfisema centrolobular",
+     0
+    ],
+    [
+     "J43.8 Outr form de enfisema",
+     0
+    ],
+    [
+     "J43.9 Enfisema NE",
+     0
+    ],
+    [
+     "J47   Bronquectasia",
+     2
+    ],
+    [
+     "J44.0 Doen pulm obs cron c/inf resp ag tr resp inf",
+     6
+    ],
+    [
+     "J44.1 Doenc pulmonar obstr cron c/exacerb aguda NE",
+     3
+    ],
+    [
+     "J44.8 Outr form espec doenc pulmonar obstrut cron",
+     1
+    ],
+    [
+     "J44.9 Doenc pulmonar obstrutiva cronica NE",
+     14
+    ],
+    [
+     "Hipertensão",
+     13
+    ],
+    [
+     "I10   Hipertensao essencial",
+     7
+    ],
+    [
+     "I11.0 Doenc cardiaca hipertensiva c/insuf cardiaca",
+     5
+    ],
+    [
+     "I11.9 Doenc cardiaca hipertensiva s/insuf cardiaca",
+     1
+    ],
+    [
+     "Angina",
+     34
+    ],
+    [
+     "I20.0 Angina instavel",
+     30
+    ],
+    [
+     "I20.1 Angina pectoris c/espasmo documentado",
+     0
+    ],
+    [
+     "I20.8 Outr form de angina pectoris",
+     0
+    ],
+    [
+     "I20.9 Angina pectoris NE",
+     4
+    ],
+    [
+     "Insuficiência Cardíaca",
+     51
+    ],
+    [
+     "I50.0 Insuf cardiaca congestiva",
+     28
+    ],
+    [
+     "I50.1 Insuf ventricular esquerda",
+     0
+    ],
+    [
+     "I50.9 Insuf cardiaca NE",
+     17
+    ],
+    [
+     "J81   Edema pulmonar NE de outr form",
+     6
+    ],
+    [
+     "Doenças Cerebrovasculares",
+     80
+    ],
+    [
+     "I63.0 Infarto cerebr dev tromb arterias pre-cerebr",
+     0
+    ],
+    [
+     "I63.1 Infarto cerebr dev embol arterias pre-cerebr",
+     0
+    ],
+    [
+     "I63.2 Inf cer dev oclusao esten NE art pre-cerebr",
+     0
+    ],
+    [
+     "I63.3 Infarto cerebr dev trombose arterias cerebr",
+     0
+    ],
+    [
+     "I63.4 Infarto cerebral dev embolia arterias cerebr",
+     0
+    ],
+    [
+     "I63.5 Inf cer dev oclusao estenose NE art cerebr",
+     1
+    ],
+    [
+     "I63.6 Inf cerebr dev tromb ven cerebr nao-piogenic",
+     0
+    ],
+    [
+     "I63.8 Outr infartos cerebrais",
+     20
+    ],
+    [
+     "I63.9 Infarto cerebral NE",
+     0
+    ],
+    [
+     "I64   Acid vasc cerebr NE como hemorrag isquemico",
+     46
+    ],
+    [
+     "I65.0 Oclusao e estenose da arteria vertebral",
+     0
+    ],
+    [
+     "I65.1 Oclusao e estenose da arteria basilar",
+     0
+    ],
+    [
+     "I65.2 Oclusao e estenose da arteria carotida",
+     0
+    ],
+    [
+     "I65.3 Oclusao/estenose art pre-cerebr mult bilat",
+     0
+    ],
+    [
+     "I65.8 Oclusao e estenose outr arteria pre-cerebral",
+     0
+    ],
+    [
+     "I65.9 Oclusao e estenose arterias pre-cerebrais NE",
+     0
+    ],
+    [
+     "I66.0 Oclusao e estenose da arteria cerebral media",
+     0
+    ],
+    [
+     "I66.1 Oclusao e estenose arteria cerebral anterior",
+     0
+    ],
+    [
+     "I66.2 Oclusao e estenose arteria cerebral post",
+     0
+    ],
+    [
+     "I66.3 Oclusao e estenose de arterias cerebelares",
+     0
+    ],
+    [
+     "I66.4 Oclusao/estenose arterias cerebr mult bilat",
+     0
+    ],
+    [
+     "I66.8 Oclusao e estenose de outr arteria cerebral",
+     0
+    ],
+    [
+     "I66.9 Oclusao e estenose de arteria cerebral NE",
+     0
+    ],
+    [
+     "I67.0 Disseccao de arterias cerebrais s/ruptura",
+     0
+    ],
+    [
+     "I67.1 Aneurisma cerebral nao-roto",
+     0
+    ],
+    [
+     "I67.2 Aterosclerose cerebral",
+     0
+    ],
+    [
+     "I67.3 Leucoencefalopatia vascular progressiva",
+     0
+    ],
+    [
+     "I67.4 Encefalopatia hipertensiva",
+     0
+    ],
+    [
+     "I67.5 Doenc de Moyamoya",
+     0
+    ],
+    [
+     "I67.6 Trombose nao-piogenica sist venoso intracran",
+     0
+    ],
+    [
+     "I67.7 Arterite cerebral NCOP",
+     0
+    ],
+    [
+     "I67.8 Outr doenc cerebrovasculares espec",
+     0
+    ],
+    [
+     "I67.9 Doenc cerebrovascular NE",
+     0
+    ],
+    [
+     "I69.0 Sequelas de hemorragia subaranoidea",
+     0
+    ],
+    [
+     "I69.1 Sequelas de hemorragia intracerebral",
+     0
+    ],
+    [
+     "I69.2 Sequelas outr hemorrag intracran nao traum",
+     0
+    ],
+    [
+     "I69.3 Sequelas de infarto cerebral",
+     0
+    ],
+    [
+     "I69.4 Sequelas acid vasc cerebr NE c/hemorr isquem",
+     0
+    ],
+    [
+     "I69.8 Sequelas outr doenc cerebrovasculares e NE",
+     0
+    ],
+    [
+     "G45.0 Sindr da arteria vertebro-basilar",
+     3
+    ],
+    [
+     "G45.1 Sindr da arteria carotidea",
+     0
+    ],
+    [
+     "G45.2 Sindr arterias pre-cerebrais mult bilaterais",
+     0
+    ],
+    [
+     "G45.3 Amaurose fugaz",
+     0
+    ],
+    [
+     "G45.4 Amnesia global transitoria",
+     0
+    ],
+    [
+     "G45.8 Outr acid isquemicos cerebr trans sindr corr",
+     6
+    ],
+    [
+     "G45.9 Isquemia cerebral transitoria NE",
+     3
+    ],
+    [
+     "G46.0 Sindr da arteria cerebral media",
+     0
+    ],
+    [
+     "G46.1 Sindr da arteria cerebral anterior",
+     0
+    ],
+    [
+     "G46.2 Sindr da arteria cerebral posterior",
+     0
+    ],
+    [
+     "G46.3 Sindr vasculares do tronco cerebral",
+     0
+    ],
+    [
+     "G46.4 Sindr vascular cerebelar",
+     0
+    ],
+    [
+     "G46.5 Sindr lacunar motora pura",
+     0
+    ],
+    [
+     "G46.6 Sindr lacunar sensorial pura",
+     0
+    ],
+    [
+     "G46.7 Outr sindr lacunares",
+     0
+    ],
+    [
+     "G46.8 Outr sindr vasc cerebr doenc cerebrovascular",
+     1
+    ],
+    [
+     "Diabetes melitus",
+     59
+    ],
+    [
+     "E10.0 DM Ins.Dep. c/coma",
+     0
+    ],
+    [
+     "E10.1 DM Ins.Dep. c/cetoacidose",
+     3
+    ],
+    [
+     "E11.0 DM Não Ins.Dep. c/coma",
+     0
+    ],
+    [
+     "E11.1 DM Não Ins.Dep. c/cetoacidose",
+     1
+    ],
+    [
+     "E12.0 DM Rel. Desnut. c/coma",
+     0
+    ],
+    [
+     "E12.1 DM Rel. Desnut. c/cetoacidose",
+     0
+    ],
+    [
+     "E13.0 Outros Tipos Espec. DMcoma",
+     0
+    ],
+    [
+     "E13.1 Outros Tipos Espec. DMcetoacidose",
+     0
+    ],
+    [
+     "E14.0 Diab. Mel. NE c/coma",
+     1
+    ],
+    [
+     "E14.1 Diab. Mel. NE c/cetoacidose",
+     1
+    ],
+    [
+     "E10.2 DM Ins.Dep. c/compl renais",
+     1
+    ],
+    [
+     "E10.3 DM Ins.Dep. c/compl oftalmicas",
+     0
+    ],
+    [
+     "E10.4 DM Ins.Dep. c/compl neurologicas",
+     0
+    ],
+    [
+     "E10.5 DM Ins.Dep. c/compl circulatorias periferica",
+     4
+    ],
+    [
+     "E10.6 DM Ins.Dep. c/outr compl espec",
+     0
+    ],
+    [
+     "E10.7 DM Ins.Dep. c/complic mult",
+     3
+    ],
+    [
+     "E10.8 DM Ins.Dep. c/compl NE",
+     5
+    ],
+    [
+     "E11.2 DM Não Ins.Dep. c/compl renais",
+     2
+    ],
+    [
+     "E11.3 DM Não Ins.Dep. c/compl oftalmicas",
+     0
+    ],
+    [
+     "E11.4 DM Não Ins.Dep. c/compl neurologicas",
+     0
+    ],
+    [
+     "E11.5 DM Não Ins.Dep. c/compl circulatorias perife",
+     1
+    ],
+    [
+     "E11.6 DM Não Ins.Dep. c/outr compl espec",
+     1
+    ],
+    [
+     "E11.7 DM Não Ins.Dep. c/complic mult",
+     2
+    ],
+    [
+     "E11.8 DM Não Ins.Dep. c/compl NE",
+     1
+    ],
+    [
+     "E12.2 DM Rel. Desnut. c/compl renais",
+     0
+    ],
+    [
+     "E12.3 DM Rel. Desnut. c/compl oftalmicas",
+     0
+    ],
+    [
+     "E12.4 DM Rel. Desnut. c/compl neurologicas",
+     0
+    ],
+    [
+     "E12.5 DM Rel. Desnut. c/compl circulatorias perife",
+     0
+    ],
+    [
+     "E12.6 DM Rel. Desnut. c/outr compl espec",
+     0
+    ],
+    [
+     "E12.7 DM Rel. Desnut. c/complic mult",
+     0
+    ],
+    [
+     "E12.8 DM Rel. Desnut. c/compl NE",
+     0
+    ],
+    [
+     "E13.2 Outros Tipos Espec. DMcompl renais",
+     0
+    ],
+    [
+     "E13.3 Outros Tipos Espec. DMcompl oftalmicas",
+     0
+    ],
+    [
+     "E13.4 Outros Tipos Espec. DMcompl neurologicas",
+     0
+    ],
+    [
+     "E13.5 Outros Tipos Espec. DMcompl circulatorias pe",
+     0
+    ],
+    [
+     "E13.6 Outros Tipos Espec. DMoutr compl espec",
+     0
+    ],
+    [
+     "E13.7 Outros Tipos Espec. DMcomplic mult",
+     0
+    ],
+    [
+     "E13.8 Outros Tipos Espec. DMcompl NE",
+     1
+    ],
+    [
+     "E14.2 Diab. Mel. NE c/compl renais",
+     0
+    ],
+    [
+     "E14.3 Diab. Mel. NE c/compl oftalmicas",
+     0
+    ],
+    [
+     "E14.4 Diab. Mel. NE c/compl neurologicas",
+     0
+    ],
+    [
+     "E14.5 Diab. Mel. NE c/compl circulatorias periferi",
+     3
+    ],
+    [
+     "E14.6 Diab. Mel. NE c/outr compl espec",
+     0
+    ],
+    [
+     "E14.7 Diab. Mel. NE c/complic mult",
+     0
+    ],
+    [
+     "E14.8 Diab. Mel. NE c/compl NE",
+     11
+    ],
+    [
+     "E10.9 DM Ins.Dep. s/complic",
+     1
+    ],
+    [
+     "E11.9 DM Não Ins.Dep. S/complic",
+     0
+    ],
+    [
+     "E12.9 DM Rel. Desnut.S/complic",
+     0
+    ],
+    [
+     "E13.9 Outros Tipos Espec. DM S/complic",
+     0
+    ],
+    [
+     "E14.9 Diab. Mel. NE S/complic",
+     17
+    ],
+    [
+     "Eplepsias",
+     13
+    ],
+    [
+     "G40.0 Epilep sind epil idiop def loc cris inic foc",
+     0
+    ],
+    [
+     "G40.1 Epilep sind epil sint def loc cris parc simp",
+     0
+    ],
+    [
+     "G40.2 Epilep sind epil sint def loc cris parc comp",
+     0
+    ],
+    [
+     "G40.3 Epilepsia e sindr epilepticas gener idiopat",
+     0
+    ],
+    [
+     "G40.4 Outr epilepsias e sindr epilepticas gener",
+     0
+    ],
+    [
+     "G40.5 Sindr epilepticas especiais",
+     0
+    ],
+    [
+     "G40.6 Crise de grande mal NE",
+     0
+    ],
+    [
+     "G40.7 Pequeno mal NE s/crises de grande mal",
+     0
+    ],
+    [
+     "G40.8 Outr epilepsias",
+     3
+    ],
+    [
+     "G40.9 Epilepsia NE",
+     10
+    ],
+    [
+     "G41.0 Estado de grande mal epileptico",
+     0
+    ],
+    [
+     "G41.1 Estado de pequeno mal epileptico",
+     0
+    ],
+    [
+     "G41.2 Estado de mal epileptico parcial complexo",
+     0
+    ],
+    [
+     "G41.8 Outr estados de mal epileptico",
+     0
+    ],
+    [
+     "G41.9 Estado de mal epileptico NE",
+     0
+    ],
+    [
+     "Infecção no Rim e Trato Urinário",
+     110
+    ],
+    [
+     "N10   Nefrite tubulo-intersticial aguda",
+     1
+    ],
+    [
+     "N11.0 Pielonefrite nao-obstrut cron assoc refluxo",
+     3
+    ],
+    [
+     "N11.1 Pielonefrite obstrutiva cronica",
+     0
+    ],
+    [
+     "N11.8 Outr nefrites tubulo-intersticiais cronicas",
+     1
+    ],
+    [
+     "N11.9 Nefrite tubulo-intersticial cronica NE",
+     0
+    ],
+    [
+     "N12   Nefrite tubulo-intersticial NE aguda cronica",
+     0
+    ],
+    [
+     "N30.0 Cistite aguda",
+     3
+    ],
+    [
+     "N30.1 Cistite intersticial",
+     0
+    ],
+    [
+     "N30.2 Outr cistites cronicas",
+     1
+    ],
+    [
+     "N30.3 Trigonite",
+     0
+    ],
+    [
+     "N30.4 Cistite p/radiacao",
+     0
+    ],
+    [
+     "N30.8 Outr cistites",
+     0
+    ],
+    [
+     "N30.9 Cistite NE",
+     1
+    ],
+    [
+     "N34.0 Abscesso uretral",
+     0
+    ],
+    [
+     "N34.1 Uretrites nao especificas",
+     1
+    ],
+    [
+     "N34.2 Outr uretrites",
+     0
+    ],
+    [
+     "N34.3 Sindr uretral NE",
+     0
+    ],
+    [
+     "N39.0 Infecc do trato urinario de localiz NE",
+     99
+    ],
+    [
+     "Infecção da pele e tecido subcutâneo",
+     48
+    ],
+    [
+     "A46   Erisipela",
+     6
+    ],
+    [
+     "L01.0 Impetigo",
+     1
+    ],
+    [
+     "L01.1 Impetiginizacao de outr dermatoses",
+     0
+    ],
+    [
+     "L02.0 Abscesso cutaneo furunculo e antraz face",
+     1
+    ],
+    [
+     "L02.1 Abscesso cutaneo furunculo e antraz pescoco",
+     0
+    ],
+    [
+     "L02.2 Abscesso cutaneo furunculo e antraz tronco",
+     1
+    ],
+    [
+     "L02.3 Abscesso cutaneo furunculo e antraz nadega",
+     0
+    ],
+    [
+     "L02.4 Abscesso cutaneo furunculo e antraz membros",
+     4
+    ],
+    [
+     "L02.8 Abscesso cutaneo furunculo e antraz outr loc",
+     1
+    ],
+    [
+     "L02.9 Abscesso cutaneo furunculo e antraz loc NE",
+     3
+    ],
+    [
+     "L03.0 Celulite de dedos das maos e dos pes",
+     5
+    ],
+    [
+     "L03.1 Celulite de outr partes de membros",
+     14
+    ],
+    [
+     "L03.2 Celulite da face",
+     1
+    ],
+    [
+     "L03.3 Celulite do tronco",
+     0
+    ],
+    [
+     "L03.8 Celulite de outr locais",
+     3
+    ],
+    [
+     "L03.9 Celulite NE",
+     0
+    ],
+    [
+     "L04.0 Linfadenite aguda de face cabeca e pescoco",
+     0
+    ],
+    [
+     "L04.1 Linfadenite aguda do tronco",
+     0
+    ],
+    [
+     "L04.2 Linfadenite aguda de membro super",
+     0
+    ],
+    [
+     "L04.3 Linfadenite aguda de membro infer",
+     0
+    ],
+    [
+     "L04.8 Linfadenite aguda de outr localiz",
+     0
+    ],
+    [
+     "L04.9 Linfadenite aguda de localiz NE",
+     0
+    ],
+    [
+     "L08.0 Piodermite",
+     5
+    ],
+    [
+     "L08.1 Eritrasma",
+     0
+    ],
+    [
+     "L08.8 Outr infecc local espec pele tec subcutaneo",
+     1
+    ],
+    [
+     "L08.9 Infecc localiz pele e do tec subcutaneo NE",
+     2
+    ],
+    [
+     "Doença Inflamatória órgãos pélvicos femininos",
+     21
+    ],
+    [
+     "N70.0 Salpingite e ooforite agudas",
+     1
+    ],
+    [
+     "N70.1 Salpingite e ooforite cronicas",
+     0
+    ],
+    [
+     "N70.9 Salpingite e ooforite NE",
+     0
+    ],
+    [
+     "N71.0 Doenc inflam aguda do utero",
+     0
+    ],
+    [
+     "N71.1 Doenc inflam cronica do utero",
+     0
+    ],
+    [
+     "N71.9 Doenc inflam NE do utero",
+     0
+    ],
+    [
+     "N72   Doenc inflam do colo do utero",
+     0
+    ],
+    [
+     "N73.0 Parametrite e celulite pelvicas agudas",
+     0
+    ],
+    [
+     "N73.1 Parametrite e celulite pelvicas cronicas",
+     0
+    ],
+    [
+     "N73.2 Parametrite e celulite pelvicas NE",
+     0
+    ],
+    [
+     "N73.3 Pelviperitonite aguda femin",
+     0
+    ],
+    [
+     "N73.4 Pelviperitonite cronica femin",
+     0
+    ],
+    [
+     "N73.5 Pelviperitonite NE femin",
+     0
+    ],
+    [
+     "N73.6 Aderencias pelviperitonais femin",
+     0
+    ],
+    [
+     "N73.8 Outr doenc inflam espec pelve fem",
+     4
+    ],
+    [
+     "N73.9 Doenc inflam NE da pelve femin",
+     4
+    ],
+    [
+     "N75.0 Cisto da gland de Bartholin",
+     1
+    ],
+    [
+     "N75.1 Abscesso da gland de Bartholin",
+     9
+    ],
+    [
+     "N75.8 Outr doenc da gland de Bartholin",
+     0
+    ],
+    [
+     "N75.9 Doenc NE da gland de Bartholin",
+     0
+    ],
+    [
+     "N76.0 Vaginite aguda",
+     0
+    ],
+    [
+     "N76.1 Vaginite subaguda e cronica",
+     0
+    ],
+    [
+     "N76.2 Vulvite aguda",
+     0
+    ],
+    [
+     "N76.3 Vulvite subaguda e cronica",
+     0
+    ],
+    [
+     "N76.4 Abscesso vulvar",
+     0
+    ],
+    [
+     "N76.5 Ulceracao vaginal",
+     0
+    ],
+    [
+     "N76.6 Ulceracao vulvar",
+     0
+    ],
+    [
+     "N76.8 Outr inflam espec da vagina e da vulva",
+     2
+    ],
+    [
+     "Úlcera gastrointestinal",
+     10
+    ],
+    [
+     "K25.0 Ulcera gastrica Aguda c/hemorragia",
+     0
+    ],
+    [
+     "K25.1 Ulcera gastrica Aguda c/perfuracao",
+     0
+    ],
+    [
+     "K25.2 Ulcera gastrica Aguda c/hemorragia e perfura",
+     0
+    ],
+    [
+     "K25.3 Ulcera gastrica Aguda Aguda s/hemorragia ou",
+     0
+    ],
+    [
+     "K25.4 Ulcera gastrica Aguda Cronica ou NE c/hemorr",
+     0
+    ],
+    [
+     "K25.5 Ulcera gastrica Aguda Cronica ou NE c/perfur",
+     0
+    ],
+    [
+     "K25.6 Ulcera gastrica Aguda Cronica ou NE c/hemorr",
+     0
+    ],
+    [
+     "K25.7 Ulcera gastrica Aguda Cronica s/hemorragia o",
+     0
+    ],
+    [
+     "K25.9 Ulcera gastrica Aguda NE como aguda cronica",
+     1
+    ],
+    [
+     "K26.0 Ulcera duodenal Aguda c/hemorragia",
+     0
+    ],
+    [
+     "K26.1 Ulcera duodenal Aguda c/perfuracao",
+     0
+    ],
+    [
+     "K26.2 Ulcera duodenal Aguda c/hemorragia e perfura",
+     0
+    ],
+    [
+     "K26.3 Ulcera duodenal Aguda s/hemorragia ou perfur",
+     0
+    ],
+    [
+     "K26.4 Ulcera duodenal Cronica ou NE c/hemorragia",
+     0
+    ],
+    [
+     "K26.5 Ulcera duodenal Cronica ou NE c/perfuracao",
+     0
+    ],
+    [
+     "K26.6 Ulcera duodenal Cronica ou NE c/hemorragia e",
+     0
+    ],
+    [
+     "K26.7 Ulcera duodenal Cronica s/hemorragia ou perf",
+     0
+    ],
+    [
+     "K26.9 Ulcera duodenal NE como aguda cronica s/hemo",
+     0
+    ],
+    [
+     "K27.0 Ulcera peptica de localiz NE Aguda c/hemorra",
+     0
+    ],
+    [
+     "K27.1 Ulcera peptica de localiz NE Aguda c/perfura",
+     0
+    ],
+    [
+     "K27.2 Ulcera peptica de localiz NE Aguda c/hemorra",
+     0
+    ],
+    [
+     "K27.3 Ulcera peptica de localiz NE Aguda s/hemorra",
+     0
+    ],
+    [
+     "K27.4 Ulcera peptica de localiz NE Cronica ou NE c",
+     0
+    ],
+    [
+     "K27.5 Ulcera peptica de localiz NE Cronica ou NE c",
+     0
+    ],
+    [
+     "K27.6 Ulcera peptica de localiz NE Cronica ou NE c",
+     0
+    ],
+    [
+     "K27.7 Ulcera peptica de localiz NE Cronica s/hemor",
+     0
+    ],
+    [
+     "K27.9 Ulcera peptica de localiz NE NE como aguda c",
+     1
+    ],
+    [
+     "K28.0 Ulcera gastrojejunal Aguda c/hemorragia",
+     0
+    ],
+    [
+     "K28.1 Ulcera gastrojejunal Aguda c/perfuracao",
+     0
+    ],
+    [
+     "K28.2 Ulcera gastrojejunal Aguda c/hemorragia e pe",
+     0
+    ],
+    [
+     "K28.3 Ulcera gastrojejunal Aguda s/hemorragia ou p",
+     0
+    ],
+    [
+     "K28.4 Ulcera gastrojejunal Cronica ou NE c/hemorra",
+     0
+    ],
+    [
+     "K28.5 Ulcera gastrojejunal Cronica ou NE c/perfura",
+     0
+    ],
+    [
+     "K28.6 Ulcera gastrojejunal Cronica ou NE c/hemorra",
+     0
+    ],
+    [
+     "K28.7 Ulcera gastrojejunal Cronica s/hemorragia ou",
+     0
+    ],
+    [
+     "K28.9 Ulcera gastrojejunal NE como aguda cronica s",
+     0
+    ],
+    [
+     "K92.0 Hematemese",
+     2
+    ],
+    [
+     "K92.1 Melena",
+     1
+    ],
+    [
+     "K92.2 Hemorragia gastrointestinal SOE",
+     5
+    ],
+    [
+     "Doenças relacionadas ao Pré-Natal e Parto",
+     25
+    ],
+    [
+     "O23.0 Infecc do rim na gravidez",
+     2
+    ],
+    [
+     "O23.1 Infecc da bexiga na gravidez",
+     0
+    ],
+    [
+     "O23.2 Infecc da uretra na gravidez",
+     0
+    ],
+    [
+     "O23.3 Infecc outr partes trato urinario gravidez",
+     1
+    ],
+    [
+     "O23.4 Infecc NE do trato urinario na gravidez",
+     13
+    ],
+    [
+     "O23.5 Infecc do trato genital na gravidez",
+     1
+    ],
+    [
+     "O23.9 Outr infecc e NE trato urinario na gravidez",
+     3
+    ],
+    [
+     "A50.0 Sifilis congen precoce sintomatica",
+     0
+    ],
+    [
+     "A50.1 Sifilis congen precoce form latente",
+     0
+    ],
+    [
+     "A50.2 Sifilis congen precoce NE",
+     0
+    ],
+    [
+     "A50.3 Oculopatia sifilitica congen tard",
+     0
+    ],
+    [
+     "A50.4 Neurossifilis congen tard",
+     0
+    ],
+    [
+     "A50.5 Outr form tard e sintomat sifilis congen",
+     0
+    ],
+    [
+     "A50.6 Sifilis congen tard latente",
+     0
+    ],
+    [
+     "A50.7 Sifilis congen tard NE",
+     0
+    ],
+    [
+     "A50.9 Sifilis congen NE",
+     5
+    ],
+    [
+     "P35.0 Sindr da rubeola congen",
+     0
+    ],
+    [
+     "Não classificados",
+     3600
+    ]
+   ],
+   "total": 4315
+  },
+  {
+   "id": "rs3",
+   "linha": "Sensíveis Atenção Básica 3",
+   "naoClassificados": "incluir",
+   "rows": [
+    [
+     "1. Doenças preveníveis p/imuniz/condições sensív",
+     19
+    ],
+    [
+     "2. Gastroenterites Infecciosas e complicações",
+     86
+    ],
+    [
+     "3. Anemia",
+     15
+    ],
+    [
+     "4. Deficiências nutricionais",
+     10
+    ],
+    [
+     "5. Infecções de ouvido, nariz e garganta",
+     8
+    ],
+    [
+     "6. Pneumonias bacterianas",
+     44
+    ],
+    [
+     "7. Asma",
+     2
+    ],
+    [
+     "8. Doencas pulmonares",
+     67
+    ],
+    [
+     "9. Hipertensão",
+     13
+    ],
+    [
+     "10. Angina",
+     34
+    ],
+    [
+     "11. Insuficiência cardíaca",
+     51
+    ],
+    [
+     "12. Doenças cerebrovasculares",
+     80
+    ],
+    [
+     "13. Diabetes melitus",
+     59
+    ],
+    [
+     "14. Epilepsias",
+     13
+    ],
+    [
+     "15. Infecção no rim e trato urinário",
+     110
+    ],
+    [
+     "16. Infecção da pele e tecido subcutâneo",
+     48
+    ],
+    [
+     "17. Doença Inflamatória órgãos pélvicos femininos",
+     21
+    ],
+    [
+     "18. Úlcera gastrointestinal",
+     10
+    ],
+    [
+     "19. Doenças relacionadas ao pré-natal e parto",
+     25
+    ],
+    [
+     "Não classificados",
+     3600
+    ]
+   ],
+   "total": 4315
+  }
+ ]
+}

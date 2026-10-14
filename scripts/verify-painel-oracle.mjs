@@ -9,10 +9,10 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { dbcToDbf, readDbfRecords } from '@precisa-saude/datasus-dbc';
+import { dbcToDbf, readDbfHeader, readDbfRecords } from '@precisa-saude/datasus-dbc';
 import { parseCnv, parseDef } from '../dist/packages/formats/src/index.js';
 import {
-  catalogoDoDef, categoriasDoEixo, compileQueryPlan, estadoInicial, executeInMemory, nomeBaseDoRecurso, specDoPainel, subtituloDoPainel,
+  catalogoDoDef, categoriasDoEixo, compileQueryPlan, estadoInicial, executeInMemory, nomeBaseDoRecurso, specDoPainel, subtituloDoPainel, withRecordLayout,
 } from '../dist/packages/core/src/index.js';
 
 const dir = process.argv[2];
@@ -34,7 +34,9 @@ const catalogos = {
   def2Text: catalogoDoDef(parseDef(expected.def2Text), recursos),
 };
 const records = [];
-for await (const r of readDbfRecords(dbcToDbf(new Uint8Array(await readFile(path.join(dir, 'RDAC2401.dbc')))))) records.push(r);
+const dbf = dbcToDbf(new Uint8Array(await readFile(path.join(dir, 'RDAC2401.dbc'))));
+for await (const r of readDbfRecords(dbf)) records.push(r);
+const layout = readDbfHeader(dbf).fields.map((field) => ({ field: field.name, type: field.type, length: field.length, decimals: field.decimalCount }));
 
 const byLabel = (list, label) => { const e = list.find((x) => x.label === label); assert.ok(e, label); return e; };
 const round2 = (v) => Math.round(v * 100) / 100;
@@ -55,7 +57,7 @@ for (const c of expected.cases) {
     suprimirLinhasZeradas: p.suprimirLinhasZeradas ?? false,
     suprimirColunasZeradas: p.suprimirColunasZeradas ?? true,
   };
-  const result = executeInMemory(records, compileQueryPlan(specDoPainel(cat, estado)), Object.fromEntries(cnvs));
+  const result = executeInMemory(records, compileQueryPlan(withRecordLayout(specDoPainel(cat, estado), layout, Object.fromEntries(cnvs))), Object.fromEntries(cnvs));
   const rows = result.rows.map((r, i) => [r.label, ...result.cells[i].map(round2)]);
   assert.deepEqual(rows, c.rows, `${c.id}: linhas`);
   if (c.columns) assert.deepEqual(result.columns.map((x) => x.label), c.columns, `${c.id}: colunas`);

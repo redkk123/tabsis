@@ -343,6 +343,28 @@ Duas coisas importantes:
 percentuais, renomear e mover colunas, ordenar, casas decimais, título e
 rodapé.
 
+Para quem vem do TabWin, os atalhos de sempre funcionam (conferidos com o
+manual do curso TabWin de fev/2011):
+
+| No TabWin | No TabSis |
+| --- | --- |
+| Clicar no título da coluna | Ordena do maior para o menor; outro clique, do menor para o maior. |
+| Operações → Somar / Mínimo / Máximo | Operações → "Somar várias colunas", "Menor…", "Maior…" (Ctrl+clique para marcar). |
+| Operações → Multiplicar / Dividir | Total **pré-calculado**: a conta feita nos totais, não a soma das linhas. |
+| Operações → Calcular indicador | Mesmo nome; escala "por 1" a "por 1.000.000" e Casas decimais. |
+| Operações → Nova coluna `Custo Médio=c2/c1` | Nova coluna por expressão aceita igual; `…*100,00` mostra 2 casas. |
+| Operações → Seqüência depois de ordenar | Numera as linhas pela ordem atual: as "n" maiores categorias. |
+| Operações → Recalcula total, Quadro → Tipo de total | Editar linhas e colunas → Tipo de total / Recalcular total. |
+| Quadro → Decimais | Casas decimais da coluna (Editar) ou da tabela inteira (Quadro). |
+| Quadro → Suprimir/agregar linhas | Mesmo critério (igual, maior, menor, diferente) e linha "Outras". |
+| Quadro → Fixar comprimento da chave | Quadro → Comprimento da chave, usado ao Incluir tabela. |
+| Editar → Editar arquivo DEF ou CNV → Gera DEF | Metadados → **Gerar DEF**: marque os campos; baixe ou use no painel. |
+| … → Gera CNV / Numera CNV | Editor de CNV → **Gerar do campo** / **Numerar**. |
+| Estatísticas → Regressão linear (coluna estimada) | Estatística → Regressão → "Inserir coluna com os valores estimados". |
+| Estatísticas → Histograma → Igual freqüência | Estatística → Histograma → Tipo de classe. |
+
+Valores negativos aparecem em vermelho, como no TabWin.
+
 **Gráfico** — barras, linhas, pizza e outros, com editor de cores, fontes e
 rótulos. Exporta SVG e PNG.
 

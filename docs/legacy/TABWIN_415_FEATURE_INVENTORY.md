@@ -64,17 +64,17 @@ explicit, replayable result transforms and must never mutate the source
 | Operation | Status |
 | --- | --- |
 | Indicator calculation | **Web** — TabWin `Calcular indicador`: numerator × 10ⁿ ÷ denominator (scale 1…1,000,000), zero on zero denominator, precalculated total = ratio of totals (decompiled, RE-002). |
-| Add two or more columns | **Web / modern policy** — pairwise addition can be chained and is persisted in recipes. |
-| Subtract, multiply or divide two columns | **Web / modern policy** — division-by-zero behavior is explicit (`error` or `zero`). |
-| Minimum and maximum | **Web / modern policy** |
+| Add two or more columns | **Web** — TabWin `Somar` over 2+ columns at once (header `Soma`, total = sum of column totals), manual do curso TabWin, SESAP-RN/COSEMS-RN, fev/2011, p. 49. |
+| Subtract, multiply or divide two columns | **Web** — headers `Diferença`, `Produto`, `Quociente`; Produto/Quociente default to a precalculated total = the same operation on the column totals (manual, p. 50). Division-by-zero behavior is explicit (`error` or `zero`). |
+| Minimum and maximum | **Web** — over 2+ columns, headers `Menor` / `Maior` (manual, p. 51–52). |
 | Multiply by a factor | **Web / modern policy** |
 | Percentage | **Web** — `A / B × 100` (modern) and TabWin `%percentagem` (value ÷ column total × 100, header `%`), decompiled. |
 | Normalize | **Web** — TabWin `Normalizar`: z-score with sample SD (n − 1), header `Z`, decompiled (RE-002). |
 | Accumulate a column | **Web / modern policy** — current result row order is authoritative. |
 | Absolute value and integer values | **Web / modern policy** — UI integer conversion uses truncation toward zero; kernel also represents round/floor/ceil. |
-| Define sequence | **Web / modern policy** — UI exposes start value and unit step. |
-| Recalculate total / change total type | **Web / modern policy** — none, sum, product, mean, initial, final, min and max are explicit per derived column. |
-| Insert a new column | **Web / modern policy** — constants and safe expressions support `C01`, exact keys, bracketed titles, parentheses and `+ - * / ^`. |
+| Define sequence | **Web** — header `Seqüência`; with a column sort active, rows are numbered by rank in that order (the manual's "n largest categories", p. 54). |
+| Recalculate total / change total type | **Web** — `set-total-policy` on any column: none, sum, product, mean, initial, final, min, max, and precalculated (freezes the total shown now). Recalcula total = back to sum (manual, p. 54, 57–58). |
+| Insert a new column | **Web** — constants and safe expressions support `c1`/`C01`, exact keys, bracketed titles, parentheses and `+ - * / ^`; TabWin form `Título=c2/c1`, and a trailing `,00` (`Percentagem=c2/c1*100,00`) fixes the column's decimal places (manual, p. 55–56). |
 
 All implemented transforms are immutable, replayable and shown in the Audit
 view. They sit after `TabulationResult`; none silently rewrites the source
@@ -85,16 +85,16 @@ focused TabWin 4.15 reference cases establish defaults, rounding and edge cases.
 
 | Presentation capability | Status |
 | --- | --- |
-| Sort values | **Web / modern presentation** — original, ascending and descending by key or numeric column; stable and non-mutating. |
-| Decimal places | **Web / modern presentation** — automatic or 0–6 fixed decimal places. |
+| Sort values | **Web** — original, ascending and descending by key or numeric column; clicking a column header sorts descending, a second click ascending, as TabWin does (manual, p. 56). Stable and non-mutating. |
+| Decimal places | **Web** — table-wide automatic or 0–6, plus per-column places (`set-decimals`, TabWin `Quadro → Decimais`) used while the table is on automatic. Negative values show in red, except in the total row. |
 | Show/hide key | **Web / modern presentation** — sticky key remains the default. |
 | Locate row/category | **Web / modern presentation** — accent-insensitive key and label search. |
 | Print table | **Web / modern presentation** — dedicated browser print stylesheet. |
-| Alter column header and width | **Cataloged** |
+| Alter column header and width | **Web (header)** — rename-column. Width: the browser sizes columns; not reproduced. |
 | Delete and move columns | **Web / modern policy** — rename, move left/right and remove are immutable recipe operations; the final numeric column cannot be deleted. |
-| Suppress/aggregate rows | **Web / modern policy** — locate selects rows; suppression or sum aggregation is reversible and audited. |
-| Fix key length | **Cataloged** |
-| Edit two table headers / insert footnote | **Cataloged** |
+| Suppress/aggregate rows | **Web** — TabWin criterion form: column, igual a / maior que / menor que / diferente de, value, optional aggregate row labelled `Outras` (manual, p. 58–59); locate-based selection also kept. Reversible and audited. |
+| Fix key length | **Web** — `include-table.keyLength` compares only the first N characters of each row key (7-digit TabNet IBGE code vs 6-digit TabWin, manual p. 59–60). |
+| Edit two table headers / insert footnote | **Web** — Título, Subtítulo and Rodapé in Quadro. |
 
 Sorting, decimals and key visibility persist in recipes and appear in Audit.
 The locate query intentionally does not persist because it is transient UI
@@ -179,3 +179,15 @@ authoring and accent conversion remain **Cataloged**; CRC testing is **Web**
 4. Complete legacy map classes, labels, layers and selection bridging.
 5. Establish focused goldens for statistics, saved `.TAB`, DBF subsets and
    origin–destination flow.
+
+
+## Help do TabWin v2 (versão impressa) — conferência de 2026-10-14
+
+| Função | Status |
+| --- | --- |
+| CNV de código curto (letra na 1ª posição, branco) | **Web, medido** — RE-003: o código vira número (A = 1 … Z = 26, não-dígito fora da 1ª posição = 0, branco = 000), igual para dado e CNV. O Help diz "A a J = 0 a 9"; o programa real faz diferente. |
+| Gera DEF a partir dos campos do DBF | **Web** — texto → `X` + CNV do campo, número → `I`. O texto exato que o TabWin gera não foi capturado. |
+| Gera CNV a partir dos campos / Numera CNV | **Web** — uma categoria por código existente; renumeração mantém subtotais. |
+| Regressão: coluna de estimados | **Web** — Nova coluna por expressão (intercepto + inclinação × X). |
+| Histograma: intervalos iguais / igual freqüência | **Web** — "Manual" (limites digitados) não reproduzido. |
+| Notas técnicas, colar tabela, `.LST` | **Cataloged** |

@@ -35,6 +35,7 @@ function validateAxis(value: unknown, name: string): asserts value is ResultAxis
     if ((axis.subtotalTargetKey !== undefined && typeof axis.subtotalTargetKey !== 'string')
       || (axis.excludeFromTotal !== undefined && typeof axis.excludeFromTotal !== 'boolean')
       || (axis.precalculatedTotal !== undefined && (typeof axis.precalculatedTotal !== 'number' || !Number.isFinite(axis.precalculatedTotal)))
+      || (axis.decimals !== undefined && (typeof axis.decimals !== 'number' || !Number.isInteger(axis.decimals) || axis.decimals < 0 || axis.decimals > 10))
       || (axis.totalPolicy !== undefined && !new Set([
         'none', 'sum', 'product', 'mean', 'initial', 'final', 'min', 'max', 'precalculated',
       ]).has(axis.totalPolicy))) {

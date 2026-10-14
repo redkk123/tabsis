@@ -860,6 +860,11 @@ dialog p { color: #676d74; font-size: 13px; line-height: 1.6; }
    por RDAC2401.DBC, que não é o nome que a pessoa baixou. */
 #result-kicker { text-transform: none; letter-spacing: .01em; }
 #result-table .row-total { font-weight: 700; background: var(--surface-2); }
+#result-table tbody td.negative { color: var(--danger); }
+#result-table thead th.sortable { cursor: pointer; user-select: none; }
+#result-table thead th.sortable:hover { text-decoration: underline; }
+#result-table thead th[aria-sort="descending"]::after { content: " ▼"; font-size: .75em; }
+#result-table thead th[aria-sort="ascending"]::after { content: " ▲"; font-size: .75em; }
 .table-tools { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
 .table-tool { border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
 .table-tool > summary { padding: 10px 13px; cursor: pointer; color: var(--ink); font-weight: 600; }
@@ -887,3 +892,8 @@ dialog p { color: #676d74; font-size: 13px; line-height: 1.6; }
 .painel-arquivo { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
 .painel-arquivo input { accent-color: var(--brand); }
 .painel-arquivos li.painel-arquivo-fora { opacity: .55; background: transparent; border-style: dashed; }
+
+.def-generate-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 4px 12px; max-height: 260px; overflow: auto; margin: 10px 0; padding: 8px; border: 1px solid var(--line); border-radius: 6px; }
+.def-generate-fields label { display: flex; gap: 6px; align-items: baseline; font-size: 13px; }
+.def-generate-fields small { color: var(--faint); }
+.def-generate-preview { max-height: 180px; overflow: auto; padding: 8px; background: var(--surface-2); border-radius: 6px; font-size: 12px; white-space: pre; }

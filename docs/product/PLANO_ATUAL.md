@@ -45,9 +45,8 @@ Publicação (2026-10-14):
       DNBR2023 119,7 → 56,5 MB, DOINF23 3,4 → 1,6 MB; paridade conferida antes
       de cada envio e hashes publicados conferidos byte a byte.
 - [x] PR redkk123/tabsis#2.
-- [ ] `datasus-dbc`: os 4 commits do bundle foram trazidos para cima da 2.0.4
-      (63/63 testes), mas o fork público para abrir o PR não foi criado —
-      fica para o dono decidir.
+- [x] `datasus-dbc`: os 4 commits trazidos para cima da 2.0.4 (63/63 testes);
+      PR Precisa-Saude/datasus-dbc#27 aberto pelo Red, esperando o mantenedor.
 
 Funções do TabWin acrescentadas depois (2026-10-14), todas tiradas do
 binário com o rea:
@@ -60,14 +59,52 @@ binário com o rea:
 - [x] **Salvar registros** no painel.
 - [x] **Acentuação do DOS**: DBF em CP850 é detectado pelo conteúdo e lido
       com os acentos certos (HUF_MEC.dbf e HUF_FILIAL.dbf do TAB_SIH são CP850).
-- [ ] "Fixar comprimento da chave": a rotina só guarda um número; o uso está
-      em outra função, ainda não lida.
+- [x] "Fixar comprimento da chave": o manual do curso explicou o uso (Incluir
+      tabela comparando só os N primeiros caracteres do código).
+
+Do manual do curso TabWin (SESAP-RN/COSEMS-RN, fev/2011), que o Red mandou:
+
+- [x] Somar / Menor / Maior de várias colunas; títulos que o TabWin sugere
+      (Soma, Diferença, Produto, Quociente, A., Abs., Int., Seqüência…).
+- [x] Produto e Quociente com total pré-calculado (a conta feita nos totais).
+- [x] Tipo de total em qualquer coluna, Recalcula total, Pré-calculado congela.
+- [x] Casas decimais por coluna; "Percentagem=c2/c1*100,00" fixa 2 casas;
+      "Título=c2/c1" em Nova coluna.
+- [x] Clique no título da coluna ordena (maior→menor, depois menor→maior);
+      Seqüência depois de ordenar numera as "n" maiores.
+- [x] Suprimir/agregar linhas por critério (igual/maior/menor/diferente) com
+      a linha "Outras"; negativos em vermelho.
+- [ ] Largura de coluna (o navegador ajusta sozinho) e salvar em PRN/SPR/SQL.
+
+Do Help do TabWin v2 (versão impressa, Vigilância em Saúde de MG):
+
+- [x] **Código curto da CNV como o TabWin real**: letra vira número, branco é
+      000 — medido com quatro testes no TabWin 4.15
+      ([RE-003](../reverse-engineering/RE_003_CNV_CODIGO_CURTO.md)); goldens e
+      painel sem diferença.
+- [x] **Faixa etária do SIH corrigida** (dado real, RDAC2401 + RD2008.DEF):
+      o código da CNV atravessa para o campo vizinho (COD_IDADE + IDADE);
+      antes 4.128 de 4.315 caíam em "Ign". Sensíveis AB também iguais.
+      `npm run verify:re003` 7/7 contra tabelas salvas pelo TabWin.
+- [x] **Gera DEF** (Metadados → Gerar DEF): campos do arquivo aberto, todos
+      marcados, "Inverter seleção"; texto vira `X` com a CNV do campo, número
+      vira `I`; baixar ou usar no painel na hora.
+- [x] **Gera CNV** (Editor de CNV → Gerar do campo): uma categoria por código
+      que existe no campo; **Numerar** renumera 1, 2, 3… e os subtotais
+      acompanham.
+- [x] Regressão linear: botão que insere a coluna de valores estimados.
+- [x] Histograma com classes de **igual freqüência**, além de intervalos
+      iguais (fica na receita).
+- [ ] Notas técnicas em linha/coluna/célula; colar tabela da área de
+      transferência; arquivo `.LST` (lista de arquivos com PAUSE, pensado para
+      troca de CD-ROM — no navegador os arquivos já são escolhidos à mão).
 - [ ] Comprimir DBF → DBC (o TabWin comprime; o TabSis só expande).
 
 Próximos passos sugeridos para a tabulação:
 
-- [ ] Seleção por tabela DBF (ex.: "Hospital AC (CNES)") conferida contra o
-      TabWin real.
+- [x] Seleção por tabela DBF (ex.: "Hospital AC (CNES)") conferida contra o
+      TabWin real (`verify:dbf-lookup` 4/4); "Não classificados" vazio não
+      aparece mais, como no TabWin.
 - [ ] Assistente para criar DEF (o TabWin tem o formulário `TFFAZDEF`).
 
 ---

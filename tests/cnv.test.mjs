@@ -70,3 +70,60 @@ test('decodes the widened new-format N columns, including its 4-column subtotal 
   // Reading and executing the layout are proven; writing it back out is not.
   assert.match(cnv.warnings.at(-1), /writing this layout back out is still refused/);
 });
+
+// RE-003: o código curto (até 4 posições) vira um número, medido no TabWin
+// 4.15 real com DBFs e CNVs de teste (pesos 1, 2, 4… no campo G, para cada
+// linha da tabela revelar exatamente quais registros caíram nela).
+test('CNV curta: letra na 1ª posição vira número (A = 1 … Z = 26), como o TabWin real', () => {
+  const digito = parseCnv(['10 3', ...Array.from({ length: 10 }, (_, d) => row(d + 1, `Digito ${d}01`, `${d}01`))].join('\n'));
+  const label = (cnv, code) => classifyCnv(cnv, code)?.label;
+  assert.equal(label(digito, '@01'), 'Digito 001');
+  assert.equal(label(digito, 'A01'), 'Digito 101');
+  assert.equal(label(digito, 'a01'), 'Digito 101');
+  assert.equal(label(digito, 'B01'), 'Digito 201');
+  assert.equal(label(digito, 'I01'), 'Digito 901');
+  for (const fora of ['J01', 'j01', 'K01', 'S01', 'T01', 'Z01']) assert.equal(label(digito, fora), undefined, fora);
+  // O lado do CNV segue a mesma regra: "A01" escrito no CNV pega o dado "101".
+  const letra = parseCnv(['10 3', ...'ABCDEFGHIJ'.split('').map((l, i) => row(i + 1, `Letra ${l}01`, `${l}01`))].join('\n'));
+  assert.equal(label(letra, '101'), 'Letra A01');
+  assert.equal(label(letra, '901'), 'Letra I01');
+  assert.equal(label(letra, '001'), undefined);
+  assert.equal(label(letra, 'J01'), 'Letra J01');
+});
+
+test('CNV curta: fora da 1ª posição, o que não é dígito vale 0; branco é o código 000', () => {
+  const cnv = parseCnv(['3 3', row(1, 'Zero', '000'), row(2, 'Um', '001'), row(3, 'Cem', '100')].join('\n'));
+  const label = (code) => classifyCnv(cnv, code)?.label;
+  assert.equal(label(null), 'Zero');
+  assert.equal(label(''), 'Zero');
+  assert.equal(label('0'), 'Zero');
+  assert.equal(label('00'), 'Zero');
+  assert.equal(label('  1'), 'Um');
+  assert.equal(label('A'), 'Cem');
+  assert.equal(label('1A'), 'Cem');
+  // Número (campo N) continua pela comparação de texto: sem a largura do campo
+  // não dá para saber como ele estava alinhado.
+  assert.equal(classifyCnv(cnv, 1), undefined);
+  // E a CNV literal (L ou código longo) não muda: compara o texto.
+  const literal = parseCnv(['2 2 L', row(1, 'Acre', 'AC'), row(2, 'Alagoas', 'AL')].join('\n'));
+  assert.equal(classifyCnv(literal, 'AC')?.label, 'Acre');
+  assert.equal(classifyCnv(literal, 'AL')?.label, 'Alagoas');
+});
+
+test('CNV curta: quem vem depois ganha também quando letra e dígito dão o mesmo código', () => {
+  const cnv = parseCnv(['3 3', row(1, 'Letra A01', 'A01'), row(2, 'Faixa 100-199', '100-199'), row(3, 'Faixa 900-999', '900-999')].join('\n'));
+  assert.equal(classifyCnv(cnv, 'A01')?.label, 'Faixa 100-199');
+  assert.equal(classifyCnv(cnv, 'J99'), undefined);
+  assert.equal(classifyCnv(cnv, '950')?.label, 'Faixa 900-999');
+  // CID de 3 caracteres numa CNV de 4: "A15" casa "A15" e a faixa A00-A099 pega A05.
+  const cid = parseCnv(['2 4', row(1, 'Tuberculose', 'A15'), row(2, 'Intestinais', 'A00-A099')].join('\n'));
+  assert.equal(classifyCnv(cid, 'A15')?.label, 'Tuberculose');
+  assert.equal(classifyCnv(cid, 'A05')?.label, 'Intestinais');
+  assert.equal(classifyCnv(cid, 'A090')?.label, 'Intestinais');
+});
+
+test('"----" das linhas-título não é código: não pega o CID M000 (RE-003, Sensíveis AB)', () => {
+  const cnv = parseCnv(['2 4', row(1, '19. Pré-natal e parto', '----'), row(2, '19.1 ITU na gravidez', 'O23 -O239', '1')].join('\n'));
+  assert.equal(classifyCnv(cnv, 'M000'), undefined);
+  assert.equal(classifyCnv(cnv, 'O230')?.sequence, 2);
+});

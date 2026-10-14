@@ -9,10 +9,11 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { dbcToDbf, readDbfRecords } from '@precisa-saude/datasus-dbc';
+import { dbcToDbf, readDbfHeader, readDbfRecords } from '@precisa-saude/datasus-dbc';
 import {
   compareWithGolden,
   compileQueryPlan,
+  withRecordLayout,
   dimensionFromDefOption,
   executeInMemory,
   filterFromDefOption,
@@ -76,17 +77,24 @@ function normalizeExport(bytes, id) {
   };
 }
 
+// A estrutura do DBF de cada lista de registros, para compilar como o app
+// compila (withRecordLayout: código da CNV que atravessa campos, RE-003).
+const layoutOf = new WeakMap();
+const layoutFrom = (dbf) => readDbfHeader(dbf).fields.map((field) => ({ field: field.name, type: field.type, length: field.length, decimals: field.decimalCount }));
+
 async function records(name) {
   const output = [];
-  for await (const record of readDbfRecords(dbcToDbf(await readFile(path.join(assetDirectory, name))))) {
-    output.push(record);
-  }
+  const dbf = dbcToDbf(await readFile(path.join(assetDirectory, name)));
+  for await (const record of readDbfRecords(dbf)) output.push(record);
+  layoutOf.set(output, layoutFrom(dbf));
   return output;
 }
 
 async function dbfRecords(name) {
   const output = [];
-  for await (const record of readDbfRecords(await readFile(path.join(assetDirectory, name)))) output.push(record);
+  const dbf = await readFile(path.join(assetDirectory, name));
+  for await (const record of readDbfRecords(dbf)) output.push(record);
+  layoutOf.set(output, layoutFrom(dbf));
   return output;
 }
 
@@ -209,7 +217,7 @@ for (const item of cases) {
     .filter((filter) => filter.conversionId)
     .map((filter) => ({ conversionId: filter.conversionId }));
   const registry = { ...registryFor(...dimensions, ...filterDimensions), ...(item.resources ?? {}) };
-  const plan = compileQueryPlan({ compatibilityProfile: 'tabwin-4.15', ...item.spec });
+  const plan = compileQueryPlan(withRecordLayout({ compatibilityProfile: 'tabwin-4.15', ...item.spec }, layoutOf.get(item.records) ?? [], registry));
   const actual = executeInMemory(item.records, plan, registry);
   const comparison = compareWithGolden(actual, reference.golden, {
     absoluteTolerance: 0,

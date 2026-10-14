@@ -17,6 +17,7 @@ export function createIncludeTableOperation(
   source: TabulationResult,
   included: TabulationResult,
   sourceLabel: string,
+  options: { keyLength?: number } = {},
 ): Extract<TableOperation, { kind: 'include-table' }> {
   const label = sourceLabel.trim();
   if (!label) throw new Error('included table requires a source label');
@@ -30,7 +31,10 @@ export function createIncludeTableOperation(
   return {
     kind: 'include-table',
     sourceLabel: label,
-    requireMatchingLabels: true,
+    // Com a chave cortada as tabelas vêm de fontes diferentes (TabNet e
+    // TabWin), e os nomes podem divergir na grafia; vale o código.
+    requireMatchingLabels: options.keyLength === undefined,
+    ...(options.keyLength !== undefined ? { keyLength: options.keyLength } : {}),
     rows: included.rows.map((row) => ({ key: row.key, label: row.label })),
     columns: included.columns.map((column) => ({
       ...column,
@@ -88,6 +92,15 @@ export function applyTableOperation(
   if (operation.kind === 'percent-of-total' && columnTotal === 0) {
     throw new Error('percent of total needs a column whose total is not zero');
   }
+  const aggregateIndexes = operation.kind === 'aggregate-columns'
+    ? operation.columnKeys.map((key) => columnIndex(source, key)) : [];
+  if (operation.kind === 'aggregate-columns' && aggregateIndexes.length < 2) {
+    throw new Error('choose at least two columns');
+  }
+  if (operation.output.totalPolicy === 'precalculated'
+    && !(operation.kind === 'binary' && ['multiply', 'divide', 'percentage'].includes(operation.operator))) {
+    throw new Error('a precalculated total is only defined for product, quotient and percentage columns');
+  }
   const numeratorIndex = operation.kind === 'indicator' ? columnIndex(source, operation.numeratorColumnKey) : -1;
   const denominatorIndex = operation.kind === 'indicator' ? columnIndex(source, operation.denominatorColumnKey) : -1;
   const indicatorScale = operation.kind === 'indicator' ? 10 ** operation.scalePower : 1;
@@ -105,6 +118,19 @@ export function applyTableOperation(
   }
   const expression = operation.kind === 'expression'
     ? parseTableExpression(source, operation.expression) : undefined;
+  const decimals = operation.output.decimals;
+  if (decimals !== undefined && !(Number.isInteger(decimals) && decimals >= 0 && decimals <= 10)) {
+    throw new Error('decimal places must be an integer from 0 to 10');
+  }
+  let sequenceRank: number[] | undefined;
+  if (operation.kind === 'sequence' && operation.order) {
+    const index = columnIndex(source, operation.order.columnKey);
+    const sign = operation.order.direction === 'ascending' ? 1 : -1;
+    const ordered = source.cells.map((_, row) => row)
+      .sort((left, right) => sign * ((source.cells[left]?.[index] ?? 0) - (source.cells[right]?.[index] ?? 0)) || left - right);
+    sequenceRank = [];
+    ordered.forEach((row, rank) => { sequenceRank![row] = rank; });
+  }
 
   const values = source.cells.map((cells, rowIndex) => {
     let value: number;
@@ -125,6 +151,10 @@ export function applyTableOperation(
     } else if (operation.kind === 'cumulative') {
       running += cells[sourceIndex] ?? 0;
       value = running;
+    } else if (operation.kind === 'aggregate-columns') {
+      const values = aggregateIndexes.map((index) => cells[index] ?? 0);
+      value = operation.operator === 'add' ? values.reduce((sum, item) => sum + item, 0)
+        : operation.operator === 'minimum' ? Math.min(...values) : Math.max(...values);
     } else if (operation.kind === 'indicator') {
       const denominator = cells[denominatorIndex] ?? 0;
       value = denominator === 0 ? 0 : ((cells[numeratorIndex] ?? 0) * indicatorScale) / denominator;
@@ -140,7 +170,7 @@ export function applyTableOperation(
         : operation.rounding === 'round' ? Math.round(input)
           : operation.rounding === 'floor' ? Math.floor(input) : Math.ceil(input);
     } else if (operation.kind === 'sequence') {
-      value = operation.start + operation.step * rowIndex;
+      value = operation.start + operation.step * (sequenceRank ? sequenceRank[rowIndex]! : rowIndex);
     } else if (operation.kind === 'constant') {
       value = operation.value;
     } else {
@@ -161,12 +191,16 @@ export function applyTableOperation(
         source: 'derived' as const,
         totalPolicy: 'precalculated' as const,
         precalculatedTotal: indicatorTotal(source, operation, indicatorScale),
+        ...(decimals !== undefined ? { decimals } : {}),
       }
       : {
         key: operation.output.key,
         label: operation.output.label,
         source: 'derived' as const,
         totalPolicy: operation.output.totalPolicy,
+        ...(operation.output.totalPolicy === 'precalculated' && operation.kind === 'binary'
+          ? { precalculatedTotal: binaryTotal(source, operation) } : {}),
+        ...(decimals !== undefined ? { decimals } : {}),
       }],
     cells: source.cells.map((cells, index) => [...cells, values[index] ?? 0]),
     warnings: [...source.warnings],
@@ -174,10 +208,20 @@ export function applyTableOperation(
   return withAudit(source, result, operation);
 }
 
+function binaryTotal(source: TabulationResult, operation: Extract<TableOperation, { kind: 'binary' }>): number {
+  // TabWin opera sobre a linha de total que cada coluna mostra, não sobre uma
+  // soma refeita: um Quociente feito sobre outro Quociente usa o total dele.
+  const left = displayedColumnTotal(source, operation.leftColumnKey) ?? 0;
+  const right = displayedColumnTotal(source, operation.rightColumnKey) ?? 0;
+  if (operation.operator === 'multiply') return left * right;
+  if (right === 0) return 0;
+  return operation.operator === 'percentage' ? (left / right) * 100 : left / right;
+}
+
 function indicatorTotal(source: TabulationResult, operation: Extract<TableOperation, { kind: 'indicator' }>, scale: number): number {
-  const denominator = calculateColumnTotal(source, operation.denominatorColumnKey, 'sum') ?? 0;
+  const denominator = displayedColumnTotal(source, operation.denominatorColumnKey) ?? 0;
   if (denominator === 0) return 0;
-  return ((calculateColumnTotal(source, operation.numeratorColumnKey, 'sum') ?? 0) * scale) / denominator;
+  return ((displayedColumnTotal(source, operation.numeratorColumnKey) ?? 0) * scale) / denominator;
 }
 
 function withAudit(source: TabulationResult, result: TabulationResult, operation: TableOperation) {
@@ -208,16 +252,21 @@ function applyStructuralOperation(source: TabulationResult, operation: TableOper
     if (!operation.sourceLabel.trim()) throw new Error('included table requires a source label');
     if (operation.rows.length !== operation.cells.length) throw new Error('included table row/cell shape is inconsistent');
     if (!operation.columns.length) throw new Error('included table must contain at least one column');
+    const keyLength = operation.keyLength;
+    if (keyLength !== undefined && (!Number.isInteger(keyLength) || keyLength < 1)) {
+      throw new Error('key length must be a positive integer');
+    }
+    const keyOf = (key: string): string => (keyLength === undefined ? key : key.slice(0, keyLength));
     const includedByKey = new Map<string, number>();
     operation.rows.forEach((row, index) => {
       if (!row.key) throw new Error('included table contains an empty row key');
-      if (includedByKey.has(row.key)) throw new Error(`included table contains duplicate row key: ${row.key}`);
-      includedByKey.set(row.key, index);
+      if (includedByKey.has(keyOf(row.key))) throw new Error(`included table contains duplicate row key: ${keyOf(row.key)}`);
+      includedByKey.set(keyOf(row.key), index);
     });
-    const sourceKeys = new Set(source.rows.map((row) => row.key));
+    const sourceKeys = new Set(source.rows.map((row) => keyOf(row.key)));
     if (sourceKeys.size !== source.rows.length) throw new Error('source table contains duplicate row keys');
     if (source.rows.length !== operation.rows.length
-      || operation.rows.some((row) => !sourceKeys.has(row.key))) {
+      || operation.rows.some((row) => !sourceKeys.has(keyOf(row.key)))) {
       throw new Error('included table row keys must exactly match the current table');
     }
     const knownColumns = new Set(source.columns.map((column) => column.key));
@@ -234,7 +283,7 @@ function applyStructuralOperation(source: TabulationResult, operation: TableOper
     const result = cloneResult(source);
     result.columns.push(...operation.columns.map((column) => ({ ...column })));
     result.cells = source.rows.map((row, sourceIndex) => {
-      const includedIndex = includedByKey.get(row.key);
+      const includedIndex = includedByKey.get(keyOf(row.key));
       if (includedIndex === undefined) throw new Error(`included table is missing row key: ${row.key}`);
       const includedRow = operation.rows[includedIndex]!;
       if (operation.requireMatchingLabels && includedRow.label !== row.label) {
@@ -242,7 +291,9 @@ function applyStructuralOperation(source: TabulationResult, operation: TableOper
       }
       return [...(source.cells[sourceIndex] ?? []), ...(operation.cells[includedIndex] ?? [])];
     });
-    result.warnings.push(`Table ${operation.sourceLabel} included by exact row key using a modern explicit policy`);
+    result.warnings.push(keyLength === undefined
+      ? `Table ${operation.sourceLabel} included by exact row key using a modern explicit policy`
+      : `Table ${operation.sourceLabel} included by the first ${keyLength} characters of the row key (TabWin fixed key length)`);
     return result;
   }
   if (operation.kind === 'transpose') {
@@ -277,6 +328,30 @@ function applyStructuralOperation(source: TabulationResult, operation: TableOper
     const result = cloneResult(source);
     result.columns.splice(index, 1);
     result.cells.forEach((cells) => cells.splice(index, 1));
+    return result;
+  }
+  if (operation.kind === 'set-total-policy' || operation.kind === 'set-decimals') {
+    if (!operation.columnKeys.length) throw new Error('choose at least one column');
+    if (operation.kind === 'set-decimals' && operation.decimals !== null
+      && !(Number.isInteger(operation.decimals) && operation.decimals >= 0 && operation.decimals <= 10)) {
+      throw new Error('decimal places must be an integer from 0 to 10');
+    }
+    const result = cloneResult(source);
+    for (const key of operation.columnKeys) {
+      const index = columnIndex(source, key);
+      const column = { ...result.columns[index]! };
+      if (operation.kind === 'set-decimals') {
+        if (operation.decimals === null) delete column.decimals;
+        else column.decimals = operation.decimals;
+      } else if (operation.totalPolicy === 'precalculated') {
+        column.precalculatedTotal = displayedColumnTotal(source, key) ?? 0;
+        column.totalPolicy = 'precalculated';
+      } else {
+        delete column.precalculatedTotal;
+        column.totalPolicy = operation.totalPolicy;
+      }
+      result.columns[index] = column;
+    }
     return result;
   }
   if (operation.kind === 'suppress-rows') {
@@ -318,6 +393,13 @@ function applyStructuralOperation(source: TabulationResult, operation: TableOper
 
 export function replayTableOperations(source: TabulationResult, operations: readonly TableOperation[]): TabulationResult {
   return operations.reduce((result, operation) => applyTableOperation(result, operation).result, source);
+}
+
+/** The total row as the table shows it: the column's own total policy, sum by default. */
+export function displayedColumnTotal(result: TabulationResult, columnKey: string): number | undefined {
+  const column = result.columns[columnIndex(result, columnKey)]!;
+  const policy = column.totalPolicy ?? 'sum';
+  return policy === 'precalculated' ? column.precalculatedTotal : calculateColumnTotal(result, columnKey, policy);
 }
 
 export function calculateColumnTotal(
