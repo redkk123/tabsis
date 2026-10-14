@@ -3,7 +3,7 @@
 ## Como reportar
 
 Use o **[Private vulnerability
-reporting](https://github.com/redkk123/tabwin-web/security/advisories/new)**
+reporting](https://github.com/redkk123/tabsis/security/advisories/new)**
 do GitHub. Ele mantém o relato privado até existir correção.
 
 Não abra issue público para vulnerabilidade. Issues são visíveis para
