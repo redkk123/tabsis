@@ -86,6 +86,13 @@ Do Help do TabWin v2 (versão impressa, Vigilância em Saúde de MG):
       o código da CNV atravessa para o campo vizinho (COD_IDADE + IDADE);
       antes 4.128 de 4.315 caíam em "Ign". Sensíveis AB também iguais.
       `npm run verify:re003` 7/7 contra tabelas salvas pelo TabWin.
+- [x] **Opções "texto + CNV" do DEF funcionando** (`FAEC_TP,DS_TPFIN,TP_FINAN.CNV`
+      no RD2008; agravos de surto no SINAN): o TabWin ignora o texto e lê a
+      CNV da posição 1. De quebra: CNV no formato N respeita o `L`, branco
+      entre vírgulas é código, e a ordem do Discriminar segue a leitura do
+      TabWin, que num DBC vai em pedaços de 4.096 bytes
+      ([RE-004](../reverse-engineering/RE_004_LOOKUP_E_ORDEM.md)).
+      `verify:re003` 9/9.
 - [x] **SIA e SINAN conferidos** (`verify:sim-sinasc` 26/27 + 1 diferença
       documentada): DEF do SIA com linha de 3 campos não derruba mais o
       arquivo; campo de data classifica; CNV literal com a última ocorrência e

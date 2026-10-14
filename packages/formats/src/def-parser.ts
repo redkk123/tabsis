@@ -147,10 +147,26 @@ function parseOption(
     return option;
   }
 
-  // Contemporary real-world DEF files also pair a textual third field with a
-  // CNV resource (for example DS_TPFIN + TP_FINAN.CNV). That is observably not
-  // the documented DBF lookup form. Preserve it as unsupported executable
-  // metadata instead of rejecting it or guessing that it is an ordinary CNV.
+  // Texto no terceiro campo com uma CNV no quarto (DS_TPFIN + TP_FINAN.CNV no
+  // RD2008.DEF; NM_AGRAVO + agravsurt.cnv no SINAN). Medido no TabWin 4.15
+  // (RE-004, 2026-10-14): a tabela sai idêntica à da mesma linha com "1" no
+  // terceiro campo — o texto é ignorado e a CNV é lida da posição 1.
+  if (/\.cnv$/i.test(fourth)) {
+    return {
+      kind: 'conversion',
+      directive,
+      label,
+      field,
+      roles,
+      startPosition: 1,
+      conversionFile: fourth,
+      ignoredThirdField: third,
+      sourceLine,
+      ...retainedTrailingFields,
+    };
+  }
+
+  // Outro recurso (sem caso real medido): guardado, sem fingir que executa.
   const option: DefExternalLookupOption = {
     kind: 'external-lookup',
     directive,

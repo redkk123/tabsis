@@ -3358,7 +3358,7 @@ async function downloadSourceDbf(): Promise<void> {
 function loadedResourceForDefOption(option: DefDefinition['options'][number]): { id: string; kind: 'cnv' | 'lookup' } | undefined {
   if (option.kind === 'conversion') {
     const entry = [...cnvByName.entries()].find(([name, definition]) =>
-      definition.mode !== 'new-format' && baseName(name) === baseName(option.conversionFile));
+      definition.mode !== 'new-format' && !definition.newFormat && baseName(name) === baseName(option.conversionFile));
     return entry ? { id: entry[0], kind: 'cnv' } : undefined;
   }
   if (option.kind === 'dbf-lookup') {

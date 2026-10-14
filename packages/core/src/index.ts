@@ -13,3 +13,4 @@ export * from './version-watch.js';
 export * from './axis-bounds.js';
 export * from './differential-seed.js';
 export * from './painel.js';
+export * from './read-order.js';

@@ -83,12 +83,19 @@ test('other first-position letters stay as audited unknown lines', () => {
   assert.equal(def.options.length, 1);
 });
 
-test('retains contemporary textual-field CNV lookups without pretending they are DBF lookups', () => {
+test('texto no terceiro campo com CNV: o TabWin ignora o texto e lê a CNV da posição 1 (RE-004)', () => {
   const def = parseDef(`; contemporary\nA*.DBC\nLSubTp FAEC,FAEC_TP,DS_TPFIN,CNV\\TP_FINAN.CNV`);
   const option = def.options[0];
-  assert.equal(option?.kind, 'external-lookup');
-  assert.equal(option?.lookupLabelField, 'DS_TPFIN');
-  assert.equal(option?.resourceFile, 'CNV\\TP_FINAN.CNV');
+  assert.equal(option?.kind, 'conversion');
+  assert.equal(option?.startPosition, 1);
+  assert.equal(option?.conversionFile, 'CNV\\TP_FINAN.CNV');
+  assert.equal(option?.ignoredThirdField, 'DS_TPFIN');
+});
+
+test('recurso que não é CNV nem DBF continua guardado, sem executar', () => {
+  const def = parseDef(`A*.DBC\nLAlgo,CAMPO,DS_X,TABELA.XYZ`);
+  assert.equal(def.options[0]?.kind, 'external-lookup');
+  assert.equal(def.options[0]?.resourceFile, 'TABELA.XYZ');
 });
 
 test('retains unresolved trailing lookup fields from contemporary real DEF records', () => {

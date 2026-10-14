@@ -43,7 +43,18 @@ export interface CnvRuleLine {
 export interface CnvDefinition {
   categoryCount: number;
   codeLength: number;
+  /**
+   * Como o código é comparado. `'new-format'` só sobra em definições antigas
+   * montadas à mão: o arquivo N agora diz o layout em {@link newFormat} e o
+   * modo segue a mesma regra do cabeçalho comum (RE-004).
+   */
   mode: CnvMode;
+  /**
+   * Arquivo no layout N (TabWin 3.7a+): colunas mais largas. É só o layout; o
+   * TabWin compara os códigos como em qualquer CNV — `N 101 6 L` é literal
+   * (TP_FINAN.CNV do SIH; RE-004).
+   */
+  newFormat?: boolean;
   precedence: CnvPrecedence;
   categories: CnvCategory[];
   rules: CnvRuleLine[];

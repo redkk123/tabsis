@@ -60,7 +60,8 @@ test('decodes the widened new-format N columns, including its 4-column subtotal 
     nrow('10', 2, '102-3 Estadual', '1023'),
     nrow('10', 3, '114-7 Fundação', '1147'),
   ].join('\n'));
-  assert.equal(cnv.mode, 'new-format');
+  assert.equal(cnv.newFormat, true);
+  assert.equal(cnv.mode, 'short');
   assert.equal(cnv.codeLength, 4);
   assert.deepEqual(cnv.categories.map(({ sequence, label, subtotalTarget }) => ({ sequence, label, subtotalTarget })), [
     { sequence: 1, label: 'Grupo', subtotalTarget: undefined },

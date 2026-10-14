@@ -223,6 +223,7 @@ function axisFromDimension(
   dimension: DimensionSpec,
   conversions: ConversionRegistry,
   observed: Map<string, string>,
+  order?: DiscriminateOrder,
 ): ResultAxisItem[] {
   if (dimension.lookupId) {
     const lookup = getLookup(conversions, dimension.lookupId);
@@ -236,7 +237,7 @@ function axisFromDimension(
     if (dimension.unclassifiedPolicy === 'discriminate' && observed.has(UNCLASSIFIED_KEY)) {
       items.push({ key: UNCLASSIFIED_KEY, label: UNCLASSIFIED_LABEL, source: 'conversion' });
     }
-    items.push(...discriminatedCodes(dimension, observed));
+    items.push(...discriminatedCodes(dimension, observed, order));
     return items;
   }
   if (dimension.conversionId) {
@@ -267,7 +268,7 @@ function axisFromDimension(
     if (dimension.unclassifiedPolicy === 'discriminate' && observed.has(UNCLASSIFIED_KEY)) {
       items.push({ key: UNCLASSIFIED_KEY, label: UNCLASSIFIED_LABEL, source: 'conversion' });
     }
-    items.push(...discriminatedCodes(dimension, observed));
+    items.push(...discriminatedCodes(dimension, observed, order));
     return items;
   }
   return [...observed.entries()]
@@ -275,12 +276,24 @@ function axisFromDimension(
     .map(([key, label]) => ({ key, label, source: 'raw' as const }));
 }
 
-/** "Discriminar": one row per unclassified code, in order of first appearance (05, 02, 04 in the oracle). */
-function discriminatedCodes(dimension: DimensionSpec, observed: Map<string, string>): ResultAxisItem[] {
+/** Posição de leitura do TabWin em que cada código do Discriminar apareceu primeiro. */
+interface DiscriminateOrder {
+  firstSeen: Map<string, number>;
+}
+
+/**
+ * "Discriminar": uma linha por código sem correspondência, na ordem em que o
+ * TabWin o encontra (05, 02, 04 no oráculo). Num DBC essa não é a ordem do
+ * arquivo — ver `read-order.ts` (RE-004).
+ */
+function discriminatedCodes(dimension: DimensionSpec, observed: Map<string, string>, order?: DiscriminateOrder): ResultAxisItem[] {
   if (dimension.unclassifiedPolicy !== 'discriminate-codes') return [];
-  return [...observed.entries()]
+  const items = [...observed.entries()]
     .filter(([key]) => key.startsWith(UNCLASSIFIED_CODE_PREFIX))
     .map(([key, label]) => ({ key, label, source: 'raw' as const }));
+  if (!order) return items;
+  const position = (key: string) => order.firstSeen.get(key) ?? 0;
+  return items.sort((a, b) => position(a.key) - position(b.key));
 }
 
 function numericFieldValue(
@@ -410,6 +423,15 @@ function propagateRowSubtotals(rows: ResultAxisItem[], cells: number[][]): void 
     }
   }
 }
+export interface TabulationOptions {
+  /**
+   * Posição de leitura do TabWin para cada registro (índice na ordem em que
+   * chegam). Só muda a ordem das linhas do Discriminar; sem ela, vale a ordem
+   * de chegada. Ver `tabwinReadPosition`.
+   */
+  readPosition?: (index: number) => number;
+}
+
 export interface TabulationAccumulator {
   /** Feeds one bounded batch. Call as many times as needed. */
   push(records: Iterable<DataRecord>): void;
@@ -432,10 +454,12 @@ export interface TabulationAccumulator {
 export function createTabulationAccumulator(
   plan: QueryPlan,
   conversions: ConversionRegistry = {},
+  options: TabulationOptions = {},
 ): TabulationAccumulator {
   const warnings = new Set(plan.warnings);
   const observedRows = new Map<string, string>();
   const observedColumns = new Map<string, string>();
+  const firstSeen = new Map<string, number>();
   const totals = new Map<string, Map<string, number>>();
   let recordsSeen = 0;
   let recordsAccepted = 0;
@@ -455,6 +479,16 @@ export function createTabulationAccumulator(
       const resolved = resolvePlanRecord(record, plan, conversions);
       if (!resolved) continue;
 
+      if (options.readPosition) {
+        // A primeira vez na leitura do TabWin, que num DBC não é a primeira no arquivo.
+        let position: number | undefined;
+        for (const key of [resolved.rowKey, resolved.columnKey]) {
+          if (!key.startsWith(UNCLASSIFIED_CODE_PREFIX)) continue;
+          position ??= options.readPosition(recordsSeen - 1);
+          const known = firstSeen.get(key);
+          if (known === undefined || position < known) firstSeen.set(key, position);
+        }
+      }
       observedRows.set(resolved.rowKey, resolved.rowLabel);
       let row = totals.get(resolved.rowKey);
       if (!row) totals.set(resolved.rowKey, row = new Map<string, number>());
@@ -477,6 +511,7 @@ export function createTabulationAccumulator(
     return materializeTabulation({
       plan, conversions, warnings, observedRows, observedColumns, totals,
       recordsSeen, recordsAccepted, rules, ruleMatches,
+      ...(options.readPosition ? { order: { firstSeen } } : {}),
     });
   }
 
@@ -494,15 +529,16 @@ interface TabulationState {
   recordsAccepted: number;
   rules: readonly CrossFieldRuleSpec[];
   ruleMatches: readonly number[];
+  order?: DiscriminateOrder;
 }
 
 function materializeTabulation(state: TabulationState): TabulationResult {
   const {
     plan, conversions, warnings, observedRows, observedColumns, totals,
-    recordsSeen, recordsAccepted, rules, ruleMatches,
+    recordsSeen, recordsAccepted, rules, ruleMatches, order,
   } = state;
 
-  let rows = axisFromDimension(plan.spec.rows, conversions, observedRows);
+  let rows = axisFromDimension(plan.spec.rows, conversions, observedRows, order);
   const measures = plan.spec.measures && plan.spec.measures.length > 1 ? plan.spec.measures : undefined;
   let columns = measures
     ? measures.map((measure, index): ResultAxisItem => ({
@@ -511,7 +547,7 @@ function materializeTabulation(state: TabulationState): TabulationResult {
       source: 'derived' as const,
     }))
     : plan.spec.columns
-      ? axisFromDimension(plan.spec.columns, conversions, observedColumns)
+      ? axisFromDimension(plan.spec.columns, conversions, observedColumns, order)
       : [{ key: '__single__', label: singleColumnLabel(plan), source: 'raw' as const }];
 
   let cells = rows.map((row) => {
@@ -570,8 +606,9 @@ export function executeInMemory(
   records: Iterable<DataRecord>,
   plan: QueryPlan,
   conversions: ConversionRegistry = {},
+  options: TabulationOptions = {},
 ): TabulationResult {
-  const accumulator = createTabulationAccumulator(plan, conversions);
+  const accumulator = createTabulationAccumulator(plan, conversions, options);
   accumulator.push(records);
   return accumulator.finish();
 }

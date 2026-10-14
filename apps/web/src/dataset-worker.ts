@@ -39,6 +39,7 @@ import {
   type ConversionRegistry,
 } from '../../../packages/core/src/execute.ts';
 import { fieldsUsedByPlan } from '../../../packages/core/src/plan-fields.ts';
+import { tabwinReadPosition } from '../../../packages/core/src/read-order.ts';
 import {
   createColumnarProjectionBuilder,
   createColumnarProjectionCache,
@@ -461,6 +462,20 @@ function streamAll(
   return readSoFar;
 }
 
+/**
+ * A ordem em que o TabWin leria estes arquivos, um depois do outro: só muda a
+ * ordem das linhas do Discriminar (num DBC o TabWin não lê na ordem do
+ * arquivo; RE-004, `read-order.ts`).
+ */
+function readPositionFor(only?: ReadonlySet<string>): (index: number) => number {
+  return tabwinReadPosition(sources.filter((source) => !only || only.has(source.name)).map((source) => {
+    if (source.kind === 'records') return { recordCount: source.records.length, dbc: false };
+    if (source.kind === 'parquet') return { recordCount: parquetHeader(source).recordCount, dbc: false };
+    const current = binaryHeader(source);
+    return { recordCount: current.recordCount, recordLength: current.recordLength, dbc: source.isDbc };
+  }));
+}
+
 function headerForSources(request: OpenRequest): DbfHeader {
   const [first] = request.sources;
   if (!first) throw new Error('Nenhuma fonte foi enviada ao trabalhador local');
@@ -581,7 +596,7 @@ function handle(request: DatasetRequest): void {
         if (![...subset].some((name) => sources.some((source) => source.name === name))) {
           throw new Error('Nenhum dos arquivos escolhidos está aberto');
         }
-        const accumulator = createTabulationAccumulator(request.plan, conversions);
+        const accumulator = createTabulationAccumulator(request.plan, conversions, { readPosition: readPositionFor(subset) });
         streamAll(request.requestId, fieldsUsedByPlan(request.plan), (batch) => accumulator.push(batch.records), subset);
         post({ type: 'tabulation', requestId: request.requestId, result: accumulator.finish(), cached: false });
         return;
@@ -598,7 +613,7 @@ function handle(request: DatasetRequest): void {
       // delas): tabula sem tocar no arquivo.
       const reused = columnarCache.get(sourceId, planFields);
       if (reused) {
-        const result: TabulationResult = executeColumnarProjection(reused, request.plan, conversions);
+        const result: TabulationResult = executeColumnarProjection(reused, request.plan, conversions, { readPosition: readPositionFor() });
         resultCache.set({ plan: request.plan, conversions }, result);
         post({ type: 'tabulation', requestId: request.requestId, result, cached: false });
         return;
@@ -607,7 +622,7 @@ function handle(request: DatasetRequest): void {
       // Primeira passagem sobre estes campos: tabula e monta a projeção na
       // MESMA leitura. Ler duas vezes para poder guardar seria pagar hoje o
       // que se quer economizar amanhã.
-      const accumulator = createTabulationAccumulator(request.plan, conversions);
+      const accumulator = createTabulationAccumulator(request.plan, conversions, { readPosition: readPositionFor() });
       const builder = createColumnarProjectionBuilder(planFields);
       streamAll(request.requestId, planFields, (batch) => {
         accumulator.push(batch.records);

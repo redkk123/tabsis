@@ -458,7 +458,8 @@ test('new-format N conversions execute, and their 4-column subtotal indicator ro
     // "   1" under the 4-column rule, so this points at sequence 1, not 10.
     nrow('10', 3, 'Filho', '1023'),
   ].join('\n'));
-  assert.equal(cnv.mode, 'new-format');
+  assert.equal(cnv.newFormat, true);
+  assert.equal(cnv.mode, 'short');
   assert.equal(cnv.categories.find((c) => c.sequence === 3)?.subtotalTarget, 1);
 
   const plan = compileQueryPlan({
