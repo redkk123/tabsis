@@ -568,6 +568,10 @@ const geoFilterList = element<HTMLElement>('#geo-filter-list');
 const geoFilterClear = element<HTMLButtonElement>('#geo-filter-clear');
 const geoFilterApply = element<HTMLButtonElement>('#geo-filter-apply');
 const mapUfLabel = element<HTMLLabelElement>('.map-uf-label');
+const mapFocusBar = element<HTMLElement>('#map-focus');
+const mapFocusBack = element<HTMLButtonElement>('#map-focus-back');
+const mapFocusTrail = element<HTMLElement>('#map-focus-trail');
+const mapFocusHint = element<HTMLElement>('#map-focus-hint');
 const mapClassCount = element<HTMLSelectElement>('#map-class-count');
 const mapManualBreaksLabel = element<HTMLElement>('#map-manual-breaks-label');
 const mapManualBreaks = element<HTMLInputElement>('#map-manual-breaks');
@@ -6149,6 +6153,9 @@ function renderMap(): void {
         ? `${integerFormat.format(matched)} áreas com dado${colunaDita}.`
         : '';
     mapMessage.hidden = !mapGeoField && !colunaDita;
+    // Com o mapa desenhado o texto é legenda, no topo: no meio ele cobria o
+    // mapa e engolia o clique e o tooltip.
+    mapMessage.classList.add('is-caption');
   } else {
     // O número tem que ser o das linhas que o MAPA tentou casar, não o da
     // tabela da tela: são coisas diferentes desde que o mapa ficou autônomo.
@@ -6462,7 +6469,10 @@ function renderMapUfOptions(): void {
   const podeDescer = mapSource === 'proprio' && Boolean(mapResult) && mapGeoField?.level === 'municipality';
   mapUfSelect.hidden = !podeDescer;
   mapUfLabel.hidden = !podeDescer;
-  if (!podeDescer || !mapResult) return;
+  if (!podeDescer || !mapResult) {
+    mapFocusBar.hidden = true;
+    return;
+  }
 
   const presentes = new Map<string, number>();
   mapResult.rows.forEach((row, index) => {
@@ -6484,6 +6494,44 @@ function renderMapUfOptions(): void {
   }
   mapUfSelect.value = presentes.has(anterior) ? anterior : '';
   mapUfFilter = mapUfSelect.value;
+  mapFocusStates = presentes;
+  renderMapFocusBar();
+}
+
+/**
+ * Estados que este arquivo tem, com o total de cada um: são os únicos em que
+ * o clique desce. Clicar num estado sem registro daria um mapa em branco.
+ */
+let mapFocusStates = new Map<string, number>();
+
+/** O mapa do Brasil clicável: de cima, cada estado desce para os seus municípios. */
+function mapCanFocus(): boolean {
+  return mapSource === 'proprio' && Boolean(mapResult)
+    && mapGeoField?.level === 'municipality' && !mapUfFilter;
+}
+
+function renderMapFocusBar(): void {
+  mapFocusBar.hidden = false;
+  const dentro = Boolean(mapUfFilter);
+  mapFocusBack.hidden = !dentro;
+  mapFocusTrail.textContent = dentro ? `Brasil › ${ufNameForCode(mapUfFilter)}` : 'Brasil';
+  mapFocusHint.textContent = dentro
+    ? 'Municípios com os dados do arquivo. Clique num município para selecioná-lo; arraste para mover.'
+    : 'Clique num estado para ver os municípios dele. Com Shift, o clique seleciona o estado em vez de descer.';
+}
+
+/** Entra num estado (ou volta ao Brasil, com ''): o mesmo que escolher no seletor Recorte. */
+function setMapFocus(uf: string): void {
+  mapUfSelect.value = uf;
+  mapUfFilter = mapUfSelect.value;
+  // O zoom e o deslocamento eram do mapa anterior; mantê-los deixaria a
+  // pessoa olhando para o lugar errado do mapa novo.
+  mapZoom = 1;
+  mapPanX = 0;
+  mapPanY = 0;
+  activeMap = null;
+  mapTooltip.hidden = true;
+  void ensureMap();
 }
 
 /** Sigla do estado a partir do código, lida do mapa incluído de UF. */
@@ -6528,6 +6576,7 @@ function mapDrawableResult(): TabulationResult | null {
 
 async function ensureMap(): Promise<void> {
   if (!currentResult) return;
+  mapMessage.classList.remove('is-caption');
 
   // A variável de linha da tela ainda serve, quando ela é geográfica: aí o
   // mapa desenha exatamente a tabela que a pessoa montou, com as conversões
@@ -9368,10 +9417,13 @@ function showMapTooltip(event: PointerEvent): void {
   const object = objectAtCanvasPoint(point.x, point.y);
   if (!object) {
     mapTooltip.hidden = true;
+    mapCanvas.classList.remove('map-can-focus');
     return;
   }
   const value = lastMapValues.get(object);
-  mapTooltip.textContent = `${object.name || object.geocode} · ${value === undefined ? 'sem valor associado' : numberFormat.format(value)}`;
+  const desce = mapCanFocus() && mapFocusStates.has(object.geocode.trim());
+  mapCanvas.classList.toggle('map-can-focus', desce);
+  mapTooltip.textContent = `${object.name || object.geocode} · ${value === undefined ? 'sem valor associado' : numberFormat.format(value)}${desce ? ' · clique para ver os municípios' : ''}`;
   mapTooltip.style.left = `${Math.min(point.x + 12, mapCanvas.clientWidth - 240)}px`;
   mapTooltip.style.top = `${Math.max(8, point.y - 34)}px`;
   mapTooltip.hidden = false;
@@ -9957,16 +10009,8 @@ mapValueColumn.addEventListener('change', () => {
   if (activeMap && currentResult) renderMap();
 });
 
-mapUfSelect.addEventListener('change', () => {
-  mapUfFilter = mapUfSelect.value;
-  // O zoom e o deslocamento eram do mapa anterior; mantê-los deixaria a
-  // pessoa olhando para o lugar errado do mapa novo.
-  mapZoom = 1;
-  mapPanX = 0;
-  mapPanY = 0;
-  activeMap = null;
-  void ensureMap();
-});
+mapUfSelect.addEventListener('change', () => setMapFocus(mapUfSelect.value));
+mapFocusBack.addEventListener('click', () => setMapFocus(''));
 mapManualBreaks.addEventListener('input', () => {
   if (activeMap && currentResult && mapClassification.value === 'manual') renderMap();
 });
@@ -10027,7 +10071,12 @@ mapCanvas.addEventListener('pointerup', (event) => {
   mapPointerOrigin = null;
   if (travelled <= 4) {
     const object = objectAtCanvasPoint(point.x, point.y);
-    if (object) toggleMapSelection(object);
+    if (object) {
+      const uf = mapCanFocus() && !event.shiftKey ? object.geocode.trim() : '';
+      if (!uf) toggleMapSelection(object);
+      else if (mapFocusStates.has(uf)) setMapFocus(uf);
+      else showToast(`${ufNameForCode(uf)} não tem registros neste arquivo.`, true);
+    }
   }
   showMapTooltip(event);
 });
