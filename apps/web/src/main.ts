@@ -101,6 +101,7 @@ import {
   belongsToUf,
   findGeographicFields,
   ufCodeOf,
+  withIbgeCheckDigit,
   type GeographicCandidate,
 } from '../../../packages/analysis/src/geographic-fields.ts';
 import { criarAbaConsulta, type AbaConsulta } from './aba-consulta.ts';
@@ -111,7 +112,7 @@ import {
   type TabwinFormatContext,
 } from '../../../packages/export/src/tabwin-formats.ts';
 import { encodeWindows1252 } from '../../../packages/formats/src/windows-1252.ts';
-import { describeAuxiliaryFile, describeDatasusFile } from '../../../packages/formats/src/datasus-file-names.ts';
+import { UF_NAMES, describeAuxiliaryFile, describeDatasusFile } from '../../../packages/formats/src/datasus-file-names.ts';
 import { datasusFieldEntry } from '../../../packages/formats/src/datasus-field-dictionary.ts';
 import { criarGerarDef } from './gerar-def.ts';
 import { criarEditorCnv } from './editor-cnv.ts';
@@ -126,10 +127,12 @@ import { describeRecognition, recognizeArchive } from '../../../packages/acquisi
 import { fetchFromMirror } from './mirror-client.ts';
 import { describeCacheUsage } from '../../../packages/acquisition/src/cache-policy.ts';
 import { fetchTabnetPreview, tabnetPreviewAvailable } from './tabnet-client.ts';
+import { nameGeographicLabels } from '../../../packages/analysis/src/geographic-labels.ts';
 import {
   buildPicker,
   codesForSelection,
   describeSelection,
+  loadGeographyNames,
   renderPicker,
   type GeoSelection,
 } from './geo-filter.ts';
@@ -207,6 +210,7 @@ import { chooseMapColumn } from '../../../packages/visualization/src/map-scale.t
 import type { ChartType } from '../../../packages/visualization/src/chart-model.ts';
 import {
   createMapScale,
+  createDivergingMapScale,
   type MapClassification,
   type MapPalette,
   type MapScale,
@@ -572,6 +576,14 @@ const mapFocusBar = element<HTMLElement>('#map-focus');
 const mapFocusBack = element<HTMLButtonElement>('#map-focus-back');
 const mapFocusTrail = element<HTMLElement>('#map-focus-trail');
 const mapFocusHint = element<HTMLElement>('#map-focus-hint');
+const mapPeriodBar = element<HTMLElement>('#map-period');
+const mapPeriodPlay = element<HTMLButtonElement>('#map-period-play');
+const mapPeriodSelect = element<HTMLSelectElement>('#map-period-select');
+const mapPeriodSlider = element<HTMLInputElement>('#map-period-slider');
+const mapPeriodStatus = element<HTMLElement>('#map-period-status');
+const mapPeriodChart = element<HTMLElement>('#map-period-chart');
+const mapVariationSelect = element<HTMLSelectElement>('#map-variation');
+const mapCard = element<HTMLElement>('#map-card');
 const mapClassCount = element<HTMLSelectElement>('#map-class-count');
 const mapManualBreaksLabel = element<HTMLElement>('#map-manual-breaks-label');
 const mapManualBreaks = element<HTMLInputElement>('#map-manual-breaks');
@@ -2739,6 +2751,13 @@ function resetAnalysisState(): void {
   mapGeoField = null;
   mapUfFilter = '';
   mapGeoFieldChoice = '';
+  mapPeriod = '';
+  mapPeriodResults.clear();
+  mapPeriodSignature = '';
+  mapFocusGeocode = '';
+  mapCard.hidden = true;
+  stopMapPeriodPlayback();
+  mapPeriodBar.hidden = true;
   geoSelection = { states: [], municipalities: [] };
   geoPicker = null;
   geoFilter.hidden = true;
@@ -3747,10 +3766,16 @@ async function runAnalysis(measureOverride?: MeasureSpec, planOverride?: QueryPl
   try {
     const plan = planOverride ?? buildPlan(measureOverride);
     const conversions = conversionsForPlan(plan);
-    const { result, cached } = await askDataset<{ result: TabulationResult; cached: boolean }>(
+    const { result: crua, cached } = await askDataset<{ result: TabulationResult; cached: boolean }>(
       { type: 'tabulate', plan, conversions, ...(arquivosDoPainel ? { sourceNames: arquivosDoPainel } : {}) },
       { label: 'Tabulação', progress: datasetProgress('Tabulando') },
     );
+    // Código do IBGE vira nome do lugar (a chave segue sendo o código). Sem a
+    // lista de nomes, a tabela sai como sempre.
+    const nomes = await loadGeographyNames();
+    const result = nomes
+      ? nameGeographicLabels(crua, { rows: plan.spec.rows.field, ...(plan.spec.columns ? { columns: plan.spec.columns.field } : {}) }, nomes)
+      : crua;
     currentPlan = plan;
     baseResult = result;
     currentResult = result;
@@ -5724,9 +5749,46 @@ async function loadMapReferenceLayer(file: File): Promise<void> {
  * down: the arcs simply do not appear and the report says why.
  */
 function mapGeocodePointsSafe(): Map<string, MapCoordinate> {
-  if (!activeMap) return new Map();
-  try { return mapGeocodePoints(activeMap); }
-  catch { return new Map(); }
+  const mapa = flowGeoMap ?? activeMap;
+  if (!mapa) return new Map();
+  try {
+    const pontos = mapGeocodePoints(mapa);
+    // O mapa traz seis dígitos; o arquivo pode trazer sete (com verificador).
+    if (flowGeoMapIncluded) {
+      for (const [codigo, ponto] of [...pontos]) {
+        const completo = withIbgeCheckDigit(codigo);
+        if (completo) pontos.set(completo, ponto);
+      }
+    }
+    return pontos;
+  } catch { return new Map(); }
+}
+
+/**
+ * O mapa que os fluxos usam para reconhecer lugares e achar o ponto de cada um.
+ *
+ * Os fluxos são entre MUNICÍPIOS, e o mapa da tela pode estar no nível do
+ * Brasil por estado (UF): com ele, todo código de município era "fora do
+ * mapa" e o resultado vinha vazio. Então os fluxos têm o mapa municipal
+ * incluído, lido na primeira vez — a não ser que a pessoa tenha aberto um mapa
+ * dela, que manda. As coordenadas são as mesmas, então as setas se desenham
+ * certas sobre qualquer um dos mapas.
+ */
+let flowGeoMap: TabwinMapDefinition | null = null;
+let flowGeoMapIncluded = false;
+
+async function ensureFlowMap(): Promise<TabwinMapDefinition | null> {
+  if (activeMap && !activeMapSource.startsWith('incluído:')) {
+    flowGeoMap = activeMap;
+    flowGeoMapIncluded = false;
+    return flowGeoMap;
+  }
+  if (flowGeoMap && flowGeoMapIncluded) return flowGeoMap;
+  const resposta = await fetch(new URL('maps/br_municip.MAP', document.baseURI));
+  if (!resposta.ok) throw new Error(`o mapa de municípios retornou HTTP ${resposta.status}`);
+  flowGeoMap = parseTabwinMap(new Uint8Array(await resposta.arrayBuffer()));
+  flowGeoMapIncluded = true;
+  return flowGeoMap;
 }
 
 function populateFlowFields(): void {
@@ -5755,8 +5817,13 @@ async function computeFlows(): Promise<void> {
   if (flowOrigin.value === flowDestination.value) {
     throw new Error('Origem e destino precisam ser campos diferentes');
   }
-  const known = activeMap
-    ? [...new Set(activeMap.objects.map((object) => object.geocode.trim()).filter(Boolean))]
+  const mapaDeFluxos = await ensureFlowMap();
+  const known = mapaDeFluxos
+    ? [...new Set(mapaDeFluxos.objects.flatMap((object) => {
+      const codigo = object.geocode.trim();
+      const completo = flowGeoMapIncluded ? withIbgeCheckDigit(codigo) : null;
+      return completo ? [codigo, completo] : [codigo];
+    }).filter(Boolean))]
     : undefined;
   const reply = await askDataset<{ result: FlowBuildResult }>(
     {
@@ -5835,7 +5902,8 @@ function renderFlowReport(result: FlowBuildResult): void {
 }
 
 function mapNameForGeocode(geocode: string): string {
-  const object = activeMap?.objects.find((item) => item.geocode.trim() === geocode);
+  const sem = geocode.length === 7 ? geocode.slice(0, 6) : geocode;
+  const object = (flowGeoMap ?? activeMap)?.objects.find((item) => { const g = item.geocode.trim(); return g === geocode || g === sem; });
   return object?.name ? `${geocode} · ${object.name}` : geocode;
 }
 
@@ -5978,6 +6046,26 @@ function renderMap(): void {
     values.set(row.key.trim().toLowerCase(), value);
     values.set(normalizeLabel(row.label), value);
   });
+  // Passando de ano em ano, a escala é uma só para todos: com a escala de cada
+  // ano, o verde mais escuro de um ano pequeno parecia igual ao de um ano
+  // grande, e o controle deslizante mostraria o contrário do que aconteceu.
+  const valoresDaEscala: number[] = mapPeriod
+    ? mapPeriodList().flatMap((periodo) => {
+      const resultadoDoAno = mapDrawableResult(periodo.name);
+      return resultadoDoAno ? resultadoDoAno.cells.map((linha) => linha[escolha.index] ?? 0) : [];
+    })
+    : [...values.values()];
+  // Variação em relação ao ano anterior: só vale com um ano escolhido que não
+  // seja o primeiro. Fora disso o mapa mostra os valores, e a faixa de período
+  // diz por quê.
+  const modoVariacao = mapVariationMode();
+  const variacao = modoVariacao && mapPeriod && mapPreviousPeriod(mapPeriod)
+    ? mapVariationBetween(mapPeriod, escolha.index, modoVariacao)
+    : null;
+  const valoresDaVariacao = variacao
+    ? mapPeriodList().slice(1).flatMap((periodo) => [...(mapVariationBetween(periodo.name, escolha.index, modoVariacao as 'abs' | 'pct')?.values() ?? [])])
+    : [];
+  const valoresMostrados = variacao ?? values;
   const classification = mapClassification.value as MapClassification;
   // Breaks the data cannot support - a recipe saved against a bigger range,
   // say - must not blank the map. Quantiles draw it, and the message below
@@ -5992,7 +6080,7 @@ function renderMap(): void {
   let scaleModel: MapScale;
   try {
     scaleModel = createMapScale(
-      values.values(),
+      valoresDaEscala,
       manualBreakProblem ? 'quantile' : classification,
       Number(mapClassCount.value),
       mapPalette.value as MapPalette,
@@ -6003,10 +6091,16 @@ function renderMap(): void {
     );
   } catch (error) {
     manualBreakProblem = error instanceof Error ? error.message : String(error);
-    scaleModel = createMapScale(values.values(), 'quantile', Number(mapClassCount.value),
+    scaleModel = createMapScale(valoresDaEscala, 'quantile', Number(mapClassCount.value),
       mapPalette.value as MapPalette, { invertPalette: mapInvertPalette.checked });
   }
-  mapManualBreaksNote.hidden = !manualBreakProblem;
+  if (variacao) scaleModel = createDivergingMapScale(valoresDaVariacao);
+  const anteriorDoAno = mapPeriod ? mapPreviousPeriod(mapPeriod) : undefined;
+  formatMapValue = variacao
+    ? (valor) => signedFormat(valor, modoVariacao === 'pct' ? '%' : '')
+    : (valor) => numberFormat.format(valor);
+  mapValueSuffix = variacao && anteriorDoAno ? ` em relação a ${anteriorDoAno.label}` : '';
+  mapManualBreaksNote.hidden = !manualBreakProblem || Boolean(variacao);
   mapManualBreaksNote.textContent = manualBreakProblem ? `${manualBreakProblem}. Mapa desenhado por quantis.` : '';
   let matched = 0;
   lastMapValues = new Map();
@@ -6015,7 +6109,7 @@ function renderMap(): void {
   context.lineWidth = Math.max(.28, .45 / scale);
   context.strokeStyle = 'rgba(49, 91, 86, .48)';
   for (const object of activeMap.objects) {
-    const value = valueForMapObject(object, values);
+    const value = valueForMapObject(object, valoresMostrados);
     lastMapValues.set(object, value);
     if (value !== undefined) matched++;
     context.beginPath();
@@ -6034,7 +6128,7 @@ function renderMap(): void {
     if (object.type === 'polygon' || object.type === 'polygon-with-seat') {
       context.fillStyle = scaleModel.colorFor(value);
       context.fill('evenodd');
-      if (mapSelection.includes(object.geocode)) {
+      if (mapSelection.includes(object.geocode) || (mapFocusGeocode && object.geocode.trim() === mapFocusGeocode)) {
         context.save();
         context.strokeStyle = '#123f36';
         context.lineWidth = Math.max(1.1, 1.8 / scale);
@@ -6159,25 +6253,30 @@ function renderMap(): void {
   } else {
     // O número tem que ser o das linhas que o MAPA tentou casar, não o da
     // tabela da tela: são coisas diferentes desde que o mapa ficou autônomo.
-    mapMessage.textContent = 'O mapa foi aberto, mas nenhum código ou nome coincide com as '
-      + `${integerFormat.format(desenhavel.rows.length)} linhas atuais.`;
+    mapMessage.textContent = 'Não deu para casar as '
+      + `${integerFormat.format(desenhavel.rows.length)} linhas desta tabela com o mapa. `
+      + 'Tabule por município ou UF, ou escolha o campo no seletor "Geografia".';
   }
   mapLegend.hidden = false;
   mapLegend.replaceChildren();
   const title = document.createElement('strong');
-  title.textContent = `${integerFormat.format(matched)} áreas associadas`;
+  title.textContent = variacao
+    ? `Variação${mapValueSuffix} · ${integerFormat.format(matched)} áreas`
+    : `${integerFormat.format(matched)} áreas associadas`;
   const gradient = document.createElement('div');
   gradient.className = 'legend-gradient';
-  gradient.style.background = `linear-gradient(90deg, ${scaleModel.classes[0]?.color ?? '#dfe8e5'}, ${scaleModel.classes.at(-1)?.color ?? '#08634f'})`;
+  gradient.style.background = variacao
+    ? `linear-gradient(90deg, ${scaleModel.classes[0]?.color}, ${scaleModel.colorFor(0)}, ${scaleModel.classes.at(-1)?.color})`
+    : `linear-gradient(90deg, ${scaleModel.classes[0]?.color ?? '#dfe8e5'}, ${scaleModel.classes.at(-1)?.color ?? '#08634f'})`;
   const range = document.createElement('div');
   range.className = 'legend-range';
   const low = document.createElement('span');
   const high = document.createElement('span');
-  low.textContent = numberFormat.format(scaleModel.min);
-  high.textContent = numberFormat.format(scaleModel.max);
+  low.textContent = variacao ? signedFormat(scaleModel.min, modoVariacao === 'pct' ? '%' : '') : numberFormat.format(scaleModel.min);
+  high.textContent = variacao ? signedFormat(scaleModel.max, modoVariacao === 'pct' ? '%' : '') : numberFormat.format(scaleModel.max);
   range.append(low, high);
   mapLegend.append(title, gradient, range);
-  if (mapClassification.value !== 'continuous') {
+  if (!variacao && mapClassification.value !== 'continuous') {
     const classList = document.createElement('div');
     classList.className = 'legend-classes';
     for (const item of scaleModel.classes) {
@@ -6194,6 +6293,7 @@ function renderMap(): void {
     mapLegend.append(classList);
   }
   mapPngButton.disabled = matched === 0;
+  renderMapFocusCard();
   renderAudit();
 }
 
@@ -6208,6 +6308,21 @@ function renderMap(): void {
 let mapResult: TabulationResult | null = null;
 let mapGeoField: GeographicCandidate | null = null;
 /**
+ * O que o mapa desenha: município ou UF. Decidido pelos DADOS (os códigos das
+ * linhas), não pelo nome do campo — `UF_ZI` tem nome de UF e traz código de
+ * município de seis dígitos, e decidir pelo nome pintava o mapa errado.
+ */
+let mapLevel: 'municipality' | 'uf' | null = null;
+
+function inferMapLevel(result: TabulationResult | null): 'municipality' | 'uf' | null {
+  const chaves = result?.rows.map((row) => row.key.trim()).filter(Boolean) ?? [];
+  if (!chaves.length) return null;
+  const maioria = (quantos: number): boolean => quantos / chaves.length >= 0.9;
+  if (maioria(chaves.filter((chave) => ufCodeOf(chave) !== null).length)) return 'municipality';
+  const ehUf = (chave: string): boolean => (/^\d{2}$/.test(chave) && chave in UF_POR_CODIGO) || chave.toUpperCase() in UF_NAMES;
+  return maioria(chaves.filter(ehUf).length) ? 'uf' : null;
+}
+/**
  * O que o `mapResult` guardado respondia.
  *
  * Guardar a tabulação do mapa sem guardar as condições dela deixava o mapa
@@ -6221,7 +6336,10 @@ let mapGeoField: GeographicCandidate | null = null;
 let mapResultSignature = '';
 
 function mapInputSignature(): string {
-  return JSON.stringify([configuredFilters, configuredCrossFieldRules]);
+  // Os arquivos abertos também são condição: juntar mais um arquivo depois de o
+  // mapa (ou o painel "Onde") ter lido o primeiro deixava o mapa com os números
+  // do primeiro, e a tabela ao lado com os de todos.
+  return JSON.stringify([configuredFilters, configuredCrossFieldRules, activeDatasetSources.map((source) => source.name)]);
 }
 /** UF isolada no mapa. Vazio quer dizer o Brasil inteiro, por estado. */
 let mapUfFilter = '';
@@ -6375,7 +6493,7 @@ function renderGeoFieldOptions(candidatos: readonly GeographicCandidate[], escol
   mapGeoFieldSelect.value = escolhido;
 }
 
-async function tabulateForMap(): Promise<TabulationResult | null> {
+async function tabulateForMap(sourceNames?: string[]): Promise<TabulationResult | null> {
   if (!dbfHeader) return null;
   const candidatos = findGeographicFields(dbfHeader.fields);
   // O primeiro é o padrão — residência —, mas a pessoa manda. A diferença não
@@ -6402,14 +6520,14 @@ async function tabulateForMap(): Promise<TabulationResult | null> {
     suppressZeroColumns: false,
   });
   const { result } = await askDataset<{ result: TabulationResult; cached: boolean }>(
-    { type: 'tabulate', plan, conversions: conversionsForPlan(plan) },
+    { type: 'tabulate', plan, conversions: conversionsForPlan(plan), ...(sourceNames ? { sourceNames } : {}) },
     {
       label: 'Mapa',
       // O progresso vai para a área do MAPA, não para o título do resultado.
       // `datasetProgress` escreve no título, e usá-lo aqui apagava o nome da
       // tabulação que a pessoa montou — o mapa passava por cima da análise
       // dela para contar do próprio progresso.
-      progress: (lidos, total) => {
+      progress: sourceNames ? () => {} : (lidos, total) => {
         mapMessage.hidden = false;
         mapMessage.textContent = total
           ? `Lendo a geografia por ${escolhido.field}: ${integerFormat.format(lidos)}`
@@ -6445,6 +6563,27 @@ function aggregateToUf(result: TabulationResult): TabulationResult {
   };
 }
 
+/**
+ * Como `aggregateToUf`, mas somando cada coluna (casos, valor, óbitos…) por
+ * UF: a tabela da pessoa pode ter várias, e o mapa escolhe uma delas.
+ */
+function aggregateColumnsToUf(result: TabulationResult): TabulationResult {
+  const somas = new Map<string, number[]>();
+  result.rows.forEach((row, index) => {
+    const uf = ufCodeOf(row.key);
+    if (!uf) return;
+    const atual = somas.get(uf) ?? result.columns.map(() => 0);
+    result.columns.forEach((_, coluna) => { atual[coluna] = (atual[coluna] ?? 0) + (result.cells[index]?.[coluna] ?? 0); });
+    somas.set(uf, atual);
+  });
+  const ordenadas = [...somas.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  return {
+    ...result,
+    rows: ordenadas.map(([uf]) => ({ key: uf, label: ufNameForCode(uf), source: 'derived' as const })),
+    cells: ordenadas.map(([, totais]) => totais),
+  };
+}
+
 /** Só as linhas da UF isolada, para o mapa municipal. */
 function onlyUf(result: TabulationResult, uf: string): TabulationResult {
   // rows e cells andam em paralelo: filtrar um sem o outro trocaria os valores
@@ -6466,18 +6605,19 @@ function onlyUf(result: TabulationResult, uf: string): TabulationResult {
  * deles daria um mapa em branco que parece defeito. A lista sai dos dados.
  */
 function renderMapUfOptions(): void {
-  const podeDescer = mapSource === 'proprio' && Boolean(mapResult) && mapGeoField?.level === 'municipality';
+  const fonte = mapSource === 'tabela' ? currentResult : mapResult;
+  const podeDescer = Boolean(fonte) && mapLevel === 'municipality';
   mapUfSelect.hidden = !podeDescer;
   mapUfLabel.hidden = !podeDescer;
-  if (!podeDescer || !mapResult) {
+  if (!podeDescer || !fonte) {
     mapFocusBar.hidden = true;
     return;
   }
 
   const presentes = new Map<string, number>();
-  mapResult.rows.forEach((row, index) => {
+  fonte.rows.forEach((row, index) => {
     const uf = ufCodeOf(row.key);
-    if (uf) presentes.set(uf, (presentes.get(uf) ?? 0) + cellValue(mapResult!, index));
+    if (uf) presentes.set(uf, (presentes.get(uf) ?? 0) + cellValue(fonte, index));
   });
 
   const anterior = mapUfSelect.value;
@@ -6506,8 +6646,8 @@ let mapFocusStates = new Map<string, number>();
 
 /** O mapa do Brasil clicável: de cima, cada estado desce para os seus municípios. */
 function mapCanFocus(): boolean {
-  return mapSource === 'proprio' && Boolean(mapResult)
-    && mapGeoField?.level === 'municipality' && !mapUfFilter;
+  return Boolean(mapSource === 'tabela' ? currentResult : mapResult)
+    && mapLevel === 'municipality' && !mapUfFilter;
 }
 
 function renderMapFocusBar(): void {
@@ -6515,9 +6655,11 @@ function renderMapFocusBar(): void {
   const dentro = Boolean(mapUfFilter);
   mapFocusBack.hidden = !dentro;
   mapFocusTrail.textContent = dentro ? `Brasil › ${ufNameForCode(mapUfFilter)}` : 'Brasil';
+  // No celular não há Shift: a dica só fala do que o toque faz.
+  const toque = window.matchMedia?.('(pointer: coarse)').matches ?? false;
   mapFocusHint.textContent = dentro
-    ? 'Municípios com os dados do arquivo. Clique num município para selecioná-lo; arraste para mover.'
-    : 'Clique num estado para ver os municípios dele. Com Shift, o clique seleciona o estado em vez de descer.';
+    ? `Municípios com os dados do arquivo. ${toque ? 'Toque' : 'Clique'} num município para ver o cartão dele${toque ? '' : '; Shift+clique seleciona para filtrar'}; arraste para mover.`
+    : `${toque ? 'Toque' : 'Clique'} num estado para ver os municípios dele.${toque ? '' : ' Com Shift, o clique seleciona o estado em vez de descer.'}`;
 }
 
 /** Entra num estado (ou volta ao Brasil, com ''): o mesmo que escolher no seletor Recorte. */
@@ -6530,6 +6672,7 @@ function setMapFocus(uf: string): void {
   mapPanX = 0;
   mapPanY = 0;
   activeMap = null;
+  mapFocusGeocode = '';
   mapTooltip.hidden = true;
   void ensureMap();
 }
@@ -6566,11 +6709,330 @@ function ufNameForCode(code: string): string {
  */
 let mapSource: 'tabela' | 'proprio' = 'proprio';
 
-function mapDrawableResult(): TabulationResult | null {
-  if (mapSource === 'tabela') return currentResult;
-  const base = mapResult;
+/**
+ * Vários anos abertos ao mesmo tempo: o mapa troca de ano com um controle
+ * deslizante, e uma barra por ano mostra a diferença entre eles.
+ *
+ * Cada ano é uma tabulação própria (só aquele arquivo), lida uma vez e guardada
+ * aqui; passar de ano depois disso é instantâneo.
+ */
+let mapPeriod = '';
+const mapPeriodResults = new Map<string, TabulationResult>();
+let mapPeriodSignature = '';
+let mapPeriodTimer: number | null = null;
+let mapPeriodLoading = '';
+
+interface MapPeriodItem { name: string; label: string }
+
+/** Os arquivos abertos, do mais antigo ao mais novo, com o período que o nome diz (RDAC2401.dbc → jan/2024). */
+function mapPeriodList(): MapPeriodItem[] {
+  if (activeDatasetSources.length < 2) return [];
+  const itens = activeDatasetSources.map((source) => ({
+    name: source.name,
+    label: describeDatasusFile(source.name)?.periodShort ?? source.name,
+  }));
+  // Dois arquivos com o mesmo período (UFs diferentes do mesmo ano) não são
+  // anos distintos: ali o nome do arquivo é o que os distingue.
+  const repetido = new Set(itens.map((item) => item.label)).size !== itens.length;
+  const lista = repetido ? itens.map((item) => ({ ...item, label: item.name })) : itens;
+  return lista.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { numeric: true }));
+}
+
+function stopMapPeriodPlayback(): void {
+  if (mapPeriodTimer !== null) window.clearInterval(mapPeriodTimer);
+  mapPeriodTimer = null;
+  mapPeriodPlay.textContent = '▶ Reproduzir';
+}
+
+function selectMapPeriod(name: string): void {
+  mapPeriod = name;
+  renderMapPeriodBar();
+  if (activeMap && currentResult && currentView === 'map') renderMap();
+}
+
+function renderMapPeriodBar(): void {
+  const periodos = mapPeriodList();
+  if (periodos.length < 2) {
+    mapPeriodBar.hidden = true;
+    stopMapPeriodPlayback();
+    return;
+  }
+  mapPeriodBar.hidden = false;
+  const prontos = periodos.filter((periodo) => mapPeriodResults.has(periodo.name));
+
+  const chaves = periodos.map((periodo) => periodo.name).join('|');
+  if (mapPeriodSelect.dataset.chaves !== chaves) {
+    mapPeriodSelect.dataset.chaves = chaves;
+    mapPeriodSelect.replaceChildren(
+      new Option(`Todos os ${periodos.length} arquivos juntos`, ''),
+      ...periodos.map((periodo) => new Option(periodo.label, periodo.name)),
+    );
+    mapPeriodSlider.max = String(periodos.length - 1);
+  }
+  mapPeriodSelect.value = mapPeriod;
+  const indice = periodos.findIndex((periodo) => periodo.name === mapPeriod);
+  mapPeriodSlider.value = String(indice >= 0 ? indice : periodos.length - 1);
+  mapPeriodSlider.disabled = prontos.length < 2;
+  mapPeriodPlay.disabled = prontos.length < 2;
+
+  const faltam = periodos.length - prontos.length;
+  const atual = periodos.find((periodo) => periodo.name === mapPeriod);
+  const lendo = periodos.find((periodo) => periodo.name === mapPeriodLoading)?.label;
+  mapPeriodStatus.textContent = faltam
+    ? `Lendo os anos${lendo ? ` (agora ${lendo})` : ''}: ${prontos.length} de ${periodos.length} prontos.`
+    : atual && mapVariationMode() && mapPreviousPeriod(atual.name)
+      ? `Cores: ${mapVariationMode() === 'pct' ? 'variação percentual' : 'diferença'} de ${mapPreviousPeriod(atual.name)!.label} para ${atual.label}. Laranja aumentou, azul diminuiu, claro ficou igual; a escala é a mesma para todos os anos.`
+    : atual && mapVariationMode()
+      ? `${atual.label} é o primeiro ano: não há ano anterior para comparar. Escolha um ano depois dele.`
+    : atual
+      ? `Mostrando ${atual.label}, com a mesma escala de cores para todos os anos: dá para comparar a cor de um ano com a de outro.`
+      : mapVariationMode()
+        ? 'Para ver a variação, escolha um ano (que não seja o primeiro) ou mova o controle.'
+        : 'Mostrando todos os arquivos juntos. Escolha um ano, ou mova o controle, para comparar.';
+
+  // Uma barra por ano: o total do que o mapa pinta, para ver a tendência antes
+  // de clicar. O total é o do recorte atual (estado isolado, filtros).
+  const coluna = mapValueColumn.value || undefined;
+  const totais = periodos.map((periodo) => {
+    const resultado = mapPeriodResults.has(periodo.name) ? mapDrawableResult(periodo.name) : null;
+    if (!resultado) return undefined;
+    const indiceColuna = chooseMapColumn(resultado.columns.map((c) => c.key), coluna).index;
+    return resultado.cells.reduce((soma, linha) => soma + (linha[indiceColuna] ?? 0), 0);
+  });
+  const maior = Math.max(1, ...totais.map((total) => total ?? 0));
+  mapPeriodChart.replaceChildren(...periodos.map((periodo, posicao) => {
+    const total = totais[posicao];
+    const botao = document.createElement('button');
+    botao.type = 'button';
+    botao.className = 'map-period-bar';
+    botao.disabled = total === undefined;
+    botao.setAttribute('aria-pressed', String(periodo.name === mapPeriod));
+    botao.title = total === undefined ? `${periodo.label}: lendo…` : `${periodo.label}: ${numberFormat.format(total)}`;
+    const barra = document.createElement('i');
+    barra.style.height = `${total === undefined ? 0 : Math.max(3, Math.round((total / maior) * 100))}%`;
+    const rotulo = document.createElement('span');
+    rotulo.textContent = periodo.label;
+    botao.append(barra, rotulo);
+    botao.addEventListener('click', () => { stopMapPeriodPlayback(); selectMapPeriod(periodo.name); });
+    return botao;
+  }));
+}
+
+function mapPeriodSignatureNow(): string {
+  return JSON.stringify([mapInputSignature(), mapSource, mapGeoField?.field ?? '', mapPeriodList().map((p) => p.name)]);
+}
+
+/**
+ * Lê cada ano numa tabulação própria, um depois do outro, em segundo plano.
+ * O mapa de todos os anos juntos já está na tela enquanto isso.
+ */
+async function loadMapPeriods(): Promise<void> {
+  const periodos = mapPeriodList();
+  if (periodos.length < 2 || !dbfHeader) {
+    mapPeriod = '';
+    mapPeriodResults.clear();
+    renderMapPeriodBar();
+    return;
+  }
+  const assinatura = mapPeriodSignatureNow();
+  if (assinatura !== mapPeriodSignature) {
+    mapPeriodResults.clear();
+    mapPeriodSignature = assinatura;
+    stopMapPeriodPlayback();
+    if (!periodos.some((periodo) => periodo.name === mapPeriod)) mapPeriod = '';
+  }
+  renderMapPeriodBar();
+  if (mapPeriodLoading) return;
+  try {
+    for (const periodo of periodos) {
+      if (mapPeriodResults.has(periodo.name)) continue;
+      mapPeriodLoading = periodo.name;
+      renderMapPeriodBar();
+      let resultado: TabulationResult | null;
+      if (mapSource === 'tabela') {
+        if (!currentPlan) break;
+        ({ result: resultado } = await askDataset<{ result: TabulationResult }>(
+          { type: 'tabulate', plan: currentPlan, conversions: conversionsForPlan(currentPlan), sourceNames: [periodo.name] },
+          { label: `Período ${periodo.label}` },
+        ));
+      } else {
+        resultado = await tabulateForMap([periodo.name]);
+      }
+      // Os filtros, o campo ou os arquivos mudaram durante a leitura: este
+      // resultado é de outra pergunta, e guardá-lo contaminaria o mapa.
+      if (mapPeriodSignatureNow() !== assinatura) return;
+      if (resultado) mapPeriodResults.set(periodo.name, resultado);
+      renderMapPeriodBar();
+      if (mapPeriod && currentView === 'map' && activeMap) renderMap();
+    }
+  } catch (error) {
+    mapPeriodStatus.textContent = `Não deu para ler todos os anos: ${error instanceof Error ? error.message : String(error)}`;
+  } finally {
+    mapPeriodLoading = '';
+    renderMapPeriodBar();
+  }
+}
+
+/** Município (ou área) em foco: o cartão com valor, posição e série por ano. */
+let mapFocusGeocode = '';
+
+function renderMapFocusCard(): void {
+  const objeto = mapFocusGeocode && activeMap
+    ? activeMap.objects.find((candidato) => candidato.geocode.trim() === mapFocusGeocode)
+    : undefined;
+  const atual = objeto ? mapDrawableResult() : null;
+  if (!objeto || !atual) {
+    mapCard.hidden = true;
+    mapCard.replaceChildren();
+    return;
+  }
+  const coluna = chooseMapColumn(atual.columns.map((c) => c.key), mapValueColumn.value || undefined).index;
+  const chave = mapFocusGeocode.toLowerCase();
+  const linhas = atual.rows
+    .map((row, index) => ({ chave: row.key.trim().toLowerCase(), valor: atual.cells[index]?.[coluna] ?? 0 }));
+  const propria = linhas.find((linha) => linha.chave === chave);
+  const comDado = linhas.filter((linha) => linha.valor > 0);
+  const soma = comDado.reduce((total, linha) => total + linha.valor, 0);
+
+  const cabecalho = document.createElement('div');
+  cabecalho.className = 'map-card-head';
+  const nome = document.createElement('strong');
+  const uf = ufCodeOf(mapFocusGeocode);
+  nome.textContent = `${objeto.name || mapFocusGeocode}${uf && mapLevel === 'municipality' ? ` · ${ufNameForCode(uf)}` : ''}`;
+  const fechar = document.createElement('button');
+  fechar.type = 'button';
+  fechar.className = 'secondary-button';
+  fechar.textContent = '✕';
+  fechar.title = 'Fechar o cartão';
+  fechar.setAttribute('aria-label', 'Fechar o cartão');
+  fechar.addEventListener('click', () => { mapFocusGeocode = ''; renderMap(); });
+  cabecalho.append(nome, fechar);
+
+  const periodoAtual = mapPeriodList().find((periodo) => periodo.name === mapPeriod);
+  const linhasDeTexto: string[] = [];
+  if (propria && propria.valor > 0) {
+    const posicao = 1 + comDado.filter((linha) => linha.valor > propria.valor).length;
+    const onde = mapUfFilter && mapLevel === 'municipality' ? ufNameForCode(mapUfFilter) : 'o mapa';
+    linhasDeTexto.push(
+      `${periodoAtual ? `${periodoAtual.label}: ` : ''}${numberFormat.format(propria.valor)}`
+      + ` · ${integerFormat.format(posicao)}º entre ${integerFormat.format(comDado.length)} áreas com dado`
+      + ` · ${numberFormat.format((propria.valor / soma) * 100)}% d${onde === 'o mapa' ? 'o mapa' : `e ${onde}`}`,
+    );
+  } else {
+    linhasDeTexto.push(`${periodoAtual ? `${periodoAtual.label}: ` : ''}sem registros nesta área.`);
+  }
+  const resumo = document.createElement('p');
+  resumo.className = 'map-card-text';
+  resumo.textContent = linhasDeTexto.join(' ');
+
+  mapCard.replaceChildren(cabecalho, resumo);
+
+  // A série: o valor desta área em cada ano, para ver a trajetória dela.
+  const periodos = mapPeriodList();
+  if (periodos.length > 1) {
+    const valores = periodos.map((periodo) => {
+      const resultado = mapPeriodResults.has(periodo.name) ? mapDrawableResult(periodo.name) : null;
+      if (!resultado) return undefined;
+      const indice = chooseMapColumn(resultado.columns.map((c) => c.key), mapValueColumn.value || undefined).index;
+      const posicao = resultado.rows.findIndex((row) => row.key.trim().toLowerCase() === chave);
+      return posicao >= 0 ? (resultado.cells[posicao]?.[indice] ?? 0) : 0;
+    });
+    const maior = Math.max(1, ...valores.map((valor) => valor ?? 0));
+    const serie = document.createElement('div');
+    serie.className = 'map-period-chart map-card-series';
+    serie.setAttribute('role', 'img');
+    serie.setAttribute('aria-label', `${objeto.name || mapFocusGeocode} por ano: ${periodos.map((p, i) => `${p.label} ${valores[i] ?? 'lendo'}`).join(', ')}`);
+    periodos.forEach((periodo, posicao) => {
+      const valor = valores[posicao];
+      const coluna = document.createElement('div');
+      coluna.className = 'map-period-bar';
+      coluna.setAttribute('aria-pressed', String(periodo.name === mapPeriod));
+      coluna.title = valor === undefined ? `${periodo.label}: lendo…` : `${periodo.label}: ${numberFormat.format(valor)}`;
+      const barra = document.createElement('i');
+      barra.style.height = `${valor === undefined ? 0 : valor === 0 ? 2 : Math.max(3, Math.round((valor / maior) * 100))}%`;
+      const rotulo = document.createElement('span');
+      rotulo.textContent = valor === undefined ? periodo.label : `${periodo.label} · ${numberFormat.format(valor)}`;
+      coluna.append(barra, rotulo);
+      serie.append(coluna);
+    });
+    mapCard.append(serie);
+  }
+  mapCard.hidden = false;
+}
+
+/** O que as cores mostram: os valores de cada ano, ou como cada área mudou em relação ao ano anterior. */
+type MapVariationMode = '' | 'abs' | 'pct';
+
+function mapVariationMode(): MapVariationMode {
+  return mapVariationSelect.value === 'abs' || mapVariationSelect.value === 'pct' ? mapVariationSelect.value : '';
+}
+
+/** O ano anterior ao escolhido, quando há ano escolhido e ele não é o primeiro. */
+function mapPreviousPeriod(periodName: string): MapPeriodItem | undefined {
+  const lista = mapPeriodList();
+  const posicao = lista.findIndex((periodo) => periodo.name === periodName);
+  return posicao > 0 ? lista[posicao - 1] : undefined;
+}
+
+/**
+ * Como cada área mudou de um ano para o seguinte, pela mesma chave do mapa.
+ *
+ * Uma área que existia no ano anterior e sumiu neste caiu para zero, e entra
+ * como queda: pular essas linhas pintaria de cinza ("sem dado") justamente o
+ * que mais diminuiu. Em percentual, uma área sem base (zero no ano anterior e
+ * positiva agora) não tem variação definida: fica sem cor, em vez de virar
+ * "infinito" ou um número inventado.
+ */
+function mapVariationBetween(periodName: string, colIndex: number, mode: Exclude<MapVariationMode, ''>): Map<string, number> | null {
+  const anterior = mapPreviousPeriod(periodName);
+  const atual = mapDrawableResult(periodName);
+  const antes = anterior ? mapDrawableResult(anterior.name) : null;
+  if (!anterior || !atual || !antes) return null;
+  const valorDe = (resultado: TabulationResult): Map<string, { valor: number; label: string }> => {
+    const mapa = new Map<string, { valor: number; label: string }>();
+    resultado.rows.forEach((row, index) => {
+      mapa.set(row.key.trim().toLowerCase(), { valor: resultado.cells[index]?.[colIndex] ?? 0, label: row.label });
+    });
+    return mapa;
+  };
+  const agora = valorDe(atual);
+  const passado = valorDe(antes);
+  const saida = new Map<string, number>();
+  for (const chave of new Set([...agora.keys(), ...passado.keys()])) {
+    const c = agora.get(chave)?.valor ?? 0;
+    const p = passado.get(chave)?.valor ?? 0;
+    const variacao = mode === 'abs' ? c - p : (p > 0 ? ((c - p) / p) * 100 : (c === 0 ? 0 : undefined));
+    if (variacao === undefined) continue;
+    saida.set(chave, variacao);
+    const label = (agora.get(chave) ?? passado.get(chave))?.label;
+    if (label) saida.set(normalizeLabel(label), variacao);
+  }
+  return saida;
+}
+
+/** Texto de um valor do mapa: o número, ou a diferença com sinal quando as cores mostram variação. */
+let formatMapValue: (value: number) => string = (value) => numberFormat.format(value);
+let mapValueSuffix = '';
+
+function signedFormat(value: number, unit: string): string {
+  const texto = Number.isInteger(value) ? integerFormat.format(Math.abs(value)) : numberFormat.format(Math.abs(value));
+  return `${value > 0 ? '+' : value < 0 ? '−' : ''}${texto}${unit}`;
+}
+
+function mapDrawableResult(periodOverride?: string): TabulationResult | null {
+  const periodo = periodOverride ?? mapPeriod;
+  // Um ano escolhido e ainda não lido não pode cair no resultado de todos os
+  // anos juntos: seria o mapa de um período com o rótulo de outro.
+  const doPeriodo = periodo ? mapPeriodResults.get(periodo) : undefined;
+  if (periodo && !doPeriodo) return null;
+  if (mapSource === 'tabela') {
+    const daTabela = doPeriodo ?? currentResult;
+    if (!daTabela || mapLevel !== 'municipality') return daTabela;
+    return mapUfFilter ? onlyUf(daTabela, mapUfFilter) : aggregateColumnsToUf(daTabela);
+  }
+  const base = doPeriodo ?? mapResult;
   if (!base) return currentResult;
-  if (mapGeoField?.level === 'uf') return base;
+  if (mapLevel === 'uf') return base;
   return mapUfFilter ? onlyUf(base, mapUfFilter) : aggregateToUf(base);
 }
 
@@ -6578,30 +7040,18 @@ async function ensureMap(): Promise<void> {
   if (!currentResult) return;
   mapMessage.classList.remove('is-caption');
 
-  // A variável de linha da tela ainda serve, quando ela é geográfica: aí o
-  // mapa desenha exatamente a tabela que a pessoa montou, com as conversões
-  // dela, que é melhor do que refazer por fora.
-  //
-  // A decisão usa `findGeographicFields`, e não uma heurística própria, para
-  // ter uma regra só. A heurística que estava aqui — `field.includes('MUNIC')`
-  // — era falsa justamente para os campos mais comuns do DATASUS:
-  // `CODMUNRES` é `CODMUN` + `RES`, sem o "I" de MUNIC, e o mesmo vale para
-  // `CODMUNOCOR`, `CODMUNNASC` e `ID_MN_RESI`. Na prática o caminho da tabela
-  // quase nunca era tomado no SIM e no SINASC.
-  const field = rowField.value.trim();
-  const daLinha = dbfHeader
-    ? findGeographicFields(dbfHeader.fields).find(
-      (candidato) => candidato.field.toUpperCase() === field.toUpperCase(),
-    )
-    : undefined;
-  const daTela = daLinha
-    ? (daLinha.level === 'municipality' ? 'br_municip.MAP' : 'br_ufsigla.MAP')
-    : '';
-  mapSource = daTela ? 'tabela' : 'proprio';
-  if (daTela) {
+  // A tabela da tela serve ao mapa quando as linhas dela são lugares: aí o mapa
+  // desenha exatamente o que a pessoa montou, com as conversões e as colunas
+  // dela. Quem decide é o CONTEÚDO das linhas (códigos de município ou de UF),
+  // não o nome do campo: `UF_ZI` tem nome de UF e traz município, e `CODMUNRES`
+  // não tem "MUNIC" no nome. Se as linhas não são lugares, o mapa vai atrás do
+  // campo geográfico sozinho.
+  const nivelDaTabela = inferMapLevel(currentResult);
+  mapSource = nivelDaTabela ? 'tabela' : 'proprio';
+  if (nivelDaTabela) {
     // Não zera `mapResult`: ele é o que alimenta a contagem do painel de
     // recorte, e refazê-lo custaria outra passada pelo arquivo.
-    mapUfFilter = '';
+    mapLevel = nivelDaTabela;
   } else if (!mapResult || mapResultSignature !== mapInputSignature()) {
     // Não é: o mapa vai atrás do campo geográfico sozinho. Antes disto, a aba
     // pedia à pessoa que reconfigurasse a análise só para ver um mapa.
@@ -6628,13 +7078,15 @@ async function ensureMap(): Promise<void> {
       return;
     }
   }
+  if (mapSource === 'proprio') mapLevel = mapGeoField?.level ?? null;
+  // Estado isolado que a tabela nova não tem não pode ficar valendo.
+  if (mapSource === 'tabela' && mapUfFilter && !currentResult.rows.some((row) => belongsToUf(row.key, mapUfFilter))) mapUfFilter = '';
 
   renderMapUfOptions();
+  void loadMapPeriods();
   // Município sem estado isolado vira mapa nacional por UF; com estado
   // isolado, o mapa daquele estado.
-  const bundled = mapSource === 'tabela'
-    ? daTela
-    : (mapGeoField?.level === 'uf' || !mapUfFilter ? 'br_ufsigla.MAP' : 'br_municip.MAP');
+  const bundled = mapLevel === 'uf' || !mapUfFilter ? 'br_ufsigla.MAP' : 'br_municip.MAP';
 
   if (activeMap && activeMapSource === `incluído: ${bundled}`) {
     renderTable(currentResult);
@@ -9423,7 +9875,7 @@ function showMapTooltip(event: PointerEvent): void {
   const value = lastMapValues.get(object);
   const desce = mapCanFocus() && mapFocusStates.has(object.geocode.trim());
   mapCanvas.classList.toggle('map-can-focus', desce);
-  mapTooltip.textContent = `${object.name || object.geocode} · ${value === undefined ? 'sem valor associado' : numberFormat.format(value)}${desce ? ' · clique para ver os municípios' : ''}`;
+  mapTooltip.textContent = `${object.name || object.geocode} · ${value === undefined ? 'sem valor associado' : `${formatMapValue(value)}${mapValueSuffix}`}${desce ? ' · clique para ver os municípios' : ''}`;
   mapTooltip.style.left = `${Math.min(point.x + 12, mapCanvas.clientWidth - 240)}px`;
   mapTooltip.style.top = `${Math.max(8, point.y - 34)}px`;
   mapTooltip.hidden = false;
@@ -10011,6 +10463,37 @@ mapValueColumn.addEventListener('change', () => {
 
 mapUfSelect.addEventListener('change', () => setMapFocus(mapUfSelect.value));
 mapFocusBack.addEventListener('click', () => setMapFocus(''));
+mapPeriodSelect.addEventListener('change', () => { stopMapPeriodPlayback(); selectMapPeriod(mapPeriodSelect.value); });
+mapVariationSelect.addEventListener('change', () => {
+  // Mostrar variação sem ano escolhido não tem o que mostrar: vai para o último ano.
+  const lista = mapPeriodList().filter((periodo) => mapPeriodResults.has(periodo.name));
+  if (mapVariationMode() && !mapPeriod && lista.length > 1) mapPeriod = lista.at(-1)!.name;
+  renderMapPeriodBar();
+  if (activeMap && currentResult && currentView === 'map') renderMap();
+});
+mapPeriodSlider.addEventListener('input', () => {
+  stopMapPeriodPlayback();
+  const periodo = mapPeriodList()[Number(mapPeriodSlider.value)];
+  if (periodo && mapPeriodResults.has(periodo.name)) selectMapPeriod(periodo.name);
+});
+mapPeriodPlay.addEventListener('click', () => {
+  if (mapPeriodTimer !== null) { stopMapPeriodPlayback(); return; }
+  const prontos = mapPeriodList().filter((periodo) => mapPeriodResults.has(periodo.name));
+  if (prontos.length < 2) return;
+  // Recomeça do primeiro ano quando está em "todos" ou no último.
+  const atual = prontos.findIndex((periodo) => periodo.name === mapPeriod);
+  // Em variação o primeiro ano não tem com o que comparar: começa no segundo.
+  const inicio = mapVariationMode() ? 1 : 0;
+  let proximo = atual < 0 || atual === prontos.length - 1 ? inicio : Math.max(inicio, atual + 1);
+  selectMapPeriod(prontos[proximo]!.name);
+  mapPeriodPlay.textContent = '❚❚ Pausar';
+  mapPeriodTimer = window.setInterval(() => {
+    proximo += 1;
+    const lista = mapPeriodList().filter((periodo) => mapPeriodResults.has(periodo.name));
+    if (proximo >= lista.length) { stopMapPeriodPlayback(); return; }
+    selectMapPeriod(lista[proximo]!.name);
+  }, 1100);
+});
 mapManualBreaks.addEventListener('input', () => {
   if (activeMap && currentResult && mapClassification.value === 'manual') renderMap();
 });
@@ -10073,9 +10556,14 @@ mapCanvas.addEventListener('pointerup', (event) => {
     const object = objectAtCanvasPoint(point.x, point.y);
     if (object) {
       const uf = mapCanFocus() && !event.shiftKey ? object.geocode.trim() : '';
-      if (!uf) toggleMapSelection(object);
-      else if (mapFocusStates.has(uf)) setMapFocus(uf);
-      else showToast(`${ufNameForCode(uf)} não tem registros neste arquivo.`, true);
+      if (uf) {
+        if (mapFocusStates.has(uf)) setMapFocus(uf);
+        else showToast(`${ufNameForCode(uf)} não tem registros neste arquivo.`, true);
+      } else if (!event.shiftKey && object.geocode.trim()) {
+        // Clicar na área em foco de novo fecha o cartão.
+        mapFocusGeocode = mapFocusGeocode === object.geocode.trim() ? '' : object.geocode.trim();
+        renderMap();
+      } else toggleMapSelection(object);
     }
   }
   showMapTooltip(event);

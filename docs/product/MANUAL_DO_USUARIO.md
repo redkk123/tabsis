@@ -501,6 +501,40 @@ o clique seleciona o estado para filtrar, em vez de descer; no mapa de um
 estado, o clique seleciona o município. O mapa segue os filtros da análise, mas
 a tabela ao lado continua como você a montou.
 
+**Vários anos de uma vez.** Marque *Juntar os próximos arquivos num só* e abra
+os arquivos de vários anos (ou escolha vários períodos em *Buscar no DATASUS*,
+que já junta). O mapa ganha uma faixa **Período**: um seletor, um **controle
+deslizante** que passa de ano em ano, o botão **▶ Reproduzir** e uma **barra
+por ano** com o total — clique numa barra para ver aquele ano. A escala de
+cores é **a mesma para todos os anos**, então a cor de um ano se compara com a
+de outro. O ano vem do nome do arquivo (`DENGBR23.dbc` é 2023); se os nomes não
+dizem o ano, a faixa mostra os nomes. Cada ano é lido uma vez, em segundo
+plano, enquanto o mapa de todos juntos já está na tela.
+
+**A diferença entre os anos.** Na faixa Período, **Cores mostram** troca os
+valores de cada ano pela **diferença para o ano anterior** (em casos) ou pela
+**variação %**. A escala é simétrica em torno de zero e é a mesma para todos os
+anos: **laranja** aumentou, **azul** diminuiu, **claro** ficou igual. Mova o
+controle ou use **▶ Reproduzir** para ver os anos passarem. Uma área que existia
+no ano anterior e sumiu conta como queda; em %, uma área que partiu de zero não
+tem variação definida e fica sem cor. O primeiro ano não tem anterior: ali o
+mapa mostra os valores e a faixa avisa.
+
+**O cartão do município.** No mapa de um estado, **clique num município** (ou,
+numa tabela por município, em qualquer área): abre o **cartão** com o nome, o
+valor, a posição entre as áreas com dado, a participação no estado e, com vários
+anos abertos, a **série por ano** daquele município. Clicar de novo, ou no ✕,
+fecha. **Shift+clique** seleciona a área para filtrar, como antes.
+
+**Nomes no lugar dos códigos.** Onde a tabela mostrava `150140`, ela mostra
+**Belém (150140)**: vale para qualquer campo de município (residência,
+ocorrência, notificação…) e para UF em código, em Linhas ou em Colunas. O
+TabSis só troca quando os códigos do campo existem de fato na tabela de
+municípios do IBGE — um campo de ocupação, também de seis dígitos, fica como
+está — e o código nunca se perde: fica entre parênteses (também nas tabelas
+exportadas) e é por ele que filtros e mapa casam. Se o DEF já dá nome ao
+código (pela CNV), esse nome é o que vale.
+
 **Estatística** — em **Operação** você escolhe: estatística descritiva,
 correlação de Pearson, regressão linear simples, histograma (com gaussiana
 ajustada quando cabe, e dizendo quando **não** cabe), e **Taxas e

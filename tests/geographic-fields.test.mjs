@@ -4,6 +4,7 @@ import {
   belongsToUf,
   findGeographicFields,
   ufCodeOf,
+  withIbgeCheckDigit,
 } from '../dist/packages/analysis/src/geographic-fields.js';
 
 const campos = (...nomes) => nomes.map((name) => ({ name }));
@@ -80,4 +81,15 @@ test('isolar um estado aceita os dois níveis do mapa', () => {
   assert.equal(belongsToUf('15', '15'), true, 'o próprio código da UF');
   assert.equal(belongsToUf('355030', '15'), false);
   assert.equal(belongsToUf('lixo', '15'), false);
+});
+
+test('o dígito verificador do IBGE bate com os municípios conhecidos', () => {
+  assert.equal(withIbgeCheckDigit('150140'), '1501402'); // Belém
+  assert.equal(withIbgeCheckDigit('355030'), '3550308'); // São Paulo
+  assert.equal(withIbgeCheckDigit('330455'), '3304557'); // Rio de Janeiro
+  assert.equal(withIbgeCheckDigit('530010'), '5300108'); // Brasília
+  // Só aceita seis dígitos.
+  assert.equal(withIbgeCheckDigit('3550308'), null);
+  assert.equal(withIbgeCheckDigit('35503'), null);
+  assert.equal(withIbgeCheckDigit('abc123'), null);
 });

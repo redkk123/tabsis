@@ -884,6 +884,25 @@
               <span class="map-focus-trail" id="map-focus-trail"></span>
               <span class="map-focus-hint" id="map-focus-hint"></span>
             </div>
+            <div class="map-period" id="map-period" hidden>
+              <div class="map-period-controls">
+                <button class="secondary-button" id="map-period-play" type="button" title="Passar os anos automaticamente">▶ Reproduzir</button>
+                <label class="map-period-select-label">Período
+                  <select id="map-period-select" title="Um ano, ou todos juntos"></select>
+                </label>
+                <label class="map-period-select-label">Cores mostram
+                  <select id="map-variation" title="Os valores de cada ano, ou como cada área mudou em relação ao ano anterior">
+                    <option value="">Os valores de cada ano</option>
+                    <option value="abs">A diferença para o ano anterior</option>
+                    <option value="pct">A variação % sobre o ano anterior</option>
+                  </select>
+                </label>
+                <input id="map-period-slider" type="range" min="0" max="0" step="1" value="0" aria-label="Mover entre os anos" />
+              </div>
+              <p class="map-focus-hint" id="map-period-status"></p>
+              <div class="map-period-chart" id="map-period-chart" role="group" aria-label="Total por ano; clique numa barra para ver o mapa daquele ano"></div>
+            </div>
+            <div class="map-card" id="map-card" hidden></div>
             <div class="map-stage">
               <canvas id="map-canvas" aria-label="Mapa temático do resultado"></canvas>
               <div class="map-message" id="map-message">Escolha uma variável geográfica para criar o mapa.</div>
@@ -892,28 +911,30 @@
             </div>
             <p class="map-breaks-note" id="map-manual-breaks-note" hidden></p>
             <div class="map-layers" id="map-layers" hidden></div>
-            <section class="flow-panel" id="flow-panel" aria-label="Fluxos origem-destino">
+            <details class="flow-panel" id="flow-panel">
+              <summary>Fluxos entre dois lugares <span>avançado, opcional</span></summary>
+              <p class="flow-intro">Mostra quantos registros vão de um lugar a outro — por exemplo, do município onde a pessoa mora (<b>de</b>) ao município onde foi atendida (<b>para</b>) — e desenha os maiores como setas no mapa. Escolha os dois campos e clique em <b>Calcular fluxos</b>. Para ver só o mapa, ignore esta parte.</p>
               <div class="flow-grid">
-                <label>Origem<select id="flow-origin"></select></label>
-                <label>Destino<select id="flow-destination"></select></label>
-                <label>Peso<select id="flow-weight"><option value="">Contagem de registros</option></select></label>
-                <label>Geocódigos fora do mapa<select id="flow-unknown">
-                  <option value="exclude">Excluir</option><option value="include">Incluir mesmo assim</option>
+                <label>De (origem)<select id="flow-origin"></select></label>
+                <label>Para (destino)<select id="flow-destination"></select></label>
+                <label>O que contar<select id="flow-weight"><option value="">Número de registros</option></select></label>
+                <label>Lugar que não está no mapa<select id="flow-unknown">
+                  <option value="exclude">Deixar de fora (e contar quantos)</option><option value="include">Incluir mesmo assim</option>
                 </select></label>
-                <label>Distância<select id="flow-distance">
+                <label>Distância entre os lugares<select id="flow-distance">
                   <option value="">Não calcular</option>
-                  <option value="geographic-haversine">Geográfica (graus, Haversine)</option>
-                  <option value="planar">Planar (unidades do mapa)</option>
+                  <option value="geographic-haversine">Em km (mapa em graus)</option>
+                  <option value="planar">Nas unidades do mapa</option>
                 </select></label>
-                <label>Arcos no mapa<select id="flow-arc-limit">
-                  <option value="0">Nenhum</option><option value="10">10 maiores</option>
-                  <option value="25" selected>25 maiores</option><option value="50">50 maiores</option>
+                <label>Setas no mapa<select id="flow-arc-limit">
+                  <option value="0">Nenhuma</option><option value="10">As 10 maiores</option>
+                  <option value="25" selected>As 25 maiores</option><option value="50">As 50 maiores</option>
                 </select></label>
                 <button class="secondary-button" id="flow-run" type="button" disabled>Calcular fluxos</button>
               </div>
-              <p class="compatibility-note">A distância só é calculada quando você diz em que modelo o mapa está: nada aqui adivinha se as coordenadas são graus ou unidades projetadas. Os fluxos são lidos dos registros brutos, sem passar pela tabulação.</p>
+              <p class="compatibility-note">A distância só é calculada quando você diz em que modelo o mapa está: o TabSis não adivinha se as coordenadas são graus ou unidades projetadas. Os fluxos são lidos dos registros brutos, sem passar pela tabulação.</p>
               <div class="flow-report" id="flow-report" hidden></div>
-            </section>
+            </details>
           </div>
 
           <div class="view-panel" id="statistics-view" data-panel="statistics" hidden>

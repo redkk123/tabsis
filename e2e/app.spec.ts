@@ -287,6 +287,7 @@ test('fluxos origem-destino agregam pelos registros e prestam contas do descarte
   await expect(page.locator('#result-table tbody')).toBeVisible();
 
   await page.locator('[data-view="map"]').click();
+  await page.locator('#flow-panel summary').click();
   await page.locator('#flow-origin').selectOption('ORIGEM');
   await page.locator('#flow-destination').selectOption('DESTINO');
   await page.locator('#flow-weight').selectOption('PESO');
@@ -312,6 +313,7 @@ test('a distância só aparece depois de escolher o modelo', async ({ page }) =>
   await page.locator('#row-field').selectOption('ORIGEM');
   await page.locator('#analysis-form').evaluate((form: HTMLFormElement) => form.requestSubmit());
   await page.locator('[data-view="map"]').click();
+  await page.locator('#flow-panel summary').click();
   await page.locator('#flow-origin').selectOption('ORIGEM');
   await page.locator('#flow-destination').selectOption('DESTINO');
   await page.locator('#flow-run').click();
@@ -2273,4 +2275,168 @@ test('o mapa abre no Brasil, o clique desce ao estado e o botão volta', async (
   await expect(page.locator('#map-focus-trail')).toHaveText('Brasil');
   await expect(page.locator('#map-uf')).toHaveValue('');
   await expect(page.locator('#map-focus-back')).toBeHidden();
+});
+
+test('vários anos abertos: o mapa troca de ano com a mesma escala e a tabela mostra os nomes dos municípios', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#combine-compatible-files').check();
+  await page.locator('#file-input').setInputFiles([
+    'e2e/fixtures/DENGBR23.dbf', 'e2e/fixtures/DENGBR24.dbf', 'e2e/fixtures/DENGBR25.dbf',
+  ]);
+  await expect(page.locator('#run-button')).toBeEnabled();
+
+  // O código do IBGE vira nome do lugar; a chave segue sendo o código.
+  await page.locator('#row-field').selectOption('CODMUNRES');
+  await page.locator('#analysis-form').evaluate((form: HTMLFormElement) => form.requestSubmit());
+  await expect(page.locator('#result-table tbody')).toContainText('Belém (150140)');
+  await expect(page.locator('#result-table tbody')).toContainText('São Paulo (355030)');
+
+  await page.locator('[data-view="map"]').click();
+  await expect(page.locator('#map-period')).toBeVisible();
+  await expect(page.locator('#map-period-status')).toContainText('Mostrando todos os arquivos juntos', { timeout: 20000 });
+  // Uma barra por ano, em ordem.
+  await expect(page.locator('.map-period-bar')).toHaveCount(3);
+  await expect(page.locator('.map-period-bar span')).toHaveText(['2023', '2024', '2025']);
+
+  // Em 2023 o maior valor é 2 (SP), mas a escala é a de todos os anos (máximo 6).
+  await page.locator('#map-period-select').selectOption({ label: '2023' });
+  await expect(page.locator('#map-period-status')).toContainText('Mostrando 2023');
+  await expect(page.locator('.map-period-bar[aria-pressed="true"] span')).toHaveText('2023');
+  await expect(page.locator('#map-legend .legend-range')).toContainText('6');
+
+  // O controle deslizante passa de ano em ano.
+  await page.locator('#map-period-slider').fill('2');
+  await expect(page.locator('#map-period-status')).toContainText('Mostrando 2025');
+  await expect(page.locator('.map-period-bar[aria-pressed="true"] span')).toHaveText('2025');
+
+  // Clicar na barra também escolhe o ano.
+  await page.locator('.map-period-bar').nth(1).click();
+  await expect(page.locator('#map-period-status')).toContainText('Mostrando 2024');
+  await expect(page.locator('#map-period-select')).toHaveValue('DENGBR24.dbf');
+});
+
+test('variação entre anos: cores divergentes, mesma escala, e o primeiro ano avisa que não tem anterior', async ({ page }) => {
+  await page.addInitScript(() => { try { localStorage.setItem('tabsis.aberto.group-campos', '1'); } catch { /* ignora */ } });
+  await page.goto('/');
+  await page.locator('#combine-compatible-files').check();
+  await page.locator('#file-input').setInputFiles([
+    'e2e/fixtures/DENGBR23.dbf', 'e2e/fixtures/DENGBR24.dbf', 'e2e/fixtures/DENGBR25.dbf',
+  ]);
+  await expect(page.locator('#run-button')).toBeEnabled();
+  await page.locator('#row-field').selectOption('SEXO');
+  await page.locator('#analysis-form').evaluate((form: HTMLFormElement) => form.requestSubmit());
+  await page.locator('[data-view="map"]').click();
+  await expect(page.locator('#map-period-status')).toContainText('Mostrando todos os arquivos juntos', { timeout: 20000 });
+
+  // Sem ano escolhido, pedir variação leva ao último ano.
+  await page.locator('#map-variation').selectOption('abs');
+  await expect(page.locator('#map-period-select')).toHaveValue('DENGBR25.dbf');
+  await expect(page.locator('#map-period-status')).toContainText('diferença de 2024 para 2025');
+  await expect(page.locator('#map-legend')).toContainText('Variação em relação a 2024');
+  // Maior mudança entre anos consecutivos: SP 2023→2024, +4. A escala é simétrica e igual em todos os anos.
+  await expect(page.locator('#map-legend .legend-range')).toContainText('+4');
+  await expect(page.locator('#map-legend .legend-range')).toContainText('−4');
+
+  await page.locator('#map-period-slider').fill('1');
+  await expect(page.locator('#map-period-status')).toContainText('diferença de 2023 para 2024');
+  await expect(page.locator('#map-legend .legend-range')).toContainText('+4');
+
+  // O primeiro ano não tem anterior: o mapa volta aos valores e a faixa explica.
+  await page.locator('#map-period-slider').fill('0');
+  await expect(page.locator('#map-period-status')).toContainText('primeiro ano');
+  await expect(page.locator('#map-legend')).not.toContainText('Variação');
+
+  await page.locator('#map-variation').selectOption('pct');
+  await page.locator('#map-period-slider').fill('2');
+  await expect(page.locator('#map-period-status')).toContainText('variação percentual de 2024 para 2025');
+  await expect(page.locator('#map-legend .legend-range')).toContainText('%');
+});
+
+test('modo foco: o clique no município abre o cartão com a posição e a série por ano', async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.addInitScript(() => { try { localStorage.setItem('tabsis.aberto.group-campos', '1'); } catch { /* ignora */ } });
+  await page.goto('/');
+  await page.locator('#combine-compatible-files').check();
+  await page.locator('#file-input').setInputFiles([
+    'e2e/fixtures/DENGBR23.dbf', 'e2e/fixtures/DENGBR24.dbf', 'e2e/fixtures/DENGBR25.dbf',
+  ]);
+  await expect(page.locator('#run-button')).toBeEnabled();
+  await page.locator('#row-field').selectOption('SEXO');
+  await page.locator('#analysis-form').evaluate((form: HTMLFormElement) => form.requestSubmit());
+  await page.locator('[data-view="map"]').click();
+  await expect(page.locator('#map-period-status')).toContainText('Mostrando todos os arquivos juntos', { timeout: 20000 });
+
+  // O mapa conta os três arquivos (e não só o primeiro, lido antes de os outros chegarem).
+  await expect(page.locator('#map-uf option[value="35"]')).toHaveText('São Paulo · 12 por município');
+  await page.locator('#map-uf').selectOption('35');
+  await expect(page.locator('#map-focus-trail')).toHaveText('Brasil › São Paulo');
+  // O mapa do estado só existe depois de carregar os municípios dele.
+  await expect(page.locator('#map-message')).toContainText('em São Paulo');
+
+  // O município do arquivo em SP é a capital, com 12 registros nos três anos.
+  const alvo = await page.evaluate(() => {
+    const canvas = document.querySelector<HTMLCanvasElement>('#map-canvas')!;
+    const tooltip = document.querySelector<HTMLElement>('#map-tooltip')!;
+    const box = canvas.getBoundingClientRect();
+    // A capital fica a leste e abaixo do centro do estado; varrer o canvas
+    // inteiro, ponto a ponto, custa segundos por causa dos 645 municípios.
+    const cx = box.width * 0.62;
+    const cy = box.height * 0.62;
+    for (let y = Math.max(0, cy - 130); y < Math.min(box.height, cy + 130); y += 3) {
+      for (let x = Math.max(0, cx - 160); x < Math.min(box.width, cx + 160); x += 3) {
+        canvas.dispatchEvent(new PointerEvent('pointermove', { clientX: box.left + x, clientY: box.top + y, bubbles: true }));
+        if (!tooltip.hidden && tooltip.textContent?.includes(' · 12')) return { x, y };
+      }
+    }
+    return null;
+  });
+  expect(alvo).not.toBeNull();
+  await page.locator('#map-canvas').click({ position: alvo! });
+
+  const cartao = page.locator('#map-card');
+  await expect(cartao).toBeVisible();
+  await expect(cartao).toContainText('São Paulo · São Paulo');
+  await expect(cartao).toContainText('12');
+  await expect(cartao).toContainText('1º entre 1 áreas com dado');
+  // A série tem uma coluna por ano, com o valor do município em cada um.
+  await expect(cartao.locator('.map-card-series .map-period-bar span')).toHaveText(['2023 · 2', '2024 · 6', '2025 · 4']);
+
+  // Clicar de novo, ou no ✕, fecha o cartão.
+  await cartao.locator('button').click();
+  await expect(cartao).toBeHidden();
+});
+
+test('tabela por UF_ZI (nome de UF, código de município): o mapa desce do Brasil ao estado mesmo assim', async ({ page }) => {
+  await page.addInitScript(() => { try { localStorage.setItem('tabsis.aberto.group-campos', '1'); } catch { /* ignora */ } });
+  await page.goto('/');
+  await page.locator('#file-input').setInputFiles('e2e/fixtures/uf-zi-e2e.csv');
+  await expect(page.locator('#run-button')).toBeEnabled();
+  await page.locator('#row-field').selectOption('UF_ZI');
+  await page.locator('#analysis-form').evaluate((form: HTMLFormElement) => form.requestSubmit());
+  await expect(page.locator('#result-table tbody')).toContainText('São Paulo (355030)');
+
+  await page.locator('[data-view="map"]').click();
+  // Pelo conteúdo (códigos de município), e não pelo nome do campo: o mapa tem dado e a trilha de foco aparece.
+  await expect(page.locator('#map-focus-trail')).toHaveText('Brasil');
+  await expect(page.locator('#map-legend')).toContainText('3 áreas associadas');
+  await expect(page.locator('#map-uf option[value="35"]')).toHaveText('São Paulo · 3 por município');
+
+  await page.locator('#map-uf').selectOption('35');
+  await expect(page.locator('#map-focus-trail')).toHaveText('Brasil › São Paulo');
+  // No estado, o mapa é municipal: só a capital tem dado.
+  await expect(page.locator('#map-legend')).toContainText('1 áreas associadas', { timeout: 15000 });
+  await page.locator('#map-focus-back').click();
+  await expect(page.locator('#map-focus-trail')).toHaveText('Brasil');
+});
+
+test('os fluxos ficam recolhidos e explicam o que são, em português', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#file-input').setInputFiles('e2e/fixtures/fluxos-e2e.csv');
+  await expect(page.locator('#run-button')).toBeEnabled();
+  await page.locator('[data-view="map"]').click();
+  await expect(page.locator('#flow-panel')).not.toHaveAttribute('open', '');
+  await expect(page.locator('#flow-origin')).toBeHidden();
+  await page.locator('#flow-panel summary').click();
+  await expect(page.locator('.flow-intro')).toContainText('de um lugar a outro');
+  await expect(page.locator('#flow-origin')).toBeVisible();
 });
