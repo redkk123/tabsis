@@ -884,6 +884,17 @@
               <span class="map-focus-trail" id="map-focus-trail"></span>
               <span class="map-focus-hint" id="map-focus-hint"></span>
             </div>
+            <div class="map-period" id="map-period" hidden>
+              <div class="map-period-controls">
+                <button class="secondary-button" id="map-period-play" type="button" title="Passar os anos automaticamente">▶ Reproduzir</button>
+                <label class="map-period-select-label">Período
+                  <select id="map-period-select" title="Um ano, ou todos juntos"></select>
+                </label>
+                <input id="map-period-slider" type="range" min="0" max="0" step="1" value="0" aria-label="Mover entre os anos" />
+              </div>
+              <p class="map-focus-hint" id="map-period-status"></p>
+              <div class="map-period-chart" id="map-period-chart" role="group" aria-label="Total por ano; clique numa barra para ver o mapa daquele ano"></div>
+            </div>
             <div class="map-stage">
               <canvas id="map-canvas" aria-label="Mapa temático do resultado"></canvas>
               <div class="map-message" id="map-message">Escolha uma variável geográfica para criar o mapa.</div>

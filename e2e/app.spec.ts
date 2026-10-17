@@ -2274,3 +2274,41 @@ test('o mapa abre no Brasil, o clique desce ao estado e o botão volta', async (
   await expect(page.locator('#map-uf')).toHaveValue('');
   await expect(page.locator('#map-focus-back')).toBeHidden();
 });
+
+test('vários anos abertos: o mapa troca de ano com a mesma escala e a tabela mostra os nomes dos municípios', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#combine-compatible-files').check();
+  await page.locator('#file-input').setInputFiles([
+    'e2e/fixtures/DENGBR23.dbf', 'e2e/fixtures/DENGBR24.dbf', 'e2e/fixtures/DENGBR25.dbf',
+  ]);
+  await expect(page.locator('#run-button')).toBeEnabled();
+
+  // O código do IBGE vira nome do lugar; a chave segue sendo o código.
+  await page.locator('#row-field').selectOption('CODMUNRES');
+  await page.locator('#analysis-form').evaluate((form: HTMLFormElement) => form.requestSubmit());
+  await expect(page.locator('#result-table tbody')).toContainText('Belém (150140)');
+  await expect(page.locator('#result-table tbody')).toContainText('São Paulo (355030)');
+
+  await page.locator('[data-view="map"]').click();
+  await expect(page.locator('#map-period')).toBeVisible();
+  await expect(page.locator('#map-period-status')).toContainText('Mostrando todos os arquivos juntos', { timeout: 20000 });
+  // Uma barra por ano, em ordem.
+  await expect(page.locator('.map-period-bar')).toHaveCount(3);
+  await expect(page.locator('.map-period-bar span')).toHaveText(['2023', '2024', '2025']);
+
+  // Em 2023 o maior valor é 2 (SP), mas a escala é a de todos os anos (máximo 6).
+  await page.locator('#map-period-select').selectOption({ label: '2023' });
+  await expect(page.locator('#map-period-status')).toContainText('Mostrando 2023');
+  await expect(page.locator('.map-period-bar[aria-pressed="true"] span')).toHaveText('2023');
+  await expect(page.locator('#map-legend .legend-range')).toContainText('6');
+
+  // O controle deslizante passa de ano em ano.
+  await page.locator('#map-period-slider').fill('2');
+  await expect(page.locator('#map-period-status')).toContainText('Mostrando 2025');
+  await expect(page.locator('.map-period-bar[aria-pressed="true"] span')).toHaveText('2025');
+
+  // Clicar na barra também escolhe o ano.
+  await page.locator('.map-period-bar').nth(1).click();
+  await expect(page.locator('#map-period-status')).toContainText('Mostrando 2024');
+  await expect(page.locator('#map-period-select')).toHaveValue('DENGBR24.dbf');
+});
