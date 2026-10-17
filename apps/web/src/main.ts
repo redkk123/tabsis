@@ -101,6 +101,7 @@ import {
   belongsToUf,
   findGeographicFields,
   ufCodeOf,
+  withIbgeCheckDigit,
   type GeographicCandidate,
 } from '../../../packages/analysis/src/geographic-fields.ts';
 import { criarAbaConsulta, type AbaConsulta } from './aba-consulta.ts';
@@ -111,7 +112,7 @@ import {
   type TabwinFormatContext,
 } from '../../../packages/export/src/tabwin-formats.ts';
 import { encodeWindows1252 } from '../../../packages/formats/src/windows-1252.ts';
-import { describeAuxiliaryFile, describeDatasusFile } from '../../../packages/formats/src/datasus-file-names.ts';
+import { UF_NAMES, describeAuxiliaryFile, describeDatasusFile } from '../../../packages/formats/src/datasus-file-names.ts';
 import { datasusFieldEntry } from '../../../packages/formats/src/datasus-field-dictionary.ts';
 import { criarGerarDef } from './gerar-def.ts';
 import { criarEditorCnv } from './editor-cnv.ts';
@@ -5748,9 +5749,46 @@ async function loadMapReferenceLayer(file: File): Promise<void> {
  * down: the arcs simply do not appear and the report says why.
  */
 function mapGeocodePointsSafe(): Map<string, MapCoordinate> {
-  if (!activeMap) return new Map();
-  try { return mapGeocodePoints(activeMap); }
-  catch { return new Map(); }
+  const mapa = flowGeoMap ?? activeMap;
+  if (!mapa) return new Map();
+  try {
+    const pontos = mapGeocodePoints(mapa);
+    // O mapa traz seis dígitos; o arquivo pode trazer sete (com verificador).
+    if (flowGeoMapIncluded) {
+      for (const [codigo, ponto] of [...pontos]) {
+        const completo = withIbgeCheckDigit(codigo);
+        if (completo) pontos.set(completo, ponto);
+      }
+    }
+    return pontos;
+  } catch { return new Map(); }
+}
+
+/**
+ * O mapa que os fluxos usam para reconhecer lugares e achar o ponto de cada um.
+ *
+ * Os fluxos são entre MUNICÍPIOS, e o mapa da tela pode estar no nível do
+ * Brasil por estado (UF): com ele, todo código de município era "fora do
+ * mapa" e o resultado vinha vazio. Então os fluxos têm o mapa municipal
+ * incluído, lido na primeira vez — a não ser que a pessoa tenha aberto um mapa
+ * dela, que manda. As coordenadas são as mesmas, então as setas se desenham
+ * certas sobre qualquer um dos mapas.
+ */
+let flowGeoMap: TabwinMapDefinition | null = null;
+let flowGeoMapIncluded = false;
+
+async function ensureFlowMap(): Promise<TabwinMapDefinition | null> {
+  if (activeMap && !activeMapSource.startsWith('incluído:')) {
+    flowGeoMap = activeMap;
+    flowGeoMapIncluded = false;
+    return flowGeoMap;
+  }
+  if (flowGeoMap && flowGeoMapIncluded) return flowGeoMap;
+  const resposta = await fetch(new URL('maps/br_municip.MAP', document.baseURI));
+  if (!resposta.ok) throw new Error(`o mapa de municípios retornou HTTP ${resposta.status}`);
+  flowGeoMap = parseTabwinMap(new Uint8Array(await resposta.arrayBuffer()));
+  flowGeoMapIncluded = true;
+  return flowGeoMap;
 }
 
 function populateFlowFields(): void {
@@ -5779,8 +5817,13 @@ async function computeFlows(): Promise<void> {
   if (flowOrigin.value === flowDestination.value) {
     throw new Error('Origem e destino precisam ser campos diferentes');
   }
-  const known = activeMap
-    ? [...new Set(activeMap.objects.map((object) => object.geocode.trim()).filter(Boolean))]
+  const mapaDeFluxos = await ensureFlowMap();
+  const known = mapaDeFluxos
+    ? [...new Set(mapaDeFluxos.objects.flatMap((object) => {
+      const codigo = object.geocode.trim();
+      const completo = flowGeoMapIncluded ? withIbgeCheckDigit(codigo) : null;
+      return completo ? [codigo, completo] : [codigo];
+    }).filter(Boolean))]
     : undefined;
   const reply = await askDataset<{ result: FlowBuildResult }>(
     {
@@ -5859,7 +5902,8 @@ function renderFlowReport(result: FlowBuildResult): void {
 }
 
 function mapNameForGeocode(geocode: string): string {
-  const object = activeMap?.objects.find((item) => item.geocode.trim() === geocode);
+  const sem = geocode.length === 7 ? geocode.slice(0, 6) : geocode;
+  const object = (flowGeoMap ?? activeMap)?.objects.find((item) => { const g = item.geocode.trim(); return g === geocode || g === sem; });
   return object?.name ? `${geocode} · ${object.name}` : geocode;
 }
 
@@ -6209,8 +6253,9 @@ function renderMap(): void {
   } else {
     // O número tem que ser o das linhas que o MAPA tentou casar, não o da
     // tabela da tela: são coisas diferentes desde que o mapa ficou autônomo.
-    mapMessage.textContent = 'O mapa foi aberto, mas nenhum código ou nome coincide com as '
-      + `${integerFormat.format(desenhavel.rows.length)} linhas atuais.`;
+    mapMessage.textContent = 'Não deu para casar as '
+      + `${integerFormat.format(desenhavel.rows.length)} linhas desta tabela com o mapa. `
+      + 'Tabule por município ou UF, ou escolha o campo no seletor "Geografia".';
   }
   mapLegend.hidden = false;
   mapLegend.replaceChildren();
@@ -6262,6 +6307,21 @@ function renderMap(): void {
  */
 let mapResult: TabulationResult | null = null;
 let mapGeoField: GeographicCandidate | null = null;
+/**
+ * O que o mapa desenha: município ou UF. Decidido pelos DADOS (os códigos das
+ * linhas), não pelo nome do campo — `UF_ZI` tem nome de UF e traz código de
+ * município de seis dígitos, e decidir pelo nome pintava o mapa errado.
+ */
+let mapLevel: 'municipality' | 'uf' | null = null;
+
+function inferMapLevel(result: TabulationResult | null): 'municipality' | 'uf' | null {
+  const chaves = result?.rows.map((row) => row.key.trim()).filter(Boolean) ?? [];
+  if (!chaves.length) return null;
+  const maioria = (quantos: number): boolean => quantos / chaves.length >= 0.9;
+  if (maioria(chaves.filter((chave) => ufCodeOf(chave) !== null).length)) return 'municipality';
+  const ehUf = (chave: string): boolean => (/^\d{2}$/.test(chave) && chave in UF_POR_CODIGO) || chave.toUpperCase() in UF_NAMES;
+  return maioria(chaves.filter(ehUf).length) ? 'uf' : null;
+}
 /**
  * O que o `mapResult` guardado respondia.
  *
@@ -6503,6 +6563,27 @@ function aggregateToUf(result: TabulationResult): TabulationResult {
   };
 }
 
+/**
+ * Como `aggregateToUf`, mas somando cada coluna (casos, valor, óbitos…) por
+ * UF: a tabela da pessoa pode ter várias, e o mapa escolhe uma delas.
+ */
+function aggregateColumnsToUf(result: TabulationResult): TabulationResult {
+  const somas = new Map<string, number[]>();
+  result.rows.forEach((row, index) => {
+    const uf = ufCodeOf(row.key);
+    if (!uf) return;
+    const atual = somas.get(uf) ?? result.columns.map(() => 0);
+    result.columns.forEach((_, coluna) => { atual[coluna] = (atual[coluna] ?? 0) + (result.cells[index]?.[coluna] ?? 0); });
+    somas.set(uf, atual);
+  });
+  const ordenadas = [...somas.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  return {
+    ...result,
+    rows: ordenadas.map(([uf]) => ({ key: uf, label: ufNameForCode(uf), source: 'derived' as const })),
+    cells: ordenadas.map(([, totais]) => totais),
+  };
+}
+
 /** Só as linhas da UF isolada, para o mapa municipal. */
 function onlyUf(result: TabulationResult, uf: string): TabulationResult {
   // rows e cells andam em paralelo: filtrar um sem o outro trocaria os valores
@@ -6524,18 +6605,19 @@ function onlyUf(result: TabulationResult, uf: string): TabulationResult {
  * deles daria um mapa em branco que parece defeito. A lista sai dos dados.
  */
 function renderMapUfOptions(): void {
-  const podeDescer = mapSource === 'proprio' && Boolean(mapResult) && mapGeoField?.level === 'municipality';
+  const fonte = mapSource === 'tabela' ? currentResult : mapResult;
+  const podeDescer = Boolean(fonte) && mapLevel === 'municipality';
   mapUfSelect.hidden = !podeDescer;
   mapUfLabel.hidden = !podeDescer;
-  if (!podeDescer || !mapResult) {
+  if (!podeDescer || !fonte) {
     mapFocusBar.hidden = true;
     return;
   }
 
   const presentes = new Map<string, number>();
-  mapResult.rows.forEach((row, index) => {
+  fonte.rows.forEach((row, index) => {
     const uf = ufCodeOf(row.key);
-    if (uf) presentes.set(uf, (presentes.get(uf) ?? 0) + cellValue(mapResult!, index));
+    if (uf) presentes.set(uf, (presentes.get(uf) ?? 0) + cellValue(fonte, index));
   });
 
   const anterior = mapUfSelect.value;
@@ -6564,8 +6646,8 @@ let mapFocusStates = new Map<string, number>();
 
 /** O mapa do Brasil clicável: de cima, cada estado desce para os seus municípios. */
 function mapCanFocus(): boolean {
-  return mapSource === 'proprio' && Boolean(mapResult)
-    && mapGeoField?.level === 'municipality' && !mapUfFilter;
+  return Boolean(mapSource === 'tabela' ? currentResult : mapResult)
+    && mapLevel === 'municipality' && !mapUfFilter;
 }
 
 function renderMapFocusBar(): void {
@@ -6573,9 +6655,11 @@ function renderMapFocusBar(): void {
   const dentro = Boolean(mapUfFilter);
   mapFocusBack.hidden = !dentro;
   mapFocusTrail.textContent = dentro ? `Brasil › ${ufNameForCode(mapUfFilter)}` : 'Brasil';
+  // No celular não há Shift: a dica só fala do que o toque faz.
+  const toque = window.matchMedia?.('(pointer: coarse)').matches ?? false;
   mapFocusHint.textContent = dentro
-    ? 'Municípios com os dados do arquivo. Clique num município para ver o cartão dele; Shift+clique seleciona para filtrar; arraste para mover.'
-    : 'Clique num estado para ver os municípios dele. Com Shift, o clique seleciona o estado em vez de descer.';
+    ? `Municípios com os dados do arquivo. ${toque ? 'Toque' : 'Clique'} num município para ver o cartão dele${toque ? '' : '; Shift+clique seleciona para filtrar'}; arraste para mover.`
+    : `${toque ? 'Toque' : 'Clique'} num estado para ver os municípios dele.${toque ? '' : ' Com Shift, o clique seleciona o estado em vez de descer.'}`;
 }
 
 /** Entra num estado (ou volta ao Brasil, com ''): o mesmo que escolher no seletor Recorte. */
@@ -6814,7 +6898,7 @@ function renderMapFocusCard(): void {
   cabecalho.className = 'map-card-head';
   const nome = document.createElement('strong');
   const uf = ufCodeOf(mapFocusGeocode);
-  nome.textContent = `${objeto.name || mapFocusGeocode}${uf && mapGeoField?.level === 'municipality' ? ` · ${ufNameForCode(uf)}` : ''}`;
+  nome.textContent = `${objeto.name || mapFocusGeocode}${uf && mapLevel === 'municipality' ? ` · ${ufNameForCode(uf)}` : ''}`;
   const fechar = document.createElement('button');
   fechar.type = 'button';
   fechar.className = 'secondary-button';
@@ -6828,7 +6912,7 @@ function renderMapFocusCard(): void {
   const linhasDeTexto: string[] = [];
   if (propria && propria.valor > 0) {
     const posicao = 1 + comDado.filter((linha) => linha.valor > propria.valor).length;
-    const onde = mapUfFilter && mapGeoField?.level === 'municipality' ? ufNameForCode(mapUfFilter) : 'o mapa';
+    const onde = mapUfFilter && mapLevel === 'municipality' ? ufNameForCode(mapUfFilter) : 'o mapa';
     linhasDeTexto.push(
       `${periodoAtual ? `${periodoAtual.label}: ` : ''}${numberFormat.format(propria.valor)}`
       + ` · ${integerFormat.format(posicao)}º entre ${integerFormat.format(comDado.length)} áreas com dado`
@@ -6941,10 +7025,14 @@ function mapDrawableResult(periodOverride?: string): TabulationResult | null {
   // anos juntos: seria o mapa de um período com o rótulo de outro.
   const doPeriodo = periodo ? mapPeriodResults.get(periodo) : undefined;
   if (periodo && !doPeriodo) return null;
-  if (mapSource === 'tabela') return doPeriodo ?? currentResult;
+  if (mapSource === 'tabela') {
+    const daTabela = doPeriodo ?? currentResult;
+    if (!daTabela || mapLevel !== 'municipality') return daTabela;
+    return mapUfFilter ? onlyUf(daTabela, mapUfFilter) : aggregateColumnsToUf(daTabela);
+  }
   const base = doPeriodo ?? mapResult;
   if (!base) return currentResult;
-  if (mapGeoField?.level === 'uf') return base;
+  if (mapLevel === 'uf') return base;
   return mapUfFilter ? onlyUf(base, mapUfFilter) : aggregateToUf(base);
 }
 
@@ -6952,30 +7040,18 @@ async function ensureMap(): Promise<void> {
   if (!currentResult) return;
   mapMessage.classList.remove('is-caption');
 
-  // A variável de linha da tela ainda serve, quando ela é geográfica: aí o
-  // mapa desenha exatamente a tabela que a pessoa montou, com as conversões
-  // dela, que é melhor do que refazer por fora.
-  //
-  // A decisão usa `findGeographicFields`, e não uma heurística própria, para
-  // ter uma regra só. A heurística que estava aqui — `field.includes('MUNIC')`
-  // — era falsa justamente para os campos mais comuns do DATASUS:
-  // `CODMUNRES` é `CODMUN` + `RES`, sem o "I" de MUNIC, e o mesmo vale para
-  // `CODMUNOCOR`, `CODMUNNASC` e `ID_MN_RESI`. Na prática o caminho da tabela
-  // quase nunca era tomado no SIM e no SINASC.
-  const field = rowField.value.trim();
-  const daLinha = dbfHeader
-    ? findGeographicFields(dbfHeader.fields).find(
-      (candidato) => candidato.field.toUpperCase() === field.toUpperCase(),
-    )
-    : undefined;
-  const daTela = daLinha
-    ? (daLinha.level === 'municipality' ? 'br_municip.MAP' : 'br_ufsigla.MAP')
-    : '';
-  mapSource = daTela ? 'tabela' : 'proprio';
-  if (daTela) {
+  // A tabela da tela serve ao mapa quando as linhas dela são lugares: aí o mapa
+  // desenha exatamente o que a pessoa montou, com as conversões e as colunas
+  // dela. Quem decide é o CONTEÚDO das linhas (códigos de município ou de UF),
+  // não o nome do campo: `UF_ZI` tem nome de UF e traz município, e `CODMUNRES`
+  // não tem "MUNIC" no nome. Se as linhas não são lugares, o mapa vai atrás do
+  // campo geográfico sozinho.
+  const nivelDaTabela = inferMapLevel(currentResult);
+  mapSource = nivelDaTabela ? 'tabela' : 'proprio';
+  if (nivelDaTabela) {
     // Não zera `mapResult`: ele é o que alimenta a contagem do painel de
     // recorte, e refazê-lo custaria outra passada pelo arquivo.
-    mapUfFilter = '';
+    mapLevel = nivelDaTabela;
   } else if (!mapResult || mapResultSignature !== mapInputSignature()) {
     // Não é: o mapa vai atrás do campo geográfico sozinho. Antes disto, a aba
     // pedia à pessoa que reconfigurasse a análise só para ver um mapa.
@@ -7002,14 +7078,15 @@ async function ensureMap(): Promise<void> {
       return;
     }
   }
+  if (mapSource === 'proprio') mapLevel = mapGeoField?.level ?? null;
+  // Estado isolado que a tabela nova não tem não pode ficar valendo.
+  if (mapSource === 'tabela' && mapUfFilter && !currentResult.rows.some((row) => belongsToUf(row.key, mapUfFilter))) mapUfFilter = '';
 
   renderMapUfOptions();
   void loadMapPeriods();
   // Município sem estado isolado vira mapa nacional por UF; com estado
   // isolado, o mapa daquele estado.
-  const bundled = mapSource === 'tabela'
-    ? daTela
-    : (mapGeoField?.level === 'uf' || !mapUfFilter ? 'br_ufsigla.MAP' : 'br_municip.MAP');
+  const bundled = mapLevel === 'uf' || !mapUfFilter ? 'br_ufsigla.MAP' : 'br_municip.MAP';
 
   if (activeMap && activeMapSource === `incluído: ${bundled}`) {
     renderTable(currentResult);

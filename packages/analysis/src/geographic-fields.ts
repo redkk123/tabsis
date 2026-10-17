@@ -108,3 +108,25 @@ export function belongsToUf(code: string, ufCode: string): boolean {
   if (limpo === ufCode) return true;
   return ufCodeOf(limpo) === ufCode;
 }
+
+/**
+ * O código de município do IBGE com o dígito verificador (sete dígitos).
+ *
+ * O DATASUS grava seis dígitos; o IBGE e muitas planilhas, sete. O último é
+ * calculado: pesos 1,2,1,2,1,2 nos seis primeiros, somando os algarismos de
+ * cada produto, e o dígito é o que completa a soma até a próxima dezena.
+ * Belém, `150140`, é `1501402`; São Paulo, `355030`, é `3550308`.
+ *
+ * Serve para reconhecer o mesmo município escrito de um jeito ou do outro. Só
+ * aceita seis dígitos: com outra coisa devolve `null`, sem inventar.
+ */
+export function withIbgeCheckDigit(code6: string): string | null {
+  const limpo = String(code6 ?? '').trim();
+  if (!/^\d{6}$/.test(limpo)) return null;
+  let soma = 0;
+  for (let i = 0; i < 6; i++) {
+    const produto = Number(limpo[i]) * (i % 2 === 0 ? 1 : 2);
+    soma += produto > 9 ? Math.floor(produto / 10) + (produto % 10) : produto;
+  }
+  return `${limpo}${(10 - (soma % 10)) % 10}`;
+}
