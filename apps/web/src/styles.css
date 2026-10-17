@@ -857,7 +857,7 @@ dialog p { color: #676d74; font-size: 13px; line-height: 1.6; }
 .painel-bloco select option:checked { background: var(--tom) linear-gradient(0deg, var(--tom), var(--tom)); color: #fff; }
 .painel-bloco select option:disabled { color: var(--faint); font-style: italic; }
 .painel-checklist { display: flex; flex-direction: column; gap: 2px; max-height: 232px; overflow: auto; padding: 4px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--surface); }
-.painel-checklist .check-label { display: flex; align-items: flex-start; gap: 7px; padding: 5px 6px; border-radius: 3px; font-size: 13px; line-height: 1.3; cursor: pointer; }
+.painel-checklist .check-label { flex: 0 0 auto; display: flex; align-items: flex-start; gap: 7px; padding: 5px 6px; border-radius: 3px; font-size: 13px; line-height: 1.3; cursor: pointer; }
 .painel-checklist .check-label:hover { background: var(--brand-soft); }
 .painel-checklist .check-label small { display: block; color: var(--faint); font-size: 11px; }
 .painel-checklist input { margin-top: 2px; accent-color: var(--tom); }
@@ -966,3 +966,39 @@ dialog p { color: #676d74; font-size: 13px; line-height: 1.6; }
 #result-table .has-note::after { content: ""; position: absolute; top: 0; right: 0; border-style: solid; border-width: 0 7px 7px 0; border-color: transparent var(--danger) transparent transparent; }
 #result-table tfoot .table-note-footer td { text-align: left; font-weight: 400; font-size: 12px; color: var(--danger); }
 #result-table tbody th { white-space: pre-wrap; }
+
+
+/* Painel de tabulação: leitura mais clara e toque confortável.
+   Cada linha das listas com caixa de marcar tem a altura do próprio texto
+   (`flex: 0 0 auto`): numa lista com rolagem, linhas que podem encolher se
+   espremem até o mínimo e o texto de uma passa por cima do da outra. */
+.painel-checklist--categorias .check-label { flex: 0 0 auto; }
+.painel-bloco { box-shadow: 0 1px 2px rgba(20, 40, 60, .06), 0 6px 18px -10px rgba(20, 40, 60, .18); border-radius: 10px; overflow: hidden; background: var(--surface); }
+.painel-bloco-cabecalho { padding: 12px 14px 8px; background: linear-gradient(180deg, color-mix(in srgb, var(--tom) 7%, transparent), transparent); }
+.painel-bloco-cabecalho p { color: #4a5057; font-size: 12.5px; line-height: 1.45; }
+.painel-bloco-corpo { padding: 0 12px 12px; gap: 8px; }
+.painel-checklist { border-radius: 8px; }
+.painel-checklist .check-label { border-bottom: 1px solid var(--line); border-radius: 0; padding: 8px 8px; }
+.painel-checklist .check-label:last-child { border-bottom: 0; }
+.painel-checklist .check-label:has(input:checked) { background: color-mix(in srgb, var(--tom) 9%, #fff); }
+.painel-checklist .check-label small { margin-top: 1px; line-height: 1.35; }
+.painel-bloco select { border-radius: 8px; }
+.painel-passos { margin: 0 0 8px; padding: 0 0 0 20px; color: #4a5057; font-size: 12.5px; line-height: 1.5; }
+.painel-passos li::marker { color: var(--selecoes); font-weight: 700; }
+.painel-passos b { color: var(--ink); font-weight: 600; }
+.painel-opcoes { padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); }
+.painel-opcoes::before { content: "Opções da tabela"; flex: 1 0 100%; color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.painel-executar { border-radius: 10px; box-shadow: 0 6px 16px -8px rgba(13, 80, 130, .55); }
+@media (pointer: coarse) {
+  .painel-checklist .check-label { min-height: 46px; align-items: center; }
+  .painel-checklist input { width: 20px; height: 20px; }
+  .painel-bloco select option { padding: 9px 8px; }
+  .painel-selecoes-botoes button { min-height: 44px; }
+}
+@media (max-width: 620px) {
+  /* O botão de executar e o resumo acompanham a rolagem: no celular o painel é
+     comprido, e o "Executar" ficava vários toques abaixo de onde a pessoa estava. */
+  .painel-rodape { position: sticky; bottom: 0; z-index: 5; margin: 14px -2px 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px 12px 0 0; background: rgba(255, 255, 255, .97); box-shadow: 0 -8px 22px -12px rgba(20, 40, 60, .35); backdrop-filter: blur(6px); }
+  .painel-resumo { font-size: 13px; }
+  .painel-executar { width: 100%; }
+}

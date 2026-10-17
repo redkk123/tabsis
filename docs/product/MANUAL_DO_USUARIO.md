@@ -200,7 +200,7 @@ TabWin, em quatro blocos numerados:
 | **1 · Linhas** | a variável cujas categorias viram as linhas | a primeira do DEF |
 | **2 · Colunas** | abre cada linha em colunas (opcional) | Não ativa |
 | **3 · Incremento** | o que se soma em cada célula; pode marcar vários | Frequência |
-| **4 · Seleções** | filtros: inclua a variável em *Ativas* e marque as categorias | nenhuma |
+| **4 · Seleções** | filtros: inclua a variável em *Em uso como filtro* e marque as categorias | nenhuma |
 
 As listas vêm do **DEF**, com os nomes exatamente como ele escreve e na ordem
 do arquivo. Escolha o DEF no seletor do alto do painel (cada um aparece com a
