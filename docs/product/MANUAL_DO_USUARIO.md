@@ -511,6 +511,21 @@ de outro. O ano vem do nome do arquivo (`DENGBR23.dbc` é 2023); se os nomes nã
 dizem o ano, a faixa mostra os nomes. Cada ano é lido uma vez, em segundo
 plano, enquanto o mapa de todos juntos já está na tela.
 
+**A diferença entre os anos.** Na faixa Período, **Cores mostram** troca os
+valores de cada ano pela **diferença para o ano anterior** (em casos) ou pela
+**variação %**. A escala é simétrica em torno de zero e é a mesma para todos os
+anos: **laranja** aumentou, **azul** diminuiu, **claro** ficou igual. Mova o
+controle ou use **▶ Reproduzir** para ver os anos passarem. Uma área que existia
+no ano anterior e sumiu conta como queda; em %, uma área que partiu de zero não
+tem variação definida e fica sem cor. O primeiro ano não tem anterior: ali o
+mapa mostra os valores e a faixa avisa.
+
+**O cartão do município.** No mapa de um estado, **clique num município** (ou,
+numa tabela por município, em qualquer área): abre o **cartão** com o nome, o
+valor, a posição entre as áreas com dado, a participação no estado e, com vários
+anos abertos, a **série por ano** daquele município. Clicar de novo, ou no ✕,
+fecha. **Shift+clique** seleciona a área para filtrar, como antes.
+
 **Nomes no lugar dos códigos.** Onde a tabela mostrava `150140`, ela mostra
 **Belém (150140)**: vale para qualquer campo de município (residência,
 ocorrência, notificação…) e para UF em código, em Linhas ou em Colunas. O

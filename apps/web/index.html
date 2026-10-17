@@ -890,11 +890,19 @@
                 <label class="map-period-select-label">Período
                   <select id="map-period-select" title="Um ano, ou todos juntos"></select>
                 </label>
+                <label class="map-period-select-label">Cores mostram
+                  <select id="map-variation" title="Os valores de cada ano, ou como cada área mudou em relação ao ano anterior">
+                    <option value="">Os valores de cada ano</option>
+                    <option value="abs">A diferença para o ano anterior</option>
+                    <option value="pct">A variação % sobre o ano anterior</option>
+                  </select>
+                </label>
                 <input id="map-period-slider" type="range" min="0" max="0" step="1" value="0" aria-label="Mover entre os anos" />
               </div>
               <p class="map-focus-hint" id="map-period-status"></p>
               <div class="map-period-chart" id="map-period-chart" role="group" aria-label="Total por ano; clique numa barra para ver o mapa daquele ano"></div>
             </div>
+            <div class="map-card" id="map-card" hidden></div>
             <div class="map-stage">
               <canvas id="map-canvas" aria-label="Mapa temático do resultado"></canvas>
               <div class="map-message" id="map-message">Escolha uma variável geográfica para criar o mapa.</div>

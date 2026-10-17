@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   createMapScale,
+  createDivergingMapScale,
   chooseMapColumn,
 } from '../dist/packages/visualization/src/map-scale.js';
 
@@ -104,4 +105,27 @@ test('sem pedir inversão, nada muda', () => {
   const a = createMapScale([1, 2, 3], 'quantile', 3, 'orange');
   const b = createMapScale([1, 2, 3], 'quantile', 3, 'orange', {});
   assert.deepEqual(a.classes.map((c) => c.color), b.classes.map((c) => c.color));
+});
+
+test('a escala de diferenças é simétrica: zero fica no meio e não muda de cor com os dados', () => {
+  const escala = createDivergingMapScale([-4, 10, 2, 0]);
+  assert.equal(escala.min, -10);
+  assert.equal(escala.max, 10);
+  assert.equal(escala.classes.length, 7);
+  // A classe do meio contém o zero.
+  const meio = escala.classes[3];
+  assert.ok(meio.lower < 0 && meio.upper > 0);
+  // Zero é a cor neutra, igual em qualquer conjunto; aumento e queda divergem.
+  assert.equal(escala.colorFor(0), createDivergingMapScale([-1, 1]).colorFor(0));
+  assert.notEqual(escala.colorFor(10), escala.colorFor(-10));
+  // Mesmo tamanho de variação, lados opostos: a mesma "força", cores diferentes.
+  assert.notEqual(escala.colorFor(5), escala.colorFor(-5));
+  assert.equal(escala.colorFor(undefined), '#dfe8e5');
+});
+
+test('a escala de diferenças sem nenhuma mudança não inventa cor', () => {
+  const escala = createDivergingMapScale([0, 0, 0]);
+  assert.equal(escala.min, 0);
+  assert.equal(escala.colorFor(0), escala.colorFor(0));
+  assert.equal(escala.colorFor(0), createDivergingMapScale([]).colorFor(0));
 });

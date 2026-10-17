@@ -209,6 +209,7 @@ import { chooseMapColumn } from '../../../packages/visualization/src/map-scale.t
 import type { ChartType } from '../../../packages/visualization/src/chart-model.ts';
 import {
   createMapScale,
+  createDivergingMapScale,
   type MapClassification,
   type MapPalette,
   type MapScale,
@@ -580,6 +581,8 @@ const mapPeriodSelect = element<HTMLSelectElement>('#map-period-select');
 const mapPeriodSlider = element<HTMLInputElement>('#map-period-slider');
 const mapPeriodStatus = element<HTMLElement>('#map-period-status');
 const mapPeriodChart = element<HTMLElement>('#map-period-chart');
+const mapVariationSelect = element<HTMLSelectElement>('#map-variation');
+const mapCard = element<HTMLElement>('#map-card');
 const mapClassCount = element<HTMLSelectElement>('#map-class-count');
 const mapManualBreaksLabel = element<HTMLElement>('#map-manual-breaks-label');
 const mapManualBreaks = element<HTMLInputElement>('#map-manual-breaks');
@@ -2750,6 +2753,8 @@ function resetAnalysisState(): void {
   mapPeriod = '';
   mapPeriodResults.clear();
   mapPeriodSignature = '';
+  mapFocusGeocode = '';
+  mapCard.hidden = true;
   stopMapPeriodPlayback();
   mapPeriodBar.hidden = true;
   geoSelection = { states: [], municipalities: [] };
@@ -6006,6 +6011,17 @@ function renderMap(): void {
       return resultadoDoAno ? resultadoDoAno.cells.map((linha) => linha[escolha.index] ?? 0) : [];
     })
     : [...values.values()];
+  // Variação em relação ao ano anterior: só vale com um ano escolhido que não
+  // seja o primeiro. Fora disso o mapa mostra os valores, e a faixa de período
+  // diz por quê.
+  const modoVariacao = mapVariationMode();
+  const variacao = modoVariacao && mapPeriod && mapPreviousPeriod(mapPeriod)
+    ? mapVariationBetween(mapPeriod, escolha.index, modoVariacao)
+    : null;
+  const valoresDaVariacao = variacao
+    ? mapPeriodList().slice(1).flatMap((periodo) => [...(mapVariationBetween(periodo.name, escolha.index, modoVariacao as 'abs' | 'pct')?.values() ?? [])])
+    : [];
+  const valoresMostrados = variacao ?? values;
   const classification = mapClassification.value as MapClassification;
   // Breaks the data cannot support - a recipe saved against a bigger range,
   // say - must not blank the map. Quantiles draw it, and the message below
@@ -6034,7 +6050,13 @@ function renderMap(): void {
     scaleModel = createMapScale(valoresDaEscala, 'quantile', Number(mapClassCount.value),
       mapPalette.value as MapPalette, { invertPalette: mapInvertPalette.checked });
   }
-  mapManualBreaksNote.hidden = !manualBreakProblem;
+  if (variacao) scaleModel = createDivergingMapScale(valoresDaVariacao);
+  const anteriorDoAno = mapPeriod ? mapPreviousPeriod(mapPeriod) : undefined;
+  formatMapValue = variacao
+    ? (valor) => signedFormat(valor, modoVariacao === 'pct' ? '%' : '')
+    : (valor) => numberFormat.format(valor);
+  mapValueSuffix = variacao && anteriorDoAno ? ` em relação a ${anteriorDoAno.label}` : '';
+  mapManualBreaksNote.hidden = !manualBreakProblem || Boolean(variacao);
   mapManualBreaksNote.textContent = manualBreakProblem ? `${manualBreakProblem}. Mapa desenhado por quantis.` : '';
   let matched = 0;
   lastMapValues = new Map();
@@ -6043,7 +6065,7 @@ function renderMap(): void {
   context.lineWidth = Math.max(.28, .45 / scale);
   context.strokeStyle = 'rgba(49, 91, 86, .48)';
   for (const object of activeMap.objects) {
-    const value = valueForMapObject(object, values);
+    const value = valueForMapObject(object, valoresMostrados);
     lastMapValues.set(object, value);
     if (value !== undefined) matched++;
     context.beginPath();
@@ -6062,7 +6084,7 @@ function renderMap(): void {
     if (object.type === 'polygon' || object.type === 'polygon-with-seat') {
       context.fillStyle = scaleModel.colorFor(value);
       context.fill('evenodd');
-      if (mapSelection.includes(object.geocode)) {
+      if (mapSelection.includes(object.geocode) || (mapFocusGeocode && object.geocode.trim() === mapFocusGeocode)) {
         context.save();
         context.strokeStyle = '#123f36';
         context.lineWidth = Math.max(1.1, 1.8 / scale);
@@ -6193,19 +6215,23 @@ function renderMap(): void {
   mapLegend.hidden = false;
   mapLegend.replaceChildren();
   const title = document.createElement('strong');
-  title.textContent = `${integerFormat.format(matched)} áreas associadas`;
+  title.textContent = variacao
+    ? `Variação${mapValueSuffix} · ${integerFormat.format(matched)} áreas`
+    : `${integerFormat.format(matched)} áreas associadas`;
   const gradient = document.createElement('div');
   gradient.className = 'legend-gradient';
-  gradient.style.background = `linear-gradient(90deg, ${scaleModel.classes[0]?.color ?? '#dfe8e5'}, ${scaleModel.classes.at(-1)?.color ?? '#08634f'})`;
+  gradient.style.background = variacao
+    ? `linear-gradient(90deg, ${scaleModel.classes[0]?.color}, ${scaleModel.colorFor(0)}, ${scaleModel.classes.at(-1)?.color})`
+    : `linear-gradient(90deg, ${scaleModel.classes[0]?.color ?? '#dfe8e5'}, ${scaleModel.classes.at(-1)?.color ?? '#08634f'})`;
   const range = document.createElement('div');
   range.className = 'legend-range';
   const low = document.createElement('span');
   const high = document.createElement('span');
-  low.textContent = numberFormat.format(scaleModel.min);
-  high.textContent = numberFormat.format(scaleModel.max);
+  low.textContent = variacao ? signedFormat(scaleModel.min, modoVariacao === 'pct' ? '%' : '') : numberFormat.format(scaleModel.min);
+  high.textContent = variacao ? signedFormat(scaleModel.max, modoVariacao === 'pct' ? '%' : '') : numberFormat.format(scaleModel.max);
   range.append(low, high);
   mapLegend.append(title, gradient, range);
-  if (mapClassification.value !== 'continuous') {
+  if (!variacao && mapClassification.value !== 'continuous') {
     const classList = document.createElement('div');
     classList.className = 'legend-classes';
     for (const item of scaleModel.classes) {
@@ -6222,6 +6248,7 @@ function renderMap(): void {
     mapLegend.append(classList);
   }
   mapPngButton.disabled = matched === 0;
+  renderMapFocusCard();
   renderAudit();
 }
 
@@ -6249,7 +6276,10 @@ let mapGeoField: GeographicCandidate | null = null;
 let mapResultSignature = '';
 
 function mapInputSignature(): string {
-  return JSON.stringify([configuredFilters, configuredCrossFieldRules]);
+  // Os arquivos abertos também são condição: juntar mais um arquivo depois de o
+  // mapa (ou o painel "Onde") ter lido o primeiro deixava o mapa com os números
+  // do primeiro, e a tabela ao lado com os de todos.
+  return JSON.stringify([configuredFilters, configuredCrossFieldRules, activeDatasetSources.map((source) => source.name)]);
 }
 /** UF isolada no mapa. Vazio quer dizer o Brasil inteiro, por estado. */
 let mapUfFilter = '';
@@ -6544,7 +6574,7 @@ function renderMapFocusBar(): void {
   mapFocusBack.hidden = !dentro;
   mapFocusTrail.textContent = dentro ? `Brasil › ${ufNameForCode(mapUfFilter)}` : 'Brasil';
   mapFocusHint.textContent = dentro
-    ? 'Municípios com os dados do arquivo. Clique num município para selecioná-lo; arraste para mover.'
+    ? 'Municípios com os dados do arquivo. Clique num município para ver o cartão dele; Shift+clique seleciona para filtrar; arraste para mover.'
     : 'Clique num estado para ver os municípios dele. Com Shift, o clique seleciona o estado em vez de descer.';
 }
 
@@ -6558,6 +6588,7 @@ function setMapFocus(uf: string): void {
   mapPanX = 0;
   mapPanY = 0;
   activeMap = null;
+  mapFocusGeocode = '';
   mapTooltip.hidden = true;
   void ensureMap();
 }
@@ -6665,9 +6696,15 @@ function renderMapPeriodBar(): void {
   const lendo = periodos.find((periodo) => periodo.name === mapPeriodLoading)?.label;
   mapPeriodStatus.textContent = faltam
     ? `Lendo os anos${lendo ? ` (agora ${lendo})` : ''}: ${prontos.length} de ${periodos.length} prontos.`
+    : atual && mapVariationMode() && mapPreviousPeriod(atual.name)
+      ? `Cores: ${mapVariationMode() === 'pct' ? 'variação percentual' : 'diferença'} de ${mapPreviousPeriod(atual.name)!.label} para ${atual.label}. Laranja aumentou, azul diminuiu, claro ficou igual; a escala é a mesma para todos os anos.`
+    : atual && mapVariationMode()
+      ? `${atual.label} é o primeiro ano: não há ano anterior para comparar. Escolha um ano depois dele.`
     : atual
       ? `Mostrando ${atual.label}, com a mesma escala de cores para todos os anos: dá para comparar a cor de um ano com a de outro.`
-      : 'Mostrando todos os arquivos juntos. Escolha um ano, ou mova o controle, para comparar.';
+      : mapVariationMode()
+        ? 'Para ver a variação, escolha um ano (que não seja o primeiro) ou mova o controle.'
+        : 'Mostrando todos os arquivos juntos. Escolha um ano, ou mova o controle, para comparar.';
 
   // Uma barra por ano: o total do que o mapa pinta, para ver a tendência antes
   // de clicar. O total é o do recorte atual (estado isolado, filtros).
@@ -6750,6 +6787,152 @@ async function loadMapPeriods(): Promise<void> {
     mapPeriodLoading = '';
     renderMapPeriodBar();
   }
+}
+
+/** Município (ou área) em foco: o cartão com valor, posição e série por ano. */
+let mapFocusGeocode = '';
+
+function renderMapFocusCard(): void {
+  const objeto = mapFocusGeocode && activeMap
+    ? activeMap.objects.find((candidato) => candidato.geocode.trim() === mapFocusGeocode)
+    : undefined;
+  const atual = objeto ? mapDrawableResult() : null;
+  if (!objeto || !atual) {
+    mapCard.hidden = true;
+    mapCard.replaceChildren();
+    return;
+  }
+  const coluna = chooseMapColumn(atual.columns.map((c) => c.key), mapValueColumn.value || undefined).index;
+  const chave = mapFocusGeocode.toLowerCase();
+  const linhas = atual.rows
+    .map((row, index) => ({ chave: row.key.trim().toLowerCase(), valor: atual.cells[index]?.[coluna] ?? 0 }));
+  const propria = linhas.find((linha) => linha.chave === chave);
+  const comDado = linhas.filter((linha) => linha.valor > 0);
+  const soma = comDado.reduce((total, linha) => total + linha.valor, 0);
+
+  const cabecalho = document.createElement('div');
+  cabecalho.className = 'map-card-head';
+  const nome = document.createElement('strong');
+  const uf = ufCodeOf(mapFocusGeocode);
+  nome.textContent = `${objeto.name || mapFocusGeocode}${uf && mapGeoField?.level === 'municipality' ? ` · ${ufNameForCode(uf)}` : ''}`;
+  const fechar = document.createElement('button');
+  fechar.type = 'button';
+  fechar.className = 'secondary-button';
+  fechar.textContent = '✕';
+  fechar.title = 'Fechar o cartão';
+  fechar.setAttribute('aria-label', 'Fechar o cartão');
+  fechar.addEventListener('click', () => { mapFocusGeocode = ''; renderMap(); });
+  cabecalho.append(nome, fechar);
+
+  const periodoAtual = mapPeriodList().find((periodo) => periodo.name === mapPeriod);
+  const linhasDeTexto: string[] = [];
+  if (propria && propria.valor > 0) {
+    const posicao = 1 + comDado.filter((linha) => linha.valor > propria.valor).length;
+    const onde = mapUfFilter && mapGeoField?.level === 'municipality' ? ufNameForCode(mapUfFilter) : 'o mapa';
+    linhasDeTexto.push(
+      `${periodoAtual ? `${periodoAtual.label}: ` : ''}${numberFormat.format(propria.valor)}`
+      + ` · ${integerFormat.format(posicao)}º entre ${integerFormat.format(comDado.length)} áreas com dado`
+      + ` · ${numberFormat.format((propria.valor / soma) * 100)}% d${onde === 'o mapa' ? 'o mapa' : `e ${onde}`}`,
+    );
+  } else {
+    linhasDeTexto.push(`${periodoAtual ? `${periodoAtual.label}: ` : ''}sem registros nesta área.`);
+  }
+  const resumo = document.createElement('p');
+  resumo.className = 'map-card-text';
+  resumo.textContent = linhasDeTexto.join(' ');
+
+  mapCard.replaceChildren(cabecalho, resumo);
+
+  // A série: o valor desta área em cada ano, para ver a trajetória dela.
+  const periodos = mapPeriodList();
+  if (periodos.length > 1) {
+    const valores = periodos.map((periodo) => {
+      const resultado = mapPeriodResults.has(periodo.name) ? mapDrawableResult(periodo.name) : null;
+      if (!resultado) return undefined;
+      const indice = chooseMapColumn(resultado.columns.map((c) => c.key), mapValueColumn.value || undefined).index;
+      const posicao = resultado.rows.findIndex((row) => row.key.trim().toLowerCase() === chave);
+      return posicao >= 0 ? (resultado.cells[posicao]?.[indice] ?? 0) : 0;
+    });
+    const maior = Math.max(1, ...valores.map((valor) => valor ?? 0));
+    const serie = document.createElement('div');
+    serie.className = 'map-period-chart map-card-series';
+    serie.setAttribute('role', 'img');
+    serie.setAttribute('aria-label', `${objeto.name || mapFocusGeocode} por ano: ${periodos.map((p, i) => `${p.label} ${valores[i] ?? 'lendo'}`).join(', ')}`);
+    periodos.forEach((periodo, posicao) => {
+      const valor = valores[posicao];
+      const coluna = document.createElement('div');
+      coluna.className = 'map-period-bar';
+      coluna.setAttribute('aria-pressed', String(periodo.name === mapPeriod));
+      coluna.title = valor === undefined ? `${periodo.label}: lendo…` : `${periodo.label}: ${numberFormat.format(valor)}`;
+      const barra = document.createElement('i');
+      barra.style.height = `${valor === undefined ? 0 : valor === 0 ? 2 : Math.max(3, Math.round((valor / maior) * 100))}%`;
+      const rotulo = document.createElement('span');
+      rotulo.textContent = valor === undefined ? periodo.label : `${periodo.label} · ${numberFormat.format(valor)}`;
+      coluna.append(barra, rotulo);
+      serie.append(coluna);
+    });
+    mapCard.append(serie);
+  }
+  mapCard.hidden = false;
+}
+
+/** O que as cores mostram: os valores de cada ano, ou como cada área mudou em relação ao ano anterior. */
+type MapVariationMode = '' | 'abs' | 'pct';
+
+function mapVariationMode(): MapVariationMode {
+  return mapVariationSelect.value === 'abs' || mapVariationSelect.value === 'pct' ? mapVariationSelect.value : '';
+}
+
+/** O ano anterior ao escolhido, quando há ano escolhido e ele não é o primeiro. */
+function mapPreviousPeriod(periodName: string): MapPeriodItem | undefined {
+  const lista = mapPeriodList();
+  const posicao = lista.findIndex((periodo) => periodo.name === periodName);
+  return posicao > 0 ? lista[posicao - 1] : undefined;
+}
+
+/**
+ * Como cada área mudou de um ano para o seguinte, pela mesma chave do mapa.
+ *
+ * Uma área que existia no ano anterior e sumiu neste caiu para zero, e entra
+ * como queda: pular essas linhas pintaria de cinza ("sem dado") justamente o
+ * que mais diminuiu. Em percentual, uma área sem base (zero no ano anterior e
+ * positiva agora) não tem variação definida: fica sem cor, em vez de virar
+ * "infinito" ou um número inventado.
+ */
+function mapVariationBetween(periodName: string, colIndex: number, mode: Exclude<MapVariationMode, ''>): Map<string, number> | null {
+  const anterior = mapPreviousPeriod(periodName);
+  const atual = mapDrawableResult(periodName);
+  const antes = anterior ? mapDrawableResult(anterior.name) : null;
+  if (!anterior || !atual || !antes) return null;
+  const valorDe = (resultado: TabulationResult): Map<string, { valor: number; label: string }> => {
+    const mapa = new Map<string, { valor: number; label: string }>();
+    resultado.rows.forEach((row, index) => {
+      mapa.set(row.key.trim().toLowerCase(), { valor: resultado.cells[index]?.[colIndex] ?? 0, label: row.label });
+    });
+    return mapa;
+  };
+  const agora = valorDe(atual);
+  const passado = valorDe(antes);
+  const saida = new Map<string, number>();
+  for (const chave of new Set([...agora.keys(), ...passado.keys()])) {
+    const c = agora.get(chave)?.valor ?? 0;
+    const p = passado.get(chave)?.valor ?? 0;
+    const variacao = mode === 'abs' ? c - p : (p > 0 ? ((c - p) / p) * 100 : (c === 0 ? 0 : undefined));
+    if (variacao === undefined) continue;
+    saida.set(chave, variacao);
+    const label = (agora.get(chave) ?? passado.get(chave))?.label;
+    if (label) saida.set(normalizeLabel(label), variacao);
+  }
+  return saida;
+}
+
+/** Texto de um valor do mapa: o número, ou a diferença com sinal quando as cores mostram variação. */
+let formatMapValue: (value: number) => string = (value) => numberFormat.format(value);
+let mapValueSuffix = '';
+
+function signedFormat(value: number, unit: string): string {
+  const texto = Number.isInteger(value) ? integerFormat.format(Math.abs(value)) : numberFormat.format(Math.abs(value));
+  return `${value > 0 ? '+' : value < 0 ? '−' : ''}${texto}${unit}`;
 }
 
 function mapDrawableResult(periodOverride?: string): TabulationResult | null {
@@ -9615,7 +9798,7 @@ function showMapTooltip(event: PointerEvent): void {
   const value = lastMapValues.get(object);
   const desce = mapCanFocus() && mapFocusStates.has(object.geocode.trim());
   mapCanvas.classList.toggle('map-can-focus', desce);
-  mapTooltip.textContent = `${object.name || object.geocode} · ${value === undefined ? 'sem valor associado' : numberFormat.format(value)}${desce ? ' · clique para ver os municípios' : ''}`;
+  mapTooltip.textContent = `${object.name || object.geocode} · ${value === undefined ? 'sem valor associado' : `${formatMapValue(value)}${mapValueSuffix}`}${desce ? ' · clique para ver os municípios' : ''}`;
   mapTooltip.style.left = `${Math.min(point.x + 12, mapCanvas.clientWidth - 240)}px`;
   mapTooltip.style.top = `${Math.max(8, point.y - 34)}px`;
   mapTooltip.hidden = false;
@@ -10204,6 +10387,13 @@ mapValueColumn.addEventListener('change', () => {
 mapUfSelect.addEventListener('change', () => setMapFocus(mapUfSelect.value));
 mapFocusBack.addEventListener('click', () => setMapFocus(''));
 mapPeriodSelect.addEventListener('change', () => { stopMapPeriodPlayback(); selectMapPeriod(mapPeriodSelect.value); });
+mapVariationSelect.addEventListener('change', () => {
+  // Mostrar variação sem ano escolhido não tem o que mostrar: vai para o último ano.
+  const lista = mapPeriodList().filter((periodo) => mapPeriodResults.has(periodo.name));
+  if (mapVariationMode() && !mapPeriod && lista.length > 1) mapPeriod = lista.at(-1)!.name;
+  renderMapPeriodBar();
+  if (activeMap && currentResult && currentView === 'map') renderMap();
+});
 mapPeriodSlider.addEventListener('input', () => {
   stopMapPeriodPlayback();
   const periodo = mapPeriodList()[Number(mapPeriodSlider.value)];
@@ -10215,7 +10405,9 @@ mapPeriodPlay.addEventListener('click', () => {
   if (prontos.length < 2) return;
   // Recomeça do primeiro ano quando está em "todos" ou no último.
   const atual = prontos.findIndex((periodo) => periodo.name === mapPeriod);
-  let proximo = atual < 0 || atual === prontos.length - 1 ? 0 : atual + 1;
+  // Em variação o primeiro ano não tem com o que comparar: começa no segundo.
+  const inicio = mapVariationMode() ? 1 : 0;
+  let proximo = atual < 0 || atual === prontos.length - 1 ? inicio : Math.max(inicio, atual + 1);
   selectMapPeriod(prontos[proximo]!.name);
   mapPeriodPlay.textContent = '❚❚ Pausar';
   mapPeriodTimer = window.setInterval(() => {
@@ -10287,9 +10479,14 @@ mapCanvas.addEventListener('pointerup', (event) => {
     const object = objectAtCanvasPoint(point.x, point.y);
     if (object) {
       const uf = mapCanFocus() && !event.shiftKey ? object.geocode.trim() : '';
-      if (!uf) toggleMapSelection(object);
-      else if (mapFocusStates.has(uf)) setMapFocus(uf);
-      else showToast(`${ufNameForCode(uf)} não tem registros neste arquivo.`, true);
+      if (uf) {
+        if (mapFocusStates.has(uf)) setMapFocus(uf);
+        else showToast(`${ufNameForCode(uf)} não tem registros neste arquivo.`, true);
+      } else if (!event.shiftKey && object.geocode.trim()) {
+        // Clicar na área em foco de novo fecha o cartão.
+        mapFocusGeocode = mapFocusGeocode === object.geocode.trim() ? '' : object.geocode.trim();
+        renderMap();
+      } else toggleMapSelection(object);
     }
   }
   showMapTooltip(event);

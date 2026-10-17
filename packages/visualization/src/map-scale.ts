@@ -126,6 +126,53 @@ export function createMapScale(
 }
 
 /**
+ * Escala para diferenças (variação entre anos): simétrica em torno de zero.
+ *
+ * Azul onde diminuiu, laranja onde aumentou, quase branco onde ficou igual. A
+ * escala vai de -M a +M, com M o maior valor absoluto observado, e não de
+ * mínimo a máximo: com mínimo e máximo, o zero cairia em qualquer cor do meio
+ * e "não mudou" deixaria de ter cara de "não mudou". Nenhum dos lados é "bom"
+ * ou "ruim" aqui — quem sabe se subir é pior é quem conhece o indicador.
+ */
+const DIVERGENTE = { baixa: '#225ea8', zero: '#f2efe9', alta: '#b84a12' } as const;
+
+function mixHex(from: string, to: string, ratio: number): string {
+  const a = rgb(from);
+  const b = rgb(to);
+  const t = Math.min(1, Math.max(0, ratio));
+  return `rgb(${a.map((channel, index) => Math.round(channel + ((b[index] ?? channel) - channel) * t)).join(',')})`;
+}
+
+export function createDivergingMapScale(source: Iterable<number>, classCount = 7): MapScale {
+  const values = [...source].filter(Number.isFinite);
+  const limite = Math.max(0, ...values.map((value) => Math.abs(value)));
+  const cores = (valor: number): string => {
+    if (limite === 0) return DIVERGENTE.zero;
+    const razao = Math.min(1, Math.abs(valor) / limite);
+    // Raiz suave: variações pequenas ainda aparecem, sem apagar as grandes.
+    const forca = Math.pow(razao, 0.75);
+    return valor < 0 ? mixHex(DIVERGENTE.zero, DIVERGENTE.baixa, forca) : mixHex(DIVERGENTE.zero, DIVERGENTE.alta, forca);
+  };
+  // Número ímpar de classes, para uma delas ficar centrada no zero.
+  const total = Math.max(3, classCount % 2 === 0 ? classCount + 1 : classCount);
+  const largura = limite === 0 ? 0 : (2 * limite) / total;
+  const classes = Array.from({ length: total }, (_, index) => {
+    const lower = -limite + largura * index;
+    const upper = -limite + largura * (index + 1);
+    return { lower, upper, color: cores((lower + upper) / 2) };
+  });
+  return {
+    min: limite === 0 ? 0 : -limite,
+    max: limite,
+    classes,
+    colorFor(value) {
+      if (value === undefined || !Number.isFinite(value)) return '#dfe8e5';
+      return cores(value);
+    },
+  };
+}
+
+/**
  * Qual coluna o mapa pinta.
  *
  * Existe por causa de um resultado silenciosamente errado: o mapa somava
