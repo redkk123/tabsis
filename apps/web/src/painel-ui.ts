@@ -230,18 +230,23 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
     el('div', { className: 'painel-log-acoes' }, logCopiar, logAbrir, logRestaurar, logArquivo),
   );
 
-  const linhas = bloco('1', 'Linhas', 'O que vira cada linha da tabela: município, sexo, faixa etária…', 'linhas');
+  const linhas = bloco('1', 'Linhas', 'Cada categoria da variável vira uma linha. Ex.: escolha “Município” e a tabela terá uma linha por município.', 'linhas');
   linhas.corpo.append(linhasBusca, linhasLista, previaLinhas, indisponiveisLinhas);
-  const colunas = bloco('2', 'Colunas', 'Opcional. Abre cada linha em colunas (ex.: por sexo). "Não ativa" = uma coluna só.', 'colunas');
+  const colunas = bloco('2', 'Colunas', 'Opcional. Divide cada linha em colunas. Ex.: Linhas = Município e Colunas = Sexo mostra homens e mulheres lado a lado. “Não ativa” = uma coluna só, com o total.', 'colunas');
   colunas.corpo.append(colunasBusca, colunasLista, previaColunas, indisponiveisColunas);
-  const incremento = bloco('3', 'Incremento', 'O número de cada célula: Frequência conta os registros; os outros somam um valor.', 'incremento');
+  const incremento = bloco('3', 'Incremento', 'O que cada célula mostra. Frequência conta quantos registros há; os outros somam um valor (ex.: Valor Total soma o dinheiro). Marque mais de um para ter várias colunas de números.', 'incremento');
   incremento.corpo.append(incrementosLista);
-  const selecoes = bloco('4', 'Seleções', 'Filtros (opcional). Escolha uma variável, clique em Incluir e marque as categorias que entram — ex.: só um município. Duplo clique também inclui ou exclui.', 'selecoes');
+  const selecoes = bloco('4', 'Seleções', 'Filtros, opcional: só entram na tabela os registros que você marcar. Ex.: só um município, ou só o sexo feminino.', 'selecoes');
   selecoes.corpo.append(
+    el('ol', { className: 'painel-passos' },
+      el('li', {}, el('b', {}, 'Escolha'), ' uma variável na lista da esquerda'),
+      el('li', {}, el('b', {}, 'Clique em Incluir'), ' (ou dê duplo clique) para ela passar para a direita'),
+      el('li', {}, el('b', {}, 'Marque'), ' abaixo as categorias que entram na tabela'),
+    ),
     el('div', { className: 'painel-selecoes-grade' },
-      el('div', { className: 'painel-sublista' }, el('label', { htmlFor: 'painel-selecoes-disponiveis' }, 'Disponíveis'), disponiveisLista, indisponiveisSelecoes),
+      el('div', { className: 'painel-sublista' }, el('label', { htmlFor: 'painel-selecoes-disponiveis' }, 'Variáveis disponíveis'), disponiveisLista, indisponiveisSelecoes),
       el('div', { className: 'painel-selecoes-botoes' }, incluirBotao, excluirBotao),
-      el('label', { className: 'painel-sublista' }, el('span', {}, 'Ativas'), ativasLista),
+      el('label', { className: 'painel-sublista' }, el('span', {}, 'Em uso como filtro'), ativasLista),
     ),
     el('div', { className: 'painel-categorias' },
       categoriasTitulo,
