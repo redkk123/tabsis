@@ -2232,3 +2232,45 @@ test('o painel de tabulação monta a tabela como o TabWin: Linhas, Colunas, Inc
   expect(await page.locator('#painel-linhas option:checked').textContent()).toBe('Sexo');
   expect(await page.locator('#painel-colunas option:checked').textContent()).toBe('UF de residência');
 });
+
+test('o mapa abre no Brasil, o clique desce ao estado e o botão volta', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#file-input').setInputFiles('e2e/fixtures/mapa-foco-e2e.csv');
+  await expect(page.locator('#run-button')).toBeEnabled();
+  // A variável de linha é SEXO, que não é geográfica: o mapa acha o município sozinho.
+  await page.locator('#row-field').selectOption('SEXO');
+  await page.locator('#analysis-form').evaluate((form: HTMLFormElement) => form.requestSubmit());
+  await expect(page.locator('#result-table tbody')).toBeVisible();
+
+  await page.locator('[data-view="map"]').click();
+  await expect(page.locator('#map-focus-trail')).toHaveText('Brasil');
+  await expect(page.locator('#map-focus-hint')).toContainText('Clique num estado');
+  await expect(page.locator('#map-uf')).toHaveValue('');
+
+  await expect(page.locator('#map-legend')).toBeVisible();
+  // São Paulo é o estado com 7 registros (o do arquivo): acha-o varrendo o canvas pelo mesmo teste de ponto que o clique usa.
+  const alvo = await page.evaluate(async () => {
+    const canvas = document.querySelector<HTMLCanvasElement>('#map-canvas')!;
+    const tooltip = document.querySelector<HTMLElement>('#map-tooltip')!;
+    const box = canvas.getBoundingClientRect();
+    for (let y = 0; y < box.height; y += 6) {
+      for (let x = 0; x < box.width; x += 6) {
+        canvas.dispatchEvent(new PointerEvent('pointermove', { clientX: box.left + x, clientY: box.top + y, bubbles: true }));
+        if (!tooltip.hidden && tooltip.textContent?.includes(' · 7 · clique')) return { x, y };
+      }
+    }
+    return null;
+  });
+  expect(alvo).not.toBeNull();
+  await expect(page.locator('#map-tooltip')).toContainText('clique para ver os municípios');
+
+  await page.locator('#map-canvas').click({ position: alvo! });
+  await expect(page.locator('#map-focus-trail')).toHaveText('Brasil › São Paulo');
+  await expect(page.locator('#map-uf')).toHaveValue('35');
+  await expect(page.locator('#map-focus-back')).toBeVisible();
+
+  await page.locator('#map-focus-back').click();
+  await expect(page.locator('#map-focus-trail')).toHaveText('Brasil');
+  await expect(page.locator('#map-uf')).toHaveValue('');
+  await expect(page.locator('#map-focus-back')).toBeHidden();
+});

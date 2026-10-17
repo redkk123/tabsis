@@ -492,6 +492,15 @@ rótulos. Exporta SVG e PNG.
 **Mapa** — mapas temáticos a partir de `.MAP` legado ou GeoJSON, com classes de
 corte, legenda, seleção espacial e fluxos origem–destino.
 
+O mapa **se monta sozinho**, sem você escolher variável: ele acha o município
+(ou a UF) de residência no arquivo e abre no **Brasil, por estado**, já pintado
+com os dados. **Clique num estado** para descer aos municípios dele, com os
+dados de cada município; **← Voltar ao Brasil** sobe de novo (o seletor
+*Recorte* faz o mesmo). Só descem os estados que o arquivo tem. Com **Shift**,
+o clique seleciona o estado para filtrar, em vez de descer; no mapa de um
+estado, o clique seleciona o município. O mapa segue os filtros da análise, mas
+a tabela ao lado continua como você a montou.
+
 **Estatística** — em **Operação** você escolhe: estatística descritiva,
 correlação de Pearson, regressão linear simples, histograma (com gaussiana
 ajustada quando cabe, e dizendo quando **não** cabe), e **Taxas e

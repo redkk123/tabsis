@@ -879,6 +879,11 @@
               </div>
               <input id="geojson-input" type="file" accept=".geojson,.json" hidden />
             </div>
+            <div class="map-focus" id="map-focus" hidden>
+              <button class="secondary-button" id="map-focus-back" type="button" hidden>← Voltar ao Brasil</button>
+              <span class="map-focus-trail" id="map-focus-trail"></span>
+              <span class="map-focus-hint" id="map-focus-hint"></span>
+            </div>
             <div class="map-stage">
               <canvas id="map-canvas" aria-label="Mapa temático do resultado"></canvas>
               <div class="map-message" id="map-message">Escolha uma variável geográfica para criar o mapa.</div>
