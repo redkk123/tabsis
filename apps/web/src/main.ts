@@ -5949,6 +5949,18 @@ function applyMapSelectionAsFilter(): void {
  * dele: os dos vizinhos ficavam desenhados em volta, e o estado não ficava em
  * destaque, que é o ponto de entrar nele.
  */
+/** Contorno dos estados (o mapa de UF incluído), lido uma vez, só para destacar o estado em foco. */
+let ufOutlineMap: TabwinMapDefinition | null = null;
+async function loadUfOutline(): Promise<void> {
+  if (ufOutlineMap) return;
+  try {
+    const resposta = await fetch(new URL('maps/br_ufsigla.MAP', document.baseURI));
+    if (!resposta.ok) return;
+    ufOutlineMap = parseTabwinMap(new Uint8Array(await resposta.arrayBuffer()));
+    if (activeMap && currentView === 'map' && mapUfFilter) renderMap();
+  } catch { /* sem contorno: o estado só não ganha o destaque */ }
+}
+
 function visibleMapObjects(): TabwinMapObject[] {
   const todos = activeMap?.objects ?? [];
   if (!mapUfFilter || mapLevel !== 'municipality' || mapClassic) return todos;
@@ -5973,8 +5985,8 @@ function boundsForDrawnArea(): { west: number; east: number; south: number; nort
   }
   if (!(east > west) || !(north > south)) return inteiro;
   // Uma folga de 4% evita o estado encostar na borda da tela.
-  const folgaX = (east - west) * 0.04;
-  const folgaY = (north - south) * 0.04;
+  const folgaX = (east - west) * 0.01;
+  const folgaY = (north - south) * 0.01;
   return { west: west - folgaX, east: east + folgaX, south: south - folgaY, north: north + folgaY };
 }
 
@@ -6033,7 +6045,8 @@ function renderMap(): void {
   const { west, east, south, north } = boundsForDrawnArea();
   const sourceWidth = east - west;
   const sourceHeight = north - south;
-  const padding = 18;
+  // Com um estado em foco, ele enche a largura: sobra só uma margem pequena.
+  const padding = mapUfFilter && mapLevel === 'municipality' && !mapClassic ? 8 : 18;
   const baseFit = Math.min((cssWidth - padding * 2) / sourceWidth, (cssHeight - padding * 2) / sourceHeight);
   const fit = baseFit * mapZoom;
   const drawnWidth = sourceWidth * fit;
@@ -6157,6 +6170,39 @@ function renderMap(): void {
       context.arc(point.x, point.y, 3.5, 0, Math.PI * 2);
       context.fill();
     }
+  }
+
+  // O estado em foco ganha contorno próprio, mais grosso e escuro que as
+  // divisas dos municípios, para ele aparecer como uma peça só.
+  if (mapUfFilter && mapLevel === 'municipality' && !mapClassic && ufOutlineMap) {
+    context.save();
+    context.lineJoin = 'round';
+    context.strokeStyle = '#0b3d33';
+    context.lineWidth = 2.4;
+    for (const objeto of ufOutlineMap.objects) {
+      if (objeto.geocode.trim() !== mapUfFilter || (objeto.type !== 'polygon' && objeto.type !== 'polygon-with-seat')) continue;
+      context.beginPath();
+      for (const parte of objeto.parts) {
+        const primeiro = parte[0];
+        // Parte de dois ou três pontos não é divisa: é um traço solto do arquivo.
+        if (!primeiro || parte.length < 4) continue;
+        const inicio = project(primeiro.x, primeiro.y);
+        context.moveTo(inicio.x, inicio.y);
+        for (let i = 1; i < parte.length; i++) {
+          const atual = parte[i]!;
+          const ponto = project(atual.x, atual.y);
+          // O arquivo junta pedaços (ilhas, enclaves) numa mesma parte, e o salto
+          // entre eles viraria um risco atravessando o estado: um salto grande
+          // começa um traço novo em vez de ligar os dois pedaços.
+          const anterior = parte[i - 1]!;
+          const salto = Math.hypot(atual.x - anterior.x, atual.y - anterior.y);
+          if (salto > Math.max(east - west, north - south) * 0.1) context.moveTo(ponto.x, ponto.y);
+          else context.lineTo(ponto.x, ponto.y);
+        }
+      }
+      context.stroke();
+    }
+    context.restore();
   }
 
   for (const layer of mapReferenceLayers) {
@@ -6688,6 +6734,7 @@ function setMapFocus(uf: string): void {
   activeMap = null;
   mapFocusGeocode = '';
   mapTooltip.hidden = true;
+  if (uf) void loadUfOutline();
   void ensureMap();
 }
 
