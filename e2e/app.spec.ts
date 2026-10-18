@@ -2279,7 +2279,6 @@ test('o mapa abre no Brasil, o clique desce ao estado e o botão volta', async (
 
 test('vários anos abertos: o mapa troca de ano com a mesma escala e a tabela mostra os nomes dos municípios', async ({ page }) => {
   await page.goto('/');
-  await page.locator('#combine-compatible-files').check();
   await page.locator('#file-input').setInputFiles([
     'e2e/fixtures/DENGBR23.dbf', 'e2e/fixtures/DENGBR24.dbf', 'e2e/fixtures/DENGBR25.dbf',
   ]);
@@ -2318,7 +2317,6 @@ test('vários anos abertos: o mapa troca de ano com a mesma escala e a tabela mo
 test('variação entre anos: cores divergentes, mesma escala, e o primeiro ano avisa que não tem anterior', async ({ page }) => {
   await page.addInitScript(() => { try { localStorage.setItem('tabsis.aberto.group-campos', '1'); } catch { /* ignora */ } });
   await page.goto('/');
-  await page.locator('#combine-compatible-files').check();
   await page.locator('#file-input').setInputFiles([
     'e2e/fixtures/DENGBR23.dbf', 'e2e/fixtures/DENGBR24.dbf', 'e2e/fixtures/DENGBR25.dbf',
   ]);
@@ -2356,7 +2354,6 @@ test('modo foco: o clique no município abre o cartão com a posição e a séri
   test.setTimeout(90_000);
   await page.addInitScript(() => { try { localStorage.setItem('tabsis.aberto.group-campos', '1'); } catch { /* ignora */ } });
   await page.goto('/');
-  await page.locator('#combine-compatible-files').check();
   await page.locator('#file-input').setInputFiles([
     'e2e/fixtures/DENGBR23.dbf', 'e2e/fixtures/DENGBR24.dbf', 'e2e/fixtures/DENGBR25.dbf',
   ]);
@@ -2470,4 +2467,32 @@ test('no estado só aparecem os municípios dele, e o modo clássico mostra todo
   await expect(page.locator('#map-focus-trail')).toBeHidden();
   await page.locator('#map-mode').selectOption('focus');
   await expect(page.locator('#map-focus-trail')).toHaveText('Brasil');
+});
+
+test('vários anos de uma vez: selecionar junta, a lista mostra cada ano, o ✕ tira um e o + junta de novo', async ({ page }) => {
+  await page.goto('/');
+  // Um gesto só, sem caixa nenhuma para marcar antes.
+  await page.locator('#file-input').setInputFiles([
+    'e2e/fixtures/DENGBR23.dbf', 'e2e/fixtures/DENGBR24.dbf', 'e2e/fixtures/DENGBR25.dbf',
+  ]);
+  const conjunto = page.locator('#dataset-files');
+  await expect(conjunto).toBeVisible();
+  await expect(page.locator('#dataset-files-summary')).toHaveText('3 juntos · 2023 a 2025 · 24 registros');
+  await expect(page.locator('#dataset-files-list li')).toHaveCount(3);
+  await expect(page.locator('#dataset-files-list .dataset-file-periodo')).toHaveText(['2023', '2024', '2025']);
+
+  // Tirar 2024 (9 registros): ficam 2023 e 2025, sem reabrir nada à mão.
+  await page.locator('#dataset-files-list li', { hasText: 'DENGBR24.dbf' }).getByRole('button').click();
+  await expect(page.locator('#dataset-files-summary')).toHaveText('2 juntos · 2023 a 2025 · 15 registros');
+  await expect(page.locator('#dataset-files-list li')).toHaveCount(2);
+  await expect(page.locator('#result-table tfoot, #result-table tbody').last()).toContainText('15');
+
+  // Juntar de volta pelo botão.
+  await page.locator('#dataset-add-input').setInputFiles('e2e/fixtures/DENGBR24.dbf');
+  await expect(page.locator('#dataset-files-summary')).toHaveText('3 juntos · 2023 a 2025 · 24 registros');
+
+  // Com um arquivo só, não há ✕ (não se tira o último).
+  await page.locator('#file-input').setInputFiles('e2e/fixtures/DENGBR23.dbf');
+  await expect(page.locator('#dataset-files-summary')).toHaveText('1 arquivo · 2023 · 4 registros');
+  await expect(page.locator('#dataset-files-list button')).toHaveCount(0);
 });

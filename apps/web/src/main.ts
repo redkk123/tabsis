@@ -359,6 +359,12 @@ const microdatasusCsvButton = element<HTMLButtonElement>('#microdatasus-csv-butt
 const labPackageButton = element<HTMLButtonElement>('#lab-package-button');
 const decodeCancelButton = element<HTMLButtonElement>('#decode-cancel-button');
 const combineCompatibleFiles = element<HTMLInputElement>('#combine-compatible-files');
+const datasetFilesSection = element<HTMLElement>('#dataset-files');
+const datasetFilesSummary = element<HTMLElement>('#dataset-files-summary');
+const datasetFilesList = element<HTMLUListElement>('#dataset-files-list');
+const datasetFilesHint = element<HTMLElement>('#dataset-files-hint');
+const datasetAddButton = element<HTMLButtonElement>('#dataset-add-button');
+const datasetAddInput = element<HTMLInputElement>('#dataset-add-input');
 const form = element<HTMLFormElement>('#analysis-form');
 const fieldSearch = element<HTMLInputElement>('#field-search');
 const rowField = element<HTMLSelectElement>('#row-field');
@@ -2693,7 +2699,107 @@ function applyDefDefaults(): void {
   apply('column', columnField.value, columnConversion, columnStartPosition);
 }
 
+/**
+ * O conjunto aberto agora, um arquivo por linha: o nome original, o período que
+ * o nome diz e o ✕ para tirar um ano sem reabrir os outros.
+ *
+ * Antes, juntar anos dependia de achar uma caixa "Juntar os próximos arquivos"
+ * e marcá-la ANTES de abrir; quem abria vários arquivos de uma vez ficava só
+ * com o último, sem aviso. Agora selecionar vários junta, e esta lista mostra o
+ * que está junto.
+ */
+function renderDatasetFiles(): void {
+  const dados = activeDatasetSources.filter((source) => ['DBC', 'DBF', 'PARQUET', 'CSV', 'TSV'].includes(source.extension.toUpperCase()));
+  datasetFilesSection.hidden = !dbfHeader || !dados.length;
+  if (datasetFilesSection.hidden) return;
+  const ordenados = [...activeDatasetSources].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { numeric: true }));
+  const periodos = ordenados.map((source) => describeDatasusFile(source.name)?.periodShort).filter((p): p is string => Boolean(p));
+  const varios = activeDatasetSources.length > 1;
+  datasetFilesSummary.textContent = [
+    varios ? `${activeDatasetSources.length} juntos` : '1 arquivo',
+    periodos.length > 1 ? `${periodos[0]} a ${periodos.at(-1)}` : periodos[0] ?? '',
+    `${integerFormat.format(datasetRecordCount)} registros`,
+  ].filter(Boolean).join(' · ');
+  datasetFilesList.replaceChildren(...ordenados.map((source) => {
+    const descricao = describeDatasusFile(source.name);
+    const item = document.createElement('li');
+    const texto = document.createElement('div');
+    texto.className = 'dataset-file-texto';
+    const nome = document.createElement('b');
+    nome.textContent = source.name;
+    const detalhe = document.createElement('span');
+    detalhe.textContent = [descricao ? [descricao.kind, descricao.place].filter(Boolean).join(' · ') : source.extension, formatBytes(source.size)].join(' · ');
+    texto.append(nome, detalhe);
+    item.append(texto);
+    if (descricao?.periodShort) {
+      const periodo = document.createElement('span');
+      periodo.className = 'dataset-file-periodo';
+      periodo.textContent = descricao.periodShort;
+      item.append(periodo);
+    }
+    if (varios) {
+      const tirar = document.createElement('button');
+      tirar.type = 'button';
+      tirar.className = 'dataset-file-tirar';
+      tirar.textContent = '✕';
+      tirar.title = `Tirar ${source.name} do conjunto (os outros continuam abertos)`;
+      tirar.setAttribute('aria-label', `Tirar ${source.name} do conjunto`);
+      tirar.addEventListener('click', () => {
+        void removeDatasetSource(source.name).catch((error) => showToast(error instanceof Error ? error.message : String(error), true));
+      });
+      item.append(tirar);
+    }
+    return item;
+  }));
+  datasetFilesHint.hidden = varios;
+}
+
+/**
+ * Tira um arquivo do conjunto e reabre os outros a partir dos arquivos já
+ * guardados nesta aba — nada é baixado de novo. A tabela é refeita com o
+ * conjunto que sobrou.
+ */
+async function removeDatasetSource(name: string): Promise<void> {
+  const indice = activeDatasetSources.findIndex((source) => source.name === name);
+  if (indice < 0 || activeDatasetSources.length < 2) return;
+  if (activeDecode) throw new Error('Espere a leitura em andamento terminar para tirar um arquivo.');
+  const fontesAntes = [...activeDatasetSources];
+  const arquivosAntes = [...activeDatasetFiles];
+  const tinhaTransformacao = appliedTransformSteps.length > 0;
+  setBusy(`Tirando ${name} do conjunto…`);
+  activeDatasetSources.splice(indice, 1);
+  activeDatasetFiles.splice(indice, 1);
+  try {
+    const { sources, fields } = await rebuildSourcesFromOriginalFiles();
+    dbfHeader = await openDataset(sources, `Conjunto sem ${name}`, fields);
+  } catch (error) {
+    activeDatasetSources.splice(0, activeDatasetSources.length, ...fontesAntes);
+    activeDatasetFiles.splice(0, activeDatasetFiles.length, ...arquivosAntes);
+    setControlsEnabled(Boolean(dbfHeader));
+    throw error;
+  }
+  // Reabrir a partir dos originais desfaz uma transformação aplicada, como
+  // acontece ao juntar um arquivo.
+  appliedTransformSteps = [];
+  if (tinhaTransformacao) populateControls();
+  const unico = activeDatasetSources.length === 1;
+  datasetName = activeDatasetSources.map((source) => source.name).join(' + ');
+  datasetFingerprint = unico ? activeDatasetSources[0]! : null;
+  currentDatasetFile = unico ? activeDatasetFiles[0]! : null;
+  sourceDbfButton.disabled = !unico || extensionOf(activeDatasetSources[0]!.name) === 'PARQUET';
+  if (arquivosDoPainel) {
+    const restantes = arquivosDoPainel.filter((arquivo) => arquivo !== name);
+    arquivosDoPainel = restantes.length && restantes.length < activeDatasetSources.length ? restantes : null;
+  }
+  clearCombinationProfile();
+  updateDatasetStats();
+  painel?.atualizar();
+  await primeiraTabulacao();
+  showToast(`${name} saiu do conjunto. Ficaram ${activeDatasetSources.length} arquivo(s), ${integerFormat.format(datasetRecordCount)} registros.`);
+}
+
 function updateDatasetStats(): void {
+  renderDatasetFiles();
   if (!dbfHeader || !activeDatasetSources.length) return;
   const sourceBytes = activeDatasetSources.reduce((total, source) => total + source.size, 0);
   // Cada número diz o que é: "registros" para quem vem do TabWin, "(linhas do
@@ -3609,8 +3715,17 @@ async function downloadSelectedDbf(): Promise<void> {
   }
 }
 
-async function loadFiles(files: File[]): Promise<void> {
+async function loadFiles(files: File[], opcoes: { juntar?: boolean } = {}): Promise<void> {
   if (!files.length) return;
+  const ehDado = (file: File) => ['DBC', 'DBF', 'PARQUET'].includes(extensionOf(file.name));
+  const combinarAntes = combineCompatibleFiles.checked;
+  // Vários arquivos de dados escolhidos juntos são vários anos (ou estados) do
+  // mesmo tipo: entram todos no conjunto. A tabela é feita uma vez, no fim, e
+  // não uma vez por arquivo — com dez anos, seriam dez leituras de tudo.
+  const variosDados = files.filter(ehDado).length > 1 || Boolean(opcoes.juntar && dbfHeader);
+  if (variosDados) tabulacaoAdiada = true;
+  let dadosNesteGesto = 0;
+  const dadosRecusados: string[] = [];
   // Cada gesto de abrir recomeça a conta. Somar a sessão inteira faria os
   // tempos crescerem sem parar e deixariam de dizer quanto custou este
   // arquivo, que é a pergunta que eles existem para responder.
@@ -3627,6 +3742,19 @@ async function loadFiles(files: File[]): Promise<void> {
     // ela interrompia a leitura de todas as que vinham depois.
     const recusados: string[] = [];
     for (const file of ordered) {
+      if (ehDado(file)) {
+        combineCompatibleFiles.checked = combinarAntes || dadosNesteGesto > 0 || Boolean(opcoes.juntar && dbfHeader);
+        try {
+          await loadFile(file);
+          dadosNesteGesto += 1;
+        } catch (error) {
+          // O primeiro arquivo de dados que falha num gesto comum continua sendo
+          // erro; depois dele (ou ao juntar), o arquivo fica de fora e os outros entram.
+          if (!dadosNesteGesto && !(opcoes.juntar && dbfHeader)) throw error;
+          dadosRecusados.push(error instanceof Error ? error.message : `${file.name}: ${String(error)}`);
+        }
+        continue;
+      }
       if (!['DEF', 'CNV', 'MAP'].includes(extensionOf(file.name))) { await loadFile(file); continue; }
       try { await loadFile(file); }
       catch (error) { recusados.push(error instanceof Error ? error.message : `${file.name}: ${String(error)}`); }
@@ -3635,6 +3763,12 @@ async function loadFiles(files: File[]): Promise<void> {
       showToast(recusados.length === 1
         ? `Não abriu: ${recusados[0]}. Os outros arquivos foram carregados.`
         : `${recusados.length} arquivos auxiliares não abriram (${recusados.slice(0, 3).map((motivo) => motivo.split(':')[0]).join(', ')}${recusados.length > 3 ? '…' : ''}). Os outros foram carregados.`, true);
+    }
+    if (dadosRecusados.length) {
+      showToast(`${dadosRecusados.length === 1 ? 'Um arquivo não entrou' : `${dadosRecusados.length} arquivos não entraram`} no conjunto: `
+        + `${dadosRecusados.slice(0, 2).join('; ')}${dadosRecusados.length > 2 ? '…' : ''}. Os outros foram juntados.`, true);
+    } else if (dadosNesteGesto > 1 || (opcoes.juntar && dadosNesteGesto)) {
+      showToast(`${activeDatasetSources.length} arquivos juntos: ${integerFormat.format(datasetRecordCount)} registros. No mapa, a faixa Período mostra um ano de cada vez.`);
     }
     const soAuxiliares = ordered.every((file) => ['DEF', 'CNV', 'MAP'].includes(extensionOf(file.name)));
     if (soAuxiliares && tabelaSemDef && dbfHeader && painel) await painel.executarAgora();
@@ -3646,6 +3780,15 @@ async function loadFiles(files: File[]): Promise<void> {
     setControlsEnabled(Boolean(dbfHeader));
   } finally {
     fileInput.value = '';
+    datasetAddInput.value = '';
+    combineCompatibleFiles.checked = combinarAntes;
+    if (variosDados) {
+      tabulacaoAdiada = false;
+      if (tabulacaoPendente && dbfHeader) {
+        tabulacaoPendente = false;
+        await primeiraTabulacao().catch((error) => showToast(error instanceof Error ? error.message : String(error), true));
+      }
+    }
   }
 }
 
@@ -9997,6 +10140,8 @@ async function exportChartPng(): Promise<void> {
 }
 
 fileInput.addEventListener('change', () => void loadFiles([...fileInput.files ?? []]));
+datasetAddButton.addEventListener('click', () => datasetAddInput.click());
+datasetAddInput.addEventListener('change', () => void loadFiles([...datasetAddInput.files ?? []], { juntar: true }));
 sourceDbfButton.addEventListener('click', () => void downloadSourceDbf().catch((error) =>
   showToast(error instanceof Error ? error.message : String(error), true)));
 microdatasusCsvButton.addEventListener('click', () => void downloadMicrodatasusCsv().catch((error) =>
@@ -10775,7 +10920,15 @@ function sincronizarControlesComPainel(spec: TabulationSpec): void {
  */
 let tabelaSemDef = false;
 
+/** Enquanto vários arquivos de um mesmo gesto são juntados, a tabela espera o último. */
+let tabulacaoAdiada = false;
+let tabulacaoPendente = false;
+
 async function primeiraTabulacao(): Promise<void> {
+  if (tabulacaoAdiada) {
+    tabulacaoPendente = true;
+    return;
+  }
   if (painel && await painel.executarAgora()) return;
   await runAnalysis();
   tabelaSemDef = Boolean(currentResult);

@@ -1002,3 +1002,23 @@ dialog p { color: #676d74; font-size: 13px; line-height: 1.6; }
   .painel-resumo { font-size: 13px; }
   .painel-executar { width: 100%; }
 }
+
+
+/* Arquivos de dados abertos: o conjunto atual, um por linha, com o período e
+   como tirar ou juntar um ano. */
+.drop-zone-dica { color: var(--brand-ink); font-weight: 600; }
+.dataset-files { margin-top: 12px; padding: 10px 11px; border: 1px solid var(--brand-line); border-radius: 8px; background: var(--brand-soft); }
+.dataset-files-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 8px; }
+.dataset-files-head b { color: var(--ink); font-size: 13px; }
+.dataset-files-head span { color: var(--muted); font-size: 11.5px; }
+.dataset-files-list { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 5px; }
+.dataset-files-list li { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 6px 6px 6px 9px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+.dataset-file-texto { display: grid; min-width: 0; flex: 1 1 auto; }
+.dataset-file-texto b { color: var(--ink); font: 600 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; overflow-wrap: anywhere; }
+.dataset-file-texto span { color: var(--muted); font-size: 11px; }
+.dataset-file-periodo { flex: 0 0 auto; padding: 2px 7px; border-radius: 999px; background: var(--brand-soft); color: var(--brand-ink); font-size: 11px; font-weight: 700; }
+.dataset-file-tirar { flex: 0 0 auto; min-width: 30px; min-height: 30px; padding: 0 8px; border: 1px solid var(--line-strong); border-radius: 6px; background: #fff; color: var(--muted); cursor: pointer; }
+.dataset-file-tirar:hover { border-color: var(--danger); color: var(--danger); }
+.dataset-add-button { width: 100%; }
+.dataset-files-hint { margin: 7px 0 0; color: var(--muted); font-size: 11.5px; line-height: 1.45; }
+@media (pointer: coarse) { .dataset-file-tirar { min-width: 40px; min-height: 40px; } }
