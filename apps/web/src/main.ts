@@ -576,6 +576,7 @@ const mapFocusBar = element<HTMLElement>('#map-focus');
 const mapFocusBack = element<HTMLButtonElement>('#map-focus-back');
 const mapFocusTrail = element<HTMLElement>('#map-focus-trail');
 const mapFocusHint = element<HTMLElement>('#map-focus-hint');
+const mapModeSelect = element<HTMLSelectElement>('#map-mode');
 const mapPeriodBar = element<HTMLElement>('#map-period');
 const mapPeriodPlay = element<HTMLButtonElement>('#map-period-play');
 const mapPeriodSelect = element<HTMLSelectElement>('#map-period-select');
@@ -5605,7 +5606,7 @@ function objectAtCanvasPoint(canvasX: number, canvasY: number): TabwinMapObject 
     x: (canvasX - mapProjection.offsetX) / mapProjection.fit + mapProjection.west,
     y: mapProjection.north - (canvasY - mapProjection.offsetY) / mapProjection.fit,
   };
-  return mapObjectAtPoint(activeMap.objects, point);
+  return mapObjectAtPoint(visibleMapObjects(), point);
 }
 
 let mapPointerOrigin: { x: number; y: number } | null = null;
@@ -5943,16 +5944,26 @@ function applyMapSelectionAsFilter(): void {
  * Cai de volta nos limites do mapa inteiro se por algum motivo nenhuma área
  * casar — uma moldura vazia daria divisão por zero na escala.
  */
+/**
+ * As áreas que o mapa mostra agora. Com um estado em foco, só os municípios
+ * dele: os dos vizinhos ficavam desenhados em volta, e o estado não ficava em
+ * destaque, que é o ponto de entrar nele.
+ */
+function visibleMapObjects(): TabwinMapObject[] {
+  const todos = activeMap?.objects ?? [];
+  if (!mapUfFilter || mapLevel !== 'municipality' || mapClassic) return todos;
+  return todos.filter((objeto) => belongsToUf(objeto.geocode.trim(), mapUfFilter));
+}
+
 function boundsForDrawnArea(): { west: number; east: number; south: number; north: number } {
   const inteiro = activeMap!.bounds;
-  if (!mapUfFilter || mapGeoField?.level !== 'municipality') return inteiro;
+  if (!mapUfFilter || mapLevel !== 'municipality' || mapClassic) return inteiro;
 
   let west = Number.POSITIVE_INFINITY;
   let east = Number.NEGATIVE_INFINITY;
   let south = Number.POSITIVE_INFINITY;
   let north = Number.NEGATIVE_INFINITY;
-  for (const objeto of activeMap!.objects) {
-    if (!belongsToUf(objeto.geocode.trim(), mapUfFilter)) continue;
+  for (const objeto of visibleMapObjects()) {
     for (const ponto of objeto.points) {
       if (ponto.x < west) west = ponto.x;
       if (ponto.x > east) east = ponto.x;
@@ -6108,7 +6119,7 @@ function renderMap(): void {
   context.lineJoin = 'round';
   context.lineWidth = Math.max(.28, .45 / scale);
   context.strokeStyle = 'rgba(49, 91, 86, .48)';
-  for (const object of activeMap.objects) {
+  for (const object of visibleMapObjects()) {
     const value = valueForMapObject(object, valoresMostrados);
     lastMapValues.set(object, value);
     if (value !== undefined) matched++;
@@ -6213,7 +6224,7 @@ function renderMap(): void {
     context.fillStyle = '#123f36';
     context.strokeStyle = 'rgba(255,255,255,.9)';
     context.lineWidth = Math.max(.5, 1 / scale);
-    for (const object of activeMap.objects) {
+    for (const object of visibleMapObjects()) {
       if (object.type !== 'polygon-with-seat') continue;
       const point = project(object.labelPoint.x, object.labelPoint.y);
       context.beginPath();
@@ -6606,9 +6617,12 @@ function onlyUf(result: TabulationResult, uf: string): TabulationResult {
  */
 function renderMapUfOptions(): void {
   const fonte = mapSource === 'tabela' ? currentResult : mapResult;
-  const podeDescer = Boolean(fonte) && mapLevel === 'municipality';
+  const podeDescer = Boolean(fonte) && mapLevel === 'municipality' && !mapClassic;
   mapUfSelect.hidden = !podeDescer;
   mapUfLabel.hidden = !podeDescer;
+  // O modo só faz sentido com municípios (o estado é o nível de cima).
+  const rotuloModo = mapModeSelect.closest('label');
+  if (rotuloModo) rotuloModo.hidden = !(fonte && mapLevel === 'municipality');
   if (!podeDescer || !fonte) {
     mapFocusBar.hidden = true;
     return;
@@ -6647,7 +6661,7 @@ let mapFocusStates = new Map<string, number>();
 /** O mapa do Brasil clicável: de cima, cada estado desce para os seus municípios. */
 function mapCanFocus(): boolean {
   return Boolean(mapSource === 'tabela' ? currentResult : mapResult)
-    && mapLevel === 'municipality' && !mapUfFilter;
+    && mapLevel === 'municipality' && !mapUfFilter && !mapClassic;
 }
 
 function renderMapFocusBar(): void {
@@ -6876,6 +6890,9 @@ async function loadMapPeriods(): Promise<void> {
 /** Município (ou área) em foco: o cartão com valor, posição e série por ano. */
 let mapFocusGeocode = '';
 
+/** Mapa clássico: um mapa só, com todos os municípios de uma vez, sem descer por estado. */
+let mapClassic = false;
+
 function renderMapFocusCard(): void {
   const objeto = mapFocusGeocode && activeMap
     ? activeMap.objects.find((candidato) => candidato.geocode.trim() === mapFocusGeocode)
@@ -7027,12 +7044,12 @@ function mapDrawableResult(periodOverride?: string): TabulationResult | null {
   if (periodo && !doPeriodo) return null;
   if (mapSource === 'tabela') {
     const daTabela = doPeriodo ?? currentResult;
-    if (!daTabela || mapLevel !== 'municipality') return daTabela;
+    if (!daTabela || mapLevel !== 'municipality' || mapClassic) return daTabela;
     return mapUfFilter ? onlyUf(daTabela, mapUfFilter) : aggregateColumnsToUf(daTabela);
   }
   const base = doPeriodo ?? mapResult;
   if (!base) return currentResult;
-  if (mapLevel === 'uf') return base;
+  if (mapLevel === 'uf' || mapClassic) return base;
   return mapUfFilter ? onlyUf(base, mapUfFilter) : aggregateToUf(base);
 }
 
@@ -7086,7 +7103,7 @@ async function ensureMap(): Promise<void> {
   void loadMapPeriods();
   // Município sem estado isolado vira mapa nacional por UF; com estado
   // isolado, o mapa daquele estado.
-  const bundled = mapLevel === 'uf' || !mapUfFilter ? 'br_ufsigla.MAP' : 'br_municip.MAP';
+  const bundled = mapLevel === 'uf' || (!mapUfFilter && !mapClassic) ? 'br_ufsigla.MAP' : 'br_municip.MAP';
 
   if (activeMap && activeMapSource === `incluído: ${bundled}`) {
     renderTable(currentResult);
@@ -10463,6 +10480,15 @@ mapValueColumn.addEventListener('change', () => {
 
 mapUfSelect.addEventListener('change', () => setMapFocus(mapUfSelect.value));
 mapFocusBack.addEventListener('click', () => setMapFocus(''));
+mapModeSelect.addEventListener('change', () => {
+  mapClassic = mapModeSelect.value === 'classic';
+  mapUfSelect.value = '';
+  mapUfFilter = '';
+  mapFocusGeocode = '';
+  mapZoom = 1; mapPanX = 0; mapPanY = 0;
+  activeMap = null;
+  void ensureMap();
+});
 mapPeriodSelect.addEventListener('change', () => { stopMapPeriodPlayback(); selectMapPeriod(mapPeriodSelect.value); });
 mapVariationSelect.addEventListener('change', () => {
   // Mostrar variação sem ano escolhido não tem o que mostrar: vai para o último ano.

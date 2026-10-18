@@ -841,6 +841,12 @@
                 <button class="secondary-button" id="map-selection-apply" type="button">Filtrar por seleção</button>
                 <button class="secondary-button" id="map-selection-clear" type="button">Limpar</button>
               </div>
+              <label class="map-uf-label" for="map-mode">Modo do mapa
+                <select id="map-mode" title="Foco: começa no Brasil e desce ao estado. Clássico: todos os municípios num mapa só">
+                  <option value="focus">Foco: Brasil → estado → município</option>
+                  <option value="classic">Clássico: todos os municípios de uma vez</option>
+                </select>
+              </label>
               <label class="map-uf-label" for="map-geo-field">Geografia
                 <select id="map-geo-field" title="Qual campo do arquivo define o lugar"></select>
               </label>

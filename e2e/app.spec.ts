@@ -2440,3 +2440,34 @@ test('os fluxos ficam recolhidos e explicam o que são, em português', async ({
   await expect(page.locator('.flow-intro')).toContainText('de um lugar a outro');
   await expect(page.locator('#flow-origin')).toBeVisible();
 });
+
+test('no estado só aparecem os municípios dele, e o modo clássico mostra todos de uma vez', async ({ page }) => {
+  await page.addInitScript(() => { try { localStorage.setItem('tabsis.aberto.group-campos', '1'); } catch { /* ignora */ } });
+  await page.goto('/');
+  await page.locator('#file-input').setInputFiles('e2e/fixtures/uf-zi-e2e.csv');
+  await expect(page.locator('#run-button')).toBeEnabled();
+  await page.locator('#row-field').selectOption('UF_ZI');
+  await page.locator('#analysis-form').evaluate((form: HTMLFormElement) => form.requestSubmit());
+  await page.locator('[data-view="map"]').click();
+  await expect(page.locator('#map-legend')).toContainText('3 áreas associadas');
+
+  await page.locator('#map-uf').selectOption('35');
+  await expect(page.locator('#map-legend')).toContainText('1 áreas associadas', { timeout: 15000 });
+  // Fora do estado nada é desenhado: os cantos do canvas ficam só com o fundo (transparente).
+  const cantos = await page.evaluate(() => {
+    const c = document.querySelector<HTMLCanvasElement>('#map-canvas')!;
+    const g = c.getContext('2d')!;
+    const w = c.width, h = c.height;
+    const alfa = (x: number, y: number) => g.getImageData(x, y, 1, 1).data[3]!;
+    return [alfa(4, 4), alfa(w - 5, 4), alfa(4, h - 5), alfa(w - 5, h - 5)];
+  });
+  expect(cantos).toEqual([0, 0, 0, 0]);
+
+  // Clássico: todos os municípios do Brasil num mapa só, sem descer por estado.
+  await page.locator('#map-mode').selectOption('classic');
+  await expect(page.locator('#map-legend')).toContainText('3 áreas associadas', { timeout: 15000 });
+  await expect(page.locator('#map-uf')).toBeHidden();
+  await expect(page.locator('#map-focus-trail')).toBeHidden();
+  await page.locator('#map-mode').selectOption('focus');
+  await expect(page.locator('#map-focus-trail')).toHaveText('Brasil');
+});
