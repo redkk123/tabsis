@@ -129,6 +129,7 @@ import { fetchFromMirror } from './mirror-client.ts';
 import { describeCacheUsage } from '../../../packages/acquisition/src/cache-policy.ts';
 import { fetchTabnetPreview, tabnetPreviewAvailable } from './tabnet-client.ts';
 import { nameGeographicLabels } from '../../../packages/analysis/src/geographic-labels.ts';
+import { populationFor, ratePer100k, readPopulationTable, type PopulationTable } from '../../../packages/analysis/src/population.ts';
 import { PERIODO_FIELD, type PainelEixo } from '../../../packages/core/src/painel.ts';
 import {
   DATE_PART_LABEL,
@@ -602,6 +603,10 @@ const mapPeriodStatus = element<HTMLElement>('#map-period-status');
 const mapPeriodChart = element<HTMLElement>('#map-period-chart');
 const mapVariationSelect = element<HTMLSelectElement>('#map-variation');
 const mapCard = element<HTMLElement>('#map-card');
+const mapTaxaCheck = element<HTMLInputElement>('#map-taxa-check');
+const mapPopulacaoButton = element<HTMLButtonElement>('#map-populacao-button');
+const mapPopulacaoInput = element<HTMLInputElement>('#map-populacao-input');
+const mapPopulacaoStatus = element<HTMLElement>('#map-populacao-status');
 const mapClassCount = element<HTMLSelectElement>('#map-class-count');
 const mapManualBreaksLabel = element<HTMLElement>('#map-manual-breaks-label');
 const mapManualBreaks = element<HTMLInputElement>('#map-manual-breaks');
@@ -2773,7 +2778,7 @@ function renderDatasetFiles(): void {
 async function removeDatasetSource(name: string): Promise<void> {
   const indice = activeDatasetSources.findIndex((source) => source.name === name);
   if (indice < 0 || activeDatasetSources.length < 2) return;
-  if (activeDecode) throw new Error('Espere a leitura em andamento terminar para tirar um arquivo.');
+  await aguardarLeituraEmAndamento();
   const fontesAntes = [...activeDatasetSources];
   const arquivosAntes = [...activeDatasetFiles];
   const tinhaTransformacao = appliedTransformSteps.length > 0;
@@ -3023,13 +3028,12 @@ async function decodeDbf(bytes: Uint8Array, file: File, isDbc: boolean, source: 
   // carrega esses bytes (só o cabeçalho), então o botão não se aplica.
   sourceDbfButton.disabled = formato === 'PARQUET';
   resetAnalysisState();
-  // Em segundo plano: a leitura pelo campo geográfico custa uma passada, e
-  // segurar a abertura do arquivo por causa de um painel lateral trocaria uma
-  // comodidade por uma espera que todo mundo paga.
-  void refreshGeoFilter();
-  // As datas do arquivo viram Mês, Ano e Semana no painel (conferidas numa amostra).
-  void detectarCamposDeData();
-  void detectarCamposRegionais();
+  // Em segundo plano (segurar a abertura por causa delas seria uma espera que
+  // todo mundo paga): a leitura pelo campo geográfico, a amostra das datas e as
+  // regiões. Quando vários arquivos chegam juntos, ficam para depois do último —
+  // feitas antes, leriam um conjunto que ainda vai crescer.
+  if (tabulacaoAdiada) leiturasDeFundoPendentes = true;
+  else iniciarLeiturasDeFundo();
   renderConfiguredFilters();
   renderCrossFieldRules();
   renderExtraMeasures();
@@ -3046,8 +3050,25 @@ function schemaSignature(header: DbfHeader): string {
     .join('|');
 }
 
+/**
+ * Espera a leitura em andamento no trabalhador (a contagem do mapa, a amostra
+ * das datas) terminar. Com arquivos grandes elas levam segundos, e recusar o
+ * próximo arquivo por isso deixava de fora, sem motivo, o 2º ano de um gesto.
+ */
+async function aguardarLeituraEmAndamento(): Promise<void> {
+  while (activeDecode) await new Promise((resolve) => window.setTimeout(resolve, 80));
+}
+
+/** Leituras de fundo de um arquivo recém-aberto: geografia para o mapa e o "Onde", datas e regiões para o painel. */
+let leiturasDeFundoPendentes = false;
+function iniciarLeiturasDeFundo(): void {
+  void refreshGeoFilter();
+  void detectarCamposDeData();
+  void detectarCamposRegionais();
+}
+
 async function openDatasetFile(bytes: Uint8Array, file: File, isDbc: boolean): Promise<DbfHeader> {
-  if (activeDecode) throw new Error('Outra leitura DBC/DBF ainda está em andamento');
+  await aguardarLeituraEmAndamento();
   setBusy(isDbc ? `Abrindo ${file.name}…` : `Lendo ${file.name}…`);
   decodeCancelButton.hidden = false;
   try {
@@ -3067,7 +3088,7 @@ async function appendCompatibleDbf(
   if (activeDatasetSources.some((item) => item.size === source.size && item.sha256 === source.sha256)) {
     throw new Error(`${file.name}: este arquivo já faz parte do conjunto combinado`);
   }
-  if (activeDecode) throw new Error('Outra leitura DBC/DBF ainda está em andamento');
+  await aguardarLeituraEmAndamento();
   if (!dbfHeader) throw new Error('Abra um arquivo antes de combinar outro');
   setBusy(`Combinando ${file.name}…`);
   decodeCancelButton.hidden = false;
@@ -3915,6 +3936,10 @@ async function loadFiles(files: File[], opcoes: { juntar?: boolean } = {}): Prom
     combineCompatibleFiles.checked = combinarAntes;
     if (variosDados) {
       tabulacaoAdiada = false;
+      if (leiturasDeFundoPendentes && dbfHeader) {
+        leiturasDeFundoPendentes = false;
+        iniciarLeiturasDeFundo();
+      }
       if (tabulacaoPendente && dbfHeader) {
         tabulacaoPendente = false;
         await primeiraTabulacao().catch((error) => showToast(error instanceof Error ? error.message : String(error), true));
@@ -6449,6 +6474,8 @@ function renderMap(): void {
   const values = new Map<string, number>();
   desenhavel.rows.forEach((row, index) => {
     const value = desenhavel.cells[index]?.[escolha.index] ?? 0;
+    // Sem população conhecida a taxa não existe: o lugar fica sem valor.
+    if (!Number.isFinite(value)) return;
     values.set(row.key.trim().toLowerCase(), value);
     values.set(normalizeLabel(row.label), value);
   });
@@ -6458,7 +6485,7 @@ function renderMap(): void {
   const valoresDaEscala: number[] = mapPeriod
     ? mapPeriodList().flatMap((periodo) => {
       const resultadoDoAno = mapDrawableResult(periodo.name);
-      return resultadoDoAno ? resultadoDoAno.cells.map((linha) => linha[escolha.index] ?? 0) : [];
+      return resultadoDoAno ? resultadoDoAno.cells.map((linha) => linha[escolha.index] ?? 0).filter(Number.isFinite) : [];
     })
     : [...values.values()];
   // Variação em relação ao ano anterior: só vale com um ano escolhido que não
@@ -6505,7 +6532,7 @@ function renderMap(): void {
   formatMapValue = variacao
     ? (valor) => signedFormat(valor, modoVariacao === 'pct' ? '%' : '')
     : (valor) => numberFormat.format(valor);
-  mapValueSuffix = variacao && anteriorDoAno ? ` em relação a ${anteriorDoAno.label}` : '';
+  mapValueSuffix = `${mapTaxaAtiva() ? ' por 100 mil hab.' : ''}${variacao && anteriorDoAno ? ` em relação a ${anteriorDoAno.label}` : ''}`;
   mapManualBreaksNote.hidden = !manualBreakProblem || Boolean(variacao);
   mapManualBreaksNote.textContent = manualBreakProblem ? `${manualBreakProblem}. Mapa desenhado por quantis.` : '';
   let matched = 0;
@@ -6707,7 +6734,7 @@ function renderMap(): void {
   const title = document.createElement('strong');
   title.textContent = variacao
     ? `Variação${mapValueSuffix} · ${integerFormat.format(matched)} áreas`
-    : `${integerFormat.format(matched)} áreas associadas`;
+    : `${mapTaxaAtiva() ? 'Por 100 mil hab. · ' : ''}${integerFormat.format(matched)} áreas associadas`;
   const gradient = document.createElement('div');
   gradient.className = 'legend-gradient';
   gradient.style.background = variacao
@@ -7301,10 +7328,15 @@ function renderMapPeriodBar(): void {
   // isolado, filtros). Clicar num ponto escolhe aquele período.
   const coluna = mapValueColumn.value || undefined;
   const totais = periodos.map((periodo) => {
-    const resultado = mapPeriodResults.has(periodo.name) ? mapDrawableResult(periodo.name) : null;
+    const resultado = mapPeriodResults.has(periodo.name) ? mapDrawableResultBruto(periodo.name) : null;
     if (!resultado) return undefined;
     const indiceColuna = chooseMapColumn(resultado.columns.map((c) => c.key), coluna).index;
-    return resultado.cells.reduce((soma, linha) => soma + (linha[indiceColuna] ?? 0), 0);
+    const casos = resultado.cells.reduce((soma, linha) => soma + (linha[indiceColuna] ?? 0), 0);
+    if (!mapTaxaAtiva()) return casos;
+    // A taxa do recorte inteiro: todos os casos sobre toda a população (somar
+    // as taxas de cada lugar não dá taxa nenhuma).
+    const habitantes = resultado.rows.reduce((soma, row) => soma + (populationFor(populacao!, row.key, periodo.label) ?? 0), 0);
+    return ratePer100k(casos, habitantes);
   });
   const escolher = (indice: number): void => { stopMapPeriodPlayback(); selectMapPeriod(periodos[indice]!.name); };
   const partes: Element[] = [evolutionChart(periodos.map((periodo) => periodo.label), totais, indice, escolher,
@@ -7552,6 +7584,50 @@ let mapFocusGeocode = '';
 /** Mapa clássico: um mapa só, com todos os municípios de uma vez, sem descer por estado. */
 let mapClassic = false;
 
+/** População aberta para a taxa por 100 mil (ver `population.ts`). */
+let populacao: PopulationTable | null = null;
+
+async function lerArquivoDePopulacao(file: File): Promise<void> {
+  const extensao = extensionOf(file.name);
+  let registros: Array<Record<string, unknown>>;
+  let campos: string[];
+  if (extensao === 'CSV' || extensao === 'TSV') {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    let texto: string;
+    try { texto = new TextDecoder('utf-8', { fatal: true }).decode(bytes); } catch { texto = textDecoder.decode(bytes); }
+    const lido = parseDelimited(texto, extensao === 'TSV' ? { delimiter: '\t' } : {});
+    registros = lido.records as Array<Record<string, unknown>>;
+    campos = lido.fields.map((campo) => campo.name);
+  } else if (['DBF', 'DBC', 'PARQUET'].includes(extensao)) {
+    // Um trabalhador à parte, só para ler a população: o conjunto aberto fica
+    // como está.
+    const trabalhador = createDatasetWorker();
+    try {
+      const fonte = workerSourceFor(file.name, new Uint8Array(await file.arrayBuffer()));
+      const aberto = await askDatasetWorker<{ header: DbfHeader }>(trabalhador, { type: 'open', sources: [fonte] },
+        { label: 'População', transfer: fonte.kind === 'binary' || fonte.kind === 'parquet' ? [fonte.bytes] : [] });
+      campos = aberto.header.fields.map((campo) => campo.name);
+      registros = (await askDatasetWorker<{ records: Array<Record<string, unknown>> }>(trabalhador,
+        { type: 'records', fields: campos, maxRecords: 500_000 }, { label: 'População' })).records;
+    } finally {
+      trabalhador.terminate();
+    }
+  } else {
+    throw new Error(`${file.name}: abra a população em DBF, DBC ou CSV.`);
+  }
+  const tabela = readPopulationTable(registros, campos, file.name);
+  populacao = tabela;
+  const anos = [...tabela.byYear.keys()].filter(Boolean).sort();
+  const municipios = Math.max(...[...tabela.byYear.values()].map((porMunicipio) => porMunicipio.size));
+  mapPopulacaoStatus.textContent = `População: ${file.name} · ${integerFormat.format(municipios)} municípios`
+    + `${anos.length ? ` · ${anos.length > 1 ? `${anos[0]} a ${anos.at(-1)}` : anos[0]}` : ''}`
+    + ` (colunas ${tabela.codeField} e ${tabela.populationField}${tabela.yearField ? `, ano em ${tabela.yearField}` : ''}).`;
+  mapTaxaCheck.disabled = false;
+  mapTaxaCheck.checked = true;
+  showToast('População aberta: o mapa mostra casos por 100 mil habitantes.');
+  if (activeMap && currentResult && currentView === 'map') { renderMapPeriodBar(); renderMap(); }
+}
+
 /** Segundo lugar do cartão, para comparar lado a lado; `mapCompareArmed` espera o próximo toque. */
 let mapCompareGeocode = '';
 let mapCompareArmed = false;
@@ -7564,7 +7640,10 @@ function mapAreaValue(geocode: string, periodName?: string): number | undefined 
   const coluna = chooseMapColumn(base.columns.map((c) => c.key), mapValueColumn.value || undefined).index;
   const chave = geocode.toLowerCase();
   const linha = base.rows.findIndex((row) => row.key.trim().toLowerCase() === chave);
-  return linha >= 0 ? (base.cells[linha]?.[coluna] ?? 0) : 0;
+  const casos = linha >= 0 ? (base.cells[linha]?.[coluna] ?? 0) : 0;
+  if (!mapTaxaAtiva()) return casos;
+  const rotulo = mapPeriodList().find((item) => item.name === periodo)?.label ?? '';
+  return ratePer100k(casos, populationFor(populacao!, geocode, rotulo));
 }
 
 function mapAreaName(geocode: string): string {
@@ -7597,12 +7676,14 @@ function renderMapFocusCard(): void {
   const descrever = (geocode: string): string => {
     const valor = mapAreaValue(geocode) ?? 0;
     const prefixo = periodoAtual ? `${periodoAtual.label}: ` : '';
-    if (!valor) return `${prefixo}sem registros nesta área.`;
+    if (!valor) return `${prefixo}${mapTaxaAtiva() ? 'sem registros (ou sem população) nesta área.' : 'sem registros nesta área.'}`;
     const dentro = linhas.some((linha) => linha.chave === geocode.toLowerCase());
-    if (!dentro) return `${prefixo}${numberFormat.format(valor)}`;
+    const unidade = mapTaxaAtiva() ? ' por 100 mil hab.' : '';
+    if (!dentro) return `${prefixo}${numberFormat.format(valor)}${unidade}`;
     const posicao = 1 + comDado.filter((linha) => linha.valor > valor).length;
-    return `${prefixo}${numberFormat.format(valor)} · ${integerFormat.format(posicao)}º entre ${integerFormat.format(comDado.length)} áreas com dado`
-      + ` · ${numberFormat.format((valor / soma) * 100)}% ${onde}`;
+    // Em taxa, "participação" (soma de taxas) não tem sentido: fica a posição.
+    return `${prefixo}${numberFormat.format(valor)}${unidade} · ${integerFormat.format(posicao)}º entre ${integerFormat.format(comDado.length)} áreas com dado`
+      + (mapTaxaAtiva() ? '' : ` · ${numberFormat.format((valor / soma) * 100)}% ${onde}`);
   };
   const botao = (texto: string, titulo: string, acao: () => void, classe = 'secondary-button'): HTMLButtonElement => {
     const elemento = document.createElement('button');
@@ -7752,7 +7833,30 @@ function signedFormat(value: number, unit: string): string {
   return `${value > 0 ? '+' : value < 0 ? '−' : ''}${texto}${unit}`;
 }
 
+/**
+ * O que o mapa pinta. Com a taxa ligada (e a população aberta), cada valor vira
+ * casos por 100 mil habitantes do lugar, no ano da população mais próximo do
+ * período. Lugar sem população conhecida fica sem valor (cinza), não zero.
+ */
 function mapDrawableResult(periodOverride?: string): TabulationResult | null {
+  const bruto = mapDrawableResultBruto(periodOverride);
+  if (!bruto || !mapTaxaAtiva()) return bruto;
+  const periodo = periodOverride ?? mapPeriod;
+  const rotulo = mapPeriodList().find((item) => item.name === periodo)?.label ?? '';
+  return {
+    ...bruto,
+    cells: bruto.rows.map((row, linha) => {
+      const habitantes = populationFor(populacao!, row.key, rotulo);
+      return (bruto.cells[linha] ?? []).map((valor) => ratePer100k(valor, habitantes) ?? Number.NaN);
+    }),
+  };
+}
+
+function mapTaxaAtiva(): boolean {
+  return Boolean(populacao) && mapTaxaCheck.checked;
+}
+
+function mapDrawableResultBruto(periodOverride?: string): TabulationResult | null {
   const periodo = periodOverride ?? mapPeriod;
   // Um ano escolhido e ainda não lido não pode cair no resultado de todos os
   // anos juntos: seria o mapa de um período com o rótulo de outro.
@@ -11200,6 +11304,16 @@ mapValueColumn.addEventListener('change', () => {
 
 mapUfSelect.addEventListener('change', () => setMapFocus(mapUfSelect.value));
 mapFocusBack.addEventListener('click', () => setMapFocus(''));
+mapPopulacaoButton.addEventListener('click', () => mapPopulacaoInput.click());
+mapPopulacaoInput.addEventListener('change', () => {
+  const arquivo = mapPopulacaoInput.files?.[0];
+  mapPopulacaoInput.value = '';
+  if (!arquivo) return;
+  void lerArquivoDePopulacao(arquivo).catch((error) => showToast(error instanceof Error ? error.message : String(error), true));
+});
+mapTaxaCheck.addEventListener('change', () => {
+  if (activeMap && currentResult && currentView === 'map') { renderMapPeriodBar(); renderMap(); }
+});
 mapModeSelect.addEventListener('change', () => {
   mapClassic = mapModeSelect.value === 'classic';
   mapUfSelect.value = '';

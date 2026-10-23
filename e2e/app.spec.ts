@@ -2661,3 +2661,27 @@ test('cartão do município: comparar dois lugares lado a lado, com as duas linh
   await cartao.getByRole('button', { name: 'Tirar a comparação' }).click();
   await expect(cartao.locator('.map-card-col--b')).toHaveCount(0);
 });
+
+test('taxa por 100 mil: a população aberta no mapa troca contagem por taxa, e desliga de volta', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#file-input').setInputFiles([
+    'e2e/fixtures/DENGBR23.dbf', 'e2e/fixtures/DENGBR24.dbf', 'e2e/fixtures/DENGBR25.dbf',
+  ]);
+  await page.locator('[data-view="map"]').click();
+  await expect(page.locator('#map-period-status')).toContainText('Mostrando todos', { timeout: 20000 });
+  await expect(page.locator('#map-taxa-check')).toBeDisabled();
+
+  await page.locator('#map-populacao-input').setInputFiles('e2e/fixtures/populacao-e2e.csv');
+  await expect(page.locator('#map-populacao-status')).toContainText('3 municípios · 2023 a 2024');
+  await expect(page.locator('#map-populacao-status')).toContainText('MUNIC_RES e POPULACAO');
+  await expect(page.locator('#map-taxa-check')).toBeChecked();
+  await expect(page.locator('#map-legend')).toContainText('Por 100 mil hab.');
+
+  // 2024: 9 casos em 19,03 milhões de habitantes = 0,05 por 100 mil.
+  await page.locator('#map-period-select').selectOption({ label: '2024' });
+  await expect(page.locator('#map-period-chart .evo-valor')).toHaveText('0,05');
+
+  await page.locator('#map-taxa-check').uncheck();
+  await expect(page.locator('#map-legend')).not.toContainText('Por 100 mil');
+  await expect(page.locator('#map-period-chart .evo-valor')).toHaveText('9');
+});

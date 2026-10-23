@@ -555,6 +555,17 @@ participação), com as duas linhas de evolução no mesmo gráfico — o segund
 tracejado em laranja, e contornado em laranja no mapa. O ✕ ao lado do segundo
 tira a comparação.
 
+**Taxa por 100 mil habitantes.** Comparar lugares pela contagem mostra o
+tamanho do lugar, não a doença. No mapa, **Abrir população (IBGE)…** aceita a
+população por município em DBF, DBC ou CSV (ex.: *IBGE · Bases populacionais*
+em Buscar no DATASUS). O TabSis acha sozinho a coluna de município (a que traz
+códigos do IBGE), a de população (a numérica de maior soma, ou a de nome POP…)
+e a de ano, se houver; linhas do mesmo município (por sexo, por idade) são
+somadas. Com **Por 100 mil habitantes** marcado, o mapa, a legenda, a variação
+e o cartão mostram taxa, com a população do ano mais próximo de cada período;
+o gráfico de evolução mostra a taxa do recorte inteiro (todos os casos sobre
+toda a população). Lugar sem população conhecida fica sem cor.
+
 **A diferença entre os anos.** Na faixa Período, **Cores mostram** troca os
 valores de cada ano pela **diferença para o ano anterior** (em casos) ou pela
 **variação %**. A escala é simétrica em torno de zero e é a mesma para todos os
