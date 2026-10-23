@@ -63,6 +63,8 @@ export interface PainelDeps {
   /** Sem DEF, o campo que a abertura escolheu como plausível (UF, município…). */
   campoInicial?(): string | undefined;
   arquivos(): PainelArquivo[];
+  /** Eixos derivados dos campos de data (Mês, Ano, Semana de um campo), conferidos nos dados. */
+  eixosDeData?(): PainelEixo[];
   valoresDistintos(campo: string): Promise<{ values: string[]; truncated: boolean }>;
   /** As primeiras linhas do arquivo, só com os campos pedidos ("Ver arquivo .DBF"). */
   primeirosRegistros?(campos: string[], limite: number): Promise<Array<Record<string, unknown>>>;
@@ -318,11 +320,23 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
     } else if (campos) {
       base = catalogoDosCampos(campos, (campo) => deps.rotuloDoCampo(campo));
     }
-    if (!base || deps.arquivos().length < 2) return base;
-    // Com vários arquivos juntos, o Ano entra no topo de Linhas e de Colunas:
-    // Linhas = Ano dá a série ano a ano; Colunas = Ano põe os anos lado a lado.
-    const ano: PainelEixo = { id: PERIODO_EIXO_ID, label: 'Ano (um por arquivo aberto)', field: PERIODO_FIELD, disponivel: true };
-    return { ...base, linhas: [ano, ...base.linhas], colunas: [ano, ...base.colunas] };
+    if (!base) return base;
+    // Mês, Ano e Semana a partir das datas do arquivo vêm logo no começo: são
+    // as escalas de tempo que quem tabula procura primeiro.
+    const datas = deps.eixosDeData?.() ?? [];
+    // Com vários arquivos juntos, o Ano (um por arquivo) entra no topo de Linhas
+    // e de Colunas: Linhas = Ano dá a série ano a ano; Colunas = Ano põe os anos
+    // lado a lado.
+    const ano: PainelEixo[] = deps.arquivos().length > 1
+      ? [{ id: PERIODO_EIXO_ID, label: 'Ano (um por arquivo aberto)', field: PERIODO_FIELD, disponivel: true }]
+      : [];
+    if (!datas.length && !ano.length) return base;
+    return {
+      ...base,
+      linhas: [...ano, ...datas, ...base.linhas],
+      colunas: [...ano, ...datas, ...base.colunas],
+      selecoes: [...datas, ...base.selecoes],
+    };
   }
 
   /** Os períodos dos arquivos abertos, na ordem: "2023", "2024"… (ou o nome do arquivo). */

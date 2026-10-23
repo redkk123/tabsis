@@ -156,7 +156,7 @@ Falta, para isso ser **a** forma de explorar os dados e não um recurso do mapa:
 - [x] **Escala temporal fora do mapa** (feito: Ano em Linhas/Colunas do painel; gráfico de linhas ou barras por ano): ano como coluna ou filtro na tabela,
       gráfico de série (linha) por ano, para um lugar ou um recorte; hoje só o
       mapa e o cartão do município mostram a série.
-- [ ] **Escalas além do ano do nome do arquivo**: mês/semana/dia a partir de um
+- [x] **Escalas além do ano do nome do arquivo** (feito: Mês, Ano e Semana epidemiológica dos campos de data, formato conferido nos valores; dia da semana fica para depois): mês/semana/dia a partir de um
       campo de data do arquivo (DT_NOTIFIC, DT_SIN_PRI…), não só o período
       escrito no nome.
 - [ ] **Escala espacial**: além de Brasil → UF → município, região de saúde e

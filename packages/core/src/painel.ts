@@ -260,8 +260,9 @@ export function catalogoDosCampos(
 
 /** TabWin's defaults when the panel opens. */
 export function estadoInicial(catalogo: PainelCatalogo): PainelEstado {
-  // O Ano virtual não é o começo natural de uma tabela: começa no primeiro campo de verdade.
-  const linha = catalogo.linhas.find((eixo) => eixo.disponivel && eixo.id !== PERIODO_EIXO_ID) ?? catalogo.linhas[0];
+  // O Ano virtual e as partes de data não são o começo natural de uma tabela:
+  // começa no primeiro campo de verdade (como o TabWin, pela ordem do DEF).
+  const linha = catalogo.linhas.find((eixo) => eixo.disponivel && eixo.id !== PERIODO_EIXO_ID && !eixo.id.startsWith('data:')) ?? catalogo.linhas[0];
   return {
     linha: linha?.id ?? '',
     coluna: null,

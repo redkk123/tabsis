@@ -2534,3 +2534,31 @@ test('Ano em Linhas ou em Colunas: cada arquivo é um período, com série e ano
   // Com os anos em colunas: barras verticais, um ano ao lado do outro.
   await expect(page.locator('#chart-type')).toHaveValue('vertical-bar');
 });
+
+test('as datas do arquivo viram Mês, Ano e Semana no painel, conferidas nos valores', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#file-input').setInputFiles('e2e/fixtures/datas-e2e.dbf');
+  const linhas = page.locator('#painel-linhas');
+  // AAAAMMDD (DT_NOTIFIC), DDMMAAAA (DTOBITO) e AAAASS (SEM_NOT): cada um lido da posição certa.
+  await expect(linhas.locator('option[value="data:mes:DT_NOTIFIC"]')).toHaveCount(1);
+  await expect(linhas.locator('option[value="data:mes:DTOBITO"]')).toHaveCount(1);
+  await expect(linhas.locator('option[value="data:semana:SEM_NOT"]')).toHaveCount(1);
+  // O começo da tabela continua sendo um campo de verdade.
+  await expect(linhas).not.toHaveValue(/^data:/);
+
+  await linhas.selectOption('data:mes:DT_NOTIFIC');
+  await page.locator('.painel-executar').click();
+  const corpo = page.locator('#result-table tbody');
+  await expect(corpo.locator('tr', { hasText: 'Janeiro' })).toContainText('2');
+  await expect(corpo.locator('tr', { hasText: 'Março' })).toContainText('3');
+  await expect(corpo.locator('tr', { hasText: 'Dezembro' })).toContainText('1');
+
+  // O mesmo mês, lido de um campo DDMMAAAA.
+  await linhas.selectOption('data:mes:DTOBITO');
+  await page.locator('.painel-executar').click();
+  await expect(corpo.locator('tr', { hasText: 'Março' })).toContainText('3');
+
+  await linhas.selectOption('data:semana:SEM_NOT');
+  await page.locator('.painel-executar').click();
+  await expect(corpo.locator('tr', { hasText: 'Semana 03' })).toContainText('2');
+});
