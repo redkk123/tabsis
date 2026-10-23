@@ -141,6 +141,33 @@ Escrito em 2026-09-02. A ordem é de prioridade: cada bloco só começa quando o
 anterior passa no portão (`npm run check:all`). Erros relatados pelo usuário
 entram na frente de tudo — o resto da fila espera.
 
+## Próximo objetivo — explorar vários DBC no tempo e no espaço (pedido do Red, 2026-10-18)
+
+Já existe: juntar vários DBC/DBF (caixa *Juntar os próximos arquivos num só*,
+ou vários períodos em *Buscar no DATASUS*); no mapa, faixa Período (seletor,
+controle deslizante, Reproduzir, barras por ano, escala única, variação entre
+anos) e descida Brasil → estado → município com cartão e série por ano.
+
+Falta, para isso ser **a** forma de explorar os dados e não um recurso do mapa:
+
+- [ ] **Abrir vários anos de forma óbvia**: um fluxo explícito ("Abrir vários
+      arquivos / vários anos"), sem depender de achar a caixa de juntar; lista
+      dos anos abertos com adicionar/remover um ano sem refazer tudo.
+- [ ] **Escala temporal fora do mapa**: ano como coluna ou filtro na tabela,
+      gráfico de série (linha) por ano, para um lugar ou um recorte; hoje só o
+      mapa e o cartão do município mostram a série.
+- [ ] **Escalas além do ano do nome do arquivo**: mês/semana/dia a partir de um
+      campo de data do arquivo (DT_NOTIFIC, DT_SIN_PRI…), não só o período
+      escrito no nome.
+- [ ] **Escala espacial**: além de Brasil → UF → município, região de saúde e
+      macrorregião; comparar dois lugares lado a lado.
+- [ ] **Medir com volume real**: 5 a 10 anos de SINAN nacional (memória do
+      navegador, tempo de leitura por ano), com orçamento de memória e aviso.
+- [ ] **Indicadores, não só contagem**: taxa por 100 mil (população por
+      município/ano), para a comparação entre lugares e anos fazer sentido.
+
+---
+
 ## Bloco 1 — Download resistente ao DATASUS lento ✅
 
 Motivo: o usuário viu "o download veio incompleto" no DNBR2025 pelo celular.

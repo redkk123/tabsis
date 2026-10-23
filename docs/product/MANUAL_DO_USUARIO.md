@@ -501,9 +501,14 @@ o clique seleciona o estado para filtrar, em vez de descer; no mapa de um
 estado, o clique seleciona o município. O mapa segue os filtros da análise, mas
 a tabela ao lado continua como você a montou.
 
-**Vários anos de uma vez.** Marque *Juntar os próximos arquivos num só* e abra
-os arquivos de vários anos (ou escolha vários períodos em *Buscar no DATASUS*,
-que já junta). O mapa ganha uma faixa **Período**: um seletor, um **controle
+**Vários anos de uma vez.** Selecione os arquivos de todos os anos **num gesto
+só** (ex.: `DENGBR19.dbc` a `DENGBR23.dbc`), ou escolha vários períodos em
+*Buscar no DATASUS*: eles são juntados num conjunto, e a tabela sai uma vez, com
+todos. Na barra lateral, **Arquivos de dados abertos** lista cada arquivo com o
+seu período; o **✕** tira um ano (os outros continuam abertos, nada é baixado de
+novo) e **+ Juntar outro ano ou arquivo** acrescenta mais um. Só se juntam
+arquivos com os mesmos campos (o mesmo sistema em anos ou estados diferentes);
+um que não combina fica de fora, com aviso, e os outros entram. O mapa ganha uma faixa **Período**: um seletor, um **controle
 deslizante** que passa de ano em ano, o botão **▶ Reproduzir** e uma **barra
 por ano** com o total — clique numa barra para ver aquele ano. A escala de
 cores é **a mesma para todos os anos**, então a cor de um ano se compara com a

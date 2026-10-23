@@ -82,6 +82,7 @@
           <strong>Abra seu arquivo DBC</strong>
           <span>Toque para escolher ou arraste aqui</span>
           <small>DBC, DBF, Parquet, CSV, DEF, CNV e MAP</small>
+          <small class="drop-zone-dica">Vários anos? Selecione todos de uma vez: eles são juntados.</small>
           <input id="file-input" type="file" accept=".dbc,.dbf,.parquet,.csv,.tsv,.def,.cnv,.map" multiple />
         </label>
 
@@ -107,10 +108,18 @@
         <div class="file-list" id="file-list" aria-live="polite"></div>
 
         <button class="secondary-button danger-button" id="decode-cancel-button" type="button" hidden>Cancelar leitura</button>
-        <label class="check-label source-combine">
-          <input id="combine-compatible-files" type="checkbox" />
-          <span>Juntar os próximos arquivos num só <small class="source-combine-ajuda">ex.: vários meses ou estados, quando têm as mesmas colunas</small></span>
-        </label>
+        <!-- Estado interno de "juntar ao conjunto aberto" (a busca do DATASUS usa). -->
+        <input id="combine-compatible-files" type="checkbox" hidden />
+        <section class="dataset-files" id="dataset-files" aria-labelledby="dataset-files-title" hidden>
+          <div class="dataset-files-head">
+            <b id="dataset-files-title">Arquivos de dados abertos</b>
+            <span id="dataset-files-summary"></span>
+          </div>
+          <ul class="dataset-files-list" id="dataset-files-list"></ul>
+          <button class="secondary-button dataset-add-button" id="dataset-add-button" type="button">+ Juntar outro ano ou arquivo</button>
+          <p class="dataset-files-hint" id="dataset-files-hint">Junte arquivos do mesmo tipo (ex.: dengue de 2019 a 2023, ou internações de vários estados). Com dois ou mais, o mapa ganha a faixa <b>Período</b> para ver um ano de cada vez e comparar.</p>
+          <input id="dataset-add-input" type="file" accept=".dbc,.dbf,.parquet" multiple hidden />
+        </section>
 
         <details class="sidebar-group needs-dataset" id="group-export">
           <summary>Baixar os dados abertos <span>DBF, CSV</span></summary>
