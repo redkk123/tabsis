@@ -129,7 +129,15 @@ import { fetchFromMirror } from './mirror-client.ts';
 import { describeCacheUsage } from '../../../packages/acquisition/src/cache-policy.ts';
 import { fetchTabnetPreview, tabnetPreviewAvailable } from './tabnet-client.ts';
 import { nameGeographicLabels } from '../../../packages/analysis/src/geographic-labels.ts';
-import { PERIODO_FIELD } from '../../../packages/core/src/painel.ts';
+import { PERIODO_FIELD, type PainelEixo } from '../../../packages/core/src/painel.ts';
+import {
+  DATE_PART_LABEL,
+  dateFieldCandidates,
+  datePartCnvText,
+  datePartsFor,
+  detectDateLayout,
+  type DatePart as DataParte,
+} from '../../../packages/analysis/src/date-fields.ts';
 import {
   buildPicker,
   codesForSelection,
@@ -2800,6 +2808,61 @@ async function removeDatasetSource(name: string): Promise<void> {
   showToast(`${name} saiu do conjunto. Ficaram ${activeDatasetSources.length} arquivo(s), ${integerFormat.format(datasetRecordCount)} registros.`);
 }
 
+/**
+ * Mês, Ano e Semana epidemiológica dos campos de data do arquivo, para o painel.
+ *
+ * O formato de cada campo é conferido numa amostra dos primeiros registros
+ * (uma leitura curta, só desses campos); o que não parece data fica de fora.
+ */
+let eixosDeData: PainelEixo[] = [];
+
+function registrarCnvDeData(part: DataParte): string {
+  const nome = `TabSis ${DATE_PART_LABEL[part]}.cnv`;
+  if (!cnvByName.has(nome)) cnvByName.set(nome, parseCnv(datePartCnvText(part)));
+  return nome;
+}
+
+async function detectarCamposDeData(): Promise<void> {
+  const header = dbfHeader;
+  if (!header) return;
+  const candidatos = dateFieldCandidates(header.fields.map((field) => ({ name: field.name, type: field.type, length: field.length }))).slice(0, 16);
+  if (!candidatos.length) {
+    eixosDeData = [];
+    return;
+  }
+  let amostra: Array<Record<string, unknown>> = [];
+  const textuais = candidatos.filter((campo) => campo.type.toUpperCase() !== 'D').map((campo) => campo.name);
+  if (textuais.length) {
+    try {
+      amostra = (await askDataset<{ records: Array<Record<string, unknown>> }>(
+        { type: 'records', fields: textuais, maxRecords: 400 },
+        { label: 'Procurando datas' },
+      )).records;
+    } catch {
+      return;
+    }
+  }
+  if (dbfHeader !== header) return;
+  const eixos: PainelEixo[] = [];
+  for (const campo of candidatos) {
+    const layout = detectDateLayout(campo, amostra.map((registro) => String(registro[campo.name] ?? '')));
+    if (!layout) continue;
+    for (const { part, startPosition } of datePartsFor(layout)) {
+      eixos.push({
+        id: `data:${part}:${campo.name.toUpperCase()}`,
+        label: `${DATE_PART_LABEL[part]} de ${friendlyFieldLabel(campo.name)}`,
+        field: campo.name,
+        conversionId: registrarCnvDeData(part),
+        startPosition,
+        disponivel: true,
+      });
+    }
+  }
+  eixosDeData = eixos;
+  populateConversions();
+  painel?.atualizar();
+}
+
 function updateDatasetStats(): void {
   renderDatasetFiles();
   if (!dbfHeader || !activeDatasetSources.length) return;
@@ -2856,6 +2919,7 @@ function resetAnalysisState(): void {
   transformJoinSource = null;
   // A geografia é do arquivo: guardá-la entre arquivos mostraria o mapa de um
   // com os números do outro.
+  eixosDeData = [];
   mapResult = null;
   mapGeoField = null;
   mapUfFilter = '';
@@ -2902,6 +2966,8 @@ async function decodeDbf(bytes: Uint8Array, file: File, isDbc: boolean, source: 
   // segurar a abertura do arquivo por causa de um painel lateral trocaria uma
   // comodidade por uma espera que todo mundo paga.
   void refreshGeoFilter();
+  // As datas do arquivo viram Mês, Ano e Semana no painel (conferidas numa amostra).
+  void detectarCamposDeData();
   renderConfiguredFilters();
   renderCrossFieldRules();
   renderExtraMeasures();
@@ -11101,6 +11167,7 @@ painel = criarPainel(element<HTMLElement>('#painel'), {
   rotuloDoCampo: (campo) => fieldLabel(campo),
   campoInicial: () => rowField.value || undefined,
   arquivos: () => activeDatasetSources.map((source) => ({ name: source.name, size: source.size })),
+  eixosDeData: () => eixosDeData,
   valoresDistintos: (campo) => askDataset<{ values: string[]; truncated: boolean }>(
     { type: 'distinct', field: campo, limit: 2000 },
     { label: 'Leitura de valores' },

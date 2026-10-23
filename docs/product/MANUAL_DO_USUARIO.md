@@ -526,6 +526,14 @@ aparece em alguns anos entra com zero nos outros. Para tabular só alguns anos,
 desmarque os outros em *Arquivos de dados* no painel. Com Ano e outra variável,
 vale o primeiro Incremento marcado.
 
+**Mês, ano e semana das datas do arquivo.** O painel confere os campos de data
+de cada arquivo (data de notificação, de internação, do óbito…) numa amostra dos
+valores e oferece, no começo de *Linhas*, *Colunas* e *Seleções*: **Mês de …**,
+**Ano de …** e, no SINAN, **Semana epidemiológica de …** (dos campos `SEM_…`).
+Funciona nos dois formatos do DATASUS: `AAAAMMDD` (SINAN, SIH) e `DDMMAAAA`
+(SIM, SINASC). Ex.: Linhas = *Mês de Data da internação* e Colunas = *Ano (um
+por arquivo aberto)* mostra a sazonalidade de vários anos lado a lado.
+
 **A diferença entre os anos.** Na faixa Período, **Cores mostram** troca os
 valores de cada ano pela **diferença para o ano anterior** (em casos) ou pela
 **variação %**. A escala é simétrica em torno de zero e é a mesma para todos os
