@@ -153,7 +153,7 @@ Falta, para isso ser **a** forma de explorar os dados e não um recurso do mapa:
 - [ ] **Abrir vários anos de forma óbvia**: um fluxo explícito ("Abrir vários
       arquivos / vários anos"), sem depender de achar a caixa de juntar; lista
       dos anos abertos com adicionar/remover um ano sem refazer tudo.
-- [ ] **Escala temporal fora do mapa**: ano como coluna ou filtro na tabela,
+- [x] **Escala temporal fora do mapa** (feito: Ano em Linhas/Colunas do painel; gráfico de linhas ou barras por ano): ano como coluna ou filtro na tabela,
       gráfico de série (linha) por ano, para um lugar ou um recorte; hoje só o
       mapa e o cartão do município mostram a série.
 - [ ] **Escalas além do ano do nome do arquivo**: mês/semana/dia a partir de um

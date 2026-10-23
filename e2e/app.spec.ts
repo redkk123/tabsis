@@ -2496,3 +2496,41 @@ test('vários anos de uma vez: selecionar junta, a lista mostra cada ano, o ✕ 
   await expect(page.locator('#dataset-files-summary')).toHaveText('1 arquivo · 2023 · 4 registros');
   await expect(page.locator('#dataset-files-list button')).toHaveCount(0);
 });
+
+test('Ano em Linhas ou em Colunas: cada arquivo é um período, com série e anos lado a lado', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#file-input').setInputFiles([
+    'e2e/fixtures/DENGBR23.dbf', 'e2e/fixtures/DENGBR24.dbf', 'e2e/fixtures/DENGBR25.dbf',
+  ]);
+  await expect(page.locator('#dataset-files-summary')).toContainText('24 registros');
+
+  const linhas = page.locator('#painel-linhas');
+  await expect(linhas.locator('option').first()).toHaveText('Ano (um por arquivo aberto)');
+  // O Ano não é o começo da tabela: a primeira linha continua sendo um campo do arquivo.
+  await expect(linhas).not.toHaveValue('periodo:arquivo');
+
+  // Linhas = Ano: a série ano a ano (4, 9, 11 registros).
+  await linhas.selectOption('periodo:arquivo');
+  await expect(page.locator('.painel-previa').first()).toContainText('3 linhas: 2023 · 2024 · 2025');
+  await page.locator('.painel-executar').click();
+  const corpo = page.locator('#result-table tbody');
+  await expect(corpo.locator('tr')).toHaveCount(3);
+  await expect(corpo.locator('tr').nth(0)).toContainText('2023');
+  await expect(corpo.locator('tr').nth(0)).toContainText('4');
+  await expect(corpo.locator('tr').nth(1)).toContainText('9');
+  await expect(corpo.locator('tr').nth(2)).toContainText('11');
+  // O gráfico vira linhas ao longo dos anos.
+  await expect(page.locator('#chart-type')).toHaveValue('line');
+
+  // Linhas = município, Colunas = Ano: os anos lado a lado.
+  await linhas.selectOption('campo:CODMUNRES');
+  await page.locator('#painel-colunas').selectOption('periodo:arquivo');
+  await page.locator('.painel-executar').click();
+  await expect(page.locator('#result-table thead')).toContainText('2023');
+  await expect(page.locator('#result-table thead')).toContainText('2025');
+  const sp = corpo.locator('tr', { hasText: 'São Paulo (355030)' });
+  await expect(sp).toContainText('2');
+  await expect(sp.locator('td')).toHaveText(['2', '6', '4', '12'].map((n) => new RegExp(`^\\s*${n}\\s*$`)));
+  // Com os anos em colunas: barras verticais, um ano ao lado do outro.
+  await expect(page.locator('#chart-type')).toHaveValue('vertical-bar');
+});

@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { parseCnv, parseDef, parseTabwinLog, serializeTabwinLog, formatTabwinElapsed } from '../dist/packages/formats/src/index.js';
 import {
+  PERIODO_EIXO_ID,
+  PERIODO_FIELD,
   PainelErro,
   catalogoDoDef,
   catalogoDosCampos,
@@ -238,4 +240,14 @@ test('Discriminar: uma linha por código só em CNV literal; em CNV curta os có
   // Na coluna, Discriminar vira uma coluna "Não classificados" só, como no TabWin.
   const coluna = rodar({ ...base, linha: cat.linhas[2].id, coluna: cat.colunas[0].id });
   assert.deepEqual(coluna.columns.map((c) => c.label), ['Branca', 'Não classificados']);
+});
+
+test('o Ano virtual não é a primeira Linha de uma tabela nova', () => {
+  const eixo = (id, field) => ({ id, label: id, field, disponivel: true });
+  const catalogo = {
+    origem: 'campos',
+    linhas: [eixo(PERIODO_EIXO_ID, PERIODO_FIELD), eixo('campo:SEXO', 'SEXO')],
+    colunas: [], selecoes: [], incrementos: [],
+  };
+  assert.equal(estadoInicial(catalogo).linha, 'campo:SEXO');
 });

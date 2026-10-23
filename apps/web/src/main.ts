@@ -26,6 +26,7 @@ import {
   type QueryPlan,
   type PortableTableV1,
   type TableOperation,
+  type ResultAxisItem,
   type TabulationResult,
   type TabulationSpec,
   type TechnicalNote,
@@ -128,6 +129,7 @@ import { fetchFromMirror } from './mirror-client.ts';
 import { describeCacheUsage } from '../../../packages/acquisition/src/cache-policy.ts';
 import { fetchTabnetPreview, tabnetPreviewAvailable } from './tabnet-client.ts';
 import { nameGeographicLabels } from '../../../packages/analysis/src/geographic-labels.ts';
+import { PERIODO_FIELD } from '../../../packages/core/src/painel.ts';
 import {
   buildPicker,
   codesForSelection,
@@ -3660,7 +3662,7 @@ async function downloadMicrodatasusCsv(): Promise<void> {
     const reply = await askDataset<{ stats: { recordsSeen: number; recordsAccepted: number; rowsEmitted: number; bytesEmitted: number } }>(
       {
         type: 'microdatasus-csv',
-        plan: currentPlan,
+        plan: planWithoutPeriod(currentPlan),
         conversions,
         fields,
         provenanceColumns: ['sourceName', 'system', 'fileType', 'year', 'month', 'uf'],
@@ -3694,11 +3696,12 @@ async function downloadSelectedDbf(): Promise<void> {
   selectedDbfButton.textContent = 'Filtrando registros…';
   try {
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-    const conversions = conversionsForPlan(currentPlan);
+    const planoDeLeitura = planWithoutPeriod(currentPlan);
+    const conversions = conversionsForPlan(planoDeLeitura);
     // The Worker selects with the same resolvePlanRecord boundary the table
     // used, so the exported subset cannot disagree with the accepted count.
     const reply = await askDataset<{ bytes: ArrayBuffer }>(
-      { type: 'selected-dbf', plan: currentPlan, conversions, ...(arquivosDoPainel ? { sourceNames: arquivosDoPainel } : {}) },
+      { type: 'selected-dbf', plan: planoDeLeitura, conversions, ...(arquivosDoPainel ? { sourceNames: arquivosDoPainel } : {}) },
       { label: 'Exportação de registros selecionados', progress: datasetProgress('Selecionando') },
     );
     const bytes = new Uint8Array(reply.bytes);
@@ -3893,8 +3896,113 @@ function clearAnalysisResult(message: string): void {
   resultTitle.textContent = message;
 }
 
+/**
+ * Gráfico que faz sentido para o tempo: com Ano em Linhas, linhas ao longo dos
+ * anos (uma por coluna da tabela); com Ano em Colunas, barras verticais com os
+ * anos lado a lado em cada categoria. Só mexe enquanto a pessoa não escolheu o
+ * tipo de gráfico à mão, e volta ao padrão quando a tabela deixa de ter Ano.
+ */
+let graficoAjustadoParaPeriodo = false;
+
+function ajustarGraficoParaPeriodo(plan: QueryPlan): void {
+  const comAno = planUsesPeriod(plan);
+  if (comAno && (chartType.value === 'horizontal-bar' || graficoAjustadoParaPeriodo)) {
+    chartType.value = plan.spec.rows.field === PERIODO_FIELD ? 'line' : 'vertical-bar';
+    chartSeriesMode.value = 'columns';
+    graficoAjustadoParaPeriodo = true;
+  } else if (!comAno && graficoAjustadoParaPeriodo) {
+    chartType.value = 'horizontal-bar';
+    chartSeriesMode.value = '';
+    graficoAjustadoParaPeriodo = false;
+  }
+}
+
+/** Se a tabela pede o Ano virtual (um período por arquivo) em Linhas ou Colunas. */
+function planUsesPeriod(plan: QueryPlan | null): boolean {
+  return Boolean(plan && (plan.spec.rows.field === PERIODO_FIELD || plan.spec.columns?.field === PERIODO_FIELD));
+}
+
+/**
+ * O mesmo plano sem o Ano virtual, para o que vai ao trabalhador ler o arquivo
+ * (exportar registros, ler um ano só): com Ano em Colunas, ficam as Linhas;
+ * com Ano em Linhas, a outra dimensão vira Linhas (ou o primeiro campo).
+ */
+function planWithoutPeriod(plan: QueryPlan): QueryPlan {
+  if (!planUsesPeriod(plan) || !dbfHeader) return plan;
+  const anoNaLinha = plan.spec.rows.field === PERIODO_FIELD;
+  const outra = anoNaLinha ? plan.spec.columns : plan.spec.rows;
+  const { columns: _semColunas, measures, ...resto } = plan.spec;
+  const rows = outra && outra.field !== PERIODO_FIELD ? outra : { field: dbfHeader.fields[0]!.name };
+  // Com outra dimensão, vale o primeiro incremento (a outra já ocupa o lugar
+  // das colunas); sem ela, os incrementos viram as colunas da tabela.
+  return compilarPlano({ ...resto, rows, ...(!outra && measures ? { measures } : {}) });
+}
+
+/**
+ * Tabela com o Ano em Linhas ou em Colunas: cada arquivo aberto é tabulado à
+ * parte (só ele) e as tabelas são postas lado a lado. Os filtros valem em
+ * todos os anos; as categorias que só aparecem em alguns anos entram com zero
+ * nos outros.
+ */
+async function tabularPorPeriodo(plan: QueryPlan): Promise<TabulationResult> {
+  if (!dbfHeader) throw new Error('Abra os arquivos antes de tabular por ano.');
+  const periodos = (activeDatasetSources.length > 1 ? mapPeriodList() : activeDatasetSources.map((source) => ({
+    name: source.name, label: describeDatasusFile(source.name)?.periodShort ?? source.name,
+  }))).filter((periodo) => !arquivosDoPainel || arquivosDoPainel.includes(periodo.name));
+  if (!periodos.length) throw new Error('Nenhum arquivo marcado para tabular por ano.');
+  const anoNaLinha = plan.spec.rows.field === PERIODO_FIELD;
+  const temOutra = Boolean(anoNaLinha ? plan.spec.columns : plan.spec.rows.field !== PERIODO_FIELD);
+  const base = planWithoutPeriod(plan);
+  const conversoes = conversionsForPlan(base);
+  const porAno: TabulationResult[] = [];
+  for (const [indice, periodo] of periodos.entries()) {
+    const { result } = await askDataset<{ result: TabulationResult }>(
+      { type: 'tabulate', plan: base, conversions: conversoes, sourceNames: [periodo.name] },
+      { label: `Tabulação de ${periodo.label}`, progress: datasetProgress(`Tabulando ${periodo.label} (${indice + 1} de ${periodos.length})`) },
+    );
+    porAno.push(result);
+  }
+  const anos: ResultAxisItem[] = periodos.map((periodo) => ({ key: periodo.label, label: periodo.label, source: 'raw' as const }));
+  const totais = {
+    warnings: [...new Set(porAno.flatMap((resultado) => resultado.warnings))],
+    recordsSeen: porAno.reduce((soma, resultado) => soma + resultado.recordsSeen, 0),
+    recordsAccepted: porAno.reduce((soma, resultado) => soma + resultado.recordsAccepted, 0),
+  };
+
+  if (!temOutra) {
+    // Sem outra dimensão: um total por ano para cada incremento.
+    const medidas = porAno[0]?.columns ?? [];
+    const somas = porAno.map((resultado) => medidas.map((_, coluna) =>
+      resultado.rows.reduce((soma, row, linha) => soma + (row.excludeFromTotal ? 0 : (resultado.cells[linha]?.[coluna] ?? 0)), 0)));
+    return anoNaLinha
+      ? { rows: anos, columns: medidas, cells: somas, ...totais }
+      : { rows: medidas.map((medida) => ({ ...medida })), columns: anos, cells: medidas.map((_, coluna) => somas.map((linha) => linha[coluna] ?? 0)), ...totais };
+  }
+
+  // Com outra dimensão: a união das categorias de todos os anos, na ordem em
+  // que aparecem, e o valor de cada ano (zero quando a categoria não aparece).
+  const categorias: ResultAxisItem[] = [];
+  const vistos = new Set<string>();
+  for (const resultado of porAno) {
+    for (const row of resultado.rows) {
+      if (vistos.has(row.key)) continue;
+      vistos.add(row.key);
+      categorias.push(row);
+    }
+  }
+  const valor = (resultado: TabulationResult, chave: string): number => {
+    const linha = resultado.rows.findIndex((row) => row.key === chave);
+    return linha >= 0 ? (resultado.cells[linha]?.[0] ?? 0) : 0;
+  };
+  return anoNaLinha
+    ? { rows: anos, columns: categorias, cells: porAno.map((resultado) => categorias.map((categoria) => valor(resultado, categoria.key))), ...totais }
+    : { rows: categorias, columns: anos, cells: categorias.map((categoria) => porAno.map((resultado) => valor(resultado, categoria.key))), ...totais };
+}
+
 async function runAnalysis(measureOverride?: MeasureSpec, planOverride?: QueryPlan): Promise<boolean> {
-  if (!dbfHeader || !rowField.value) return false;
+  // O plano do painel pode ter Linhas = Ano (virtual), que não existe no seletor
+  // de campos da barra lateral: com plano pronto, o seletor não precisa ter valor.
+  if (!dbfHeader || (!rowField.value && !planOverride)) return false;
   if (!datasetRecordCount) {
     clearAnalysisResult('O conjunto atual não contém registros para tabular.');
     setControlsEnabled(true);
@@ -3910,10 +4018,12 @@ async function runAnalysis(measureOverride?: MeasureSpec, planOverride?: QueryPl
   try {
     const plan = planOverride ?? buildPlan(measureOverride);
     const conversions = conversionsForPlan(plan);
-    const { result: crua, cached } = await askDataset<{ result: TabulationResult; cached: boolean }>(
-      { type: 'tabulate', plan, conversions, ...(arquivosDoPainel ? { sourceNames: arquivosDoPainel } : {}) },
-      { label: 'Tabulação', progress: datasetProgress('Tabulando') },
-    );
+    const { result: crua, cached } = planUsesPeriod(plan)
+      ? { result: await tabularPorPeriodo(plan), cached: false }
+      : await askDataset<{ result: TabulationResult; cached: boolean }>(
+        { type: 'tabulate', plan, conversions, ...(arquivosDoPainel ? { sourceNames: arquivosDoPainel } : {}) },
+        { label: 'Tabulação', progress: datasetProgress('Tabulando') },
+      );
     // Código do IBGE vira nome do lugar (a chave segue sendo o código). Sem a
     // lista de nomes, a tabela sai como sempre.
     const nomes = await loadGeographyNames();
@@ -3935,6 +4045,7 @@ async function runAnalysis(measureOverride?: MeasureSpec, planOverride?: QueryPl
     tableSubtitle.value = '';
     tableFooter.value = '';
     tableNotes = [];
+    ajustarGraficoParaPeriodo(plan);
     renderResult();
     appendTabulationLogEntry(plan, result, cached);
     if (cached) showToast('Resultado em cache — sem nova leitura do arquivo');
@@ -7056,7 +7167,7 @@ async function loadMapPeriods(): Promise<void> {
       if (mapSource === 'tabela') {
         if (!currentPlan) break;
         ({ result: resultado } = await askDataset<{ result: TabulationResult }>(
-          { type: 'tabulate', plan: currentPlan, conversions: conversionsForPlan(currentPlan), sourceNames: [periodo.name] },
+          { type: 'tabulate', plan: planWithoutPeriod(currentPlan), conversions: conversionsForPlan(planWithoutPeriod(currentPlan)), sourceNames: [periodo.name] },
           { label: `Período ${periodo.label}` },
         ));
       } else {
@@ -10570,6 +10681,8 @@ tableRowAggregate.addEventListener('click', () => {
   } catch (error) { showToast(error instanceof Error ? error.message : String(error), true); }
 });
 chartType.addEventListener('change', () => {
+  // Escolha da pessoa: o ajuste automático para o Ano não mexe mais.
+  graficoAjustadoParaPeriodo = false;
   updateChartBindingControls();
   if (currentResult) renderChart(currentResult);
 });
