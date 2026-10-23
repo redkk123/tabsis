@@ -596,6 +596,7 @@ const mapModeSelect = element<HTMLSelectElement>('#map-mode');
 const mapPeriodBar = element<HTMLElement>('#map-period');
 const mapPeriodPlay = element<HTMLButtonElement>('#map-period-play');
 const mapPeriodSelect = element<HTMLSelectElement>('#map-period-select');
+const mapTimeScaleSelect = element<HTMLSelectElement>('#map-time-scale');
 const mapPeriodSlider = element<HTMLInputElement>('#map-period-slider');
 const mapPeriodStatus = element<HTMLElement>('#map-period-status');
 const mapPeriodChart = element<HTMLElement>('#map-period-chart');
@@ -2861,6 +2862,8 @@ async function detectarCamposDeData(): Promise<void> {
   eixosDeData = eixos;
   populateConversions();
   painel?.atualizar();
+  // Com o mapa aberto, a faixa de tempo ganha as escalas de data na hora.
+  if (currentView === 'map' && activeMap) void loadMapPeriods();
 }
 
 function updateDatasetStats(): void {
@@ -2927,6 +2930,8 @@ function resetAnalysisState(): void {
   mapPeriod = '';
   mapPeriodResults.clear();
   mapPeriodSignature = '';
+  mapTimeScale = '';
+  mapDatePeriods = [];
   mapFocusGeocode = '';
   mapCard.hidden = true;
   stopMapPeriodPlayback();
@@ -4012,7 +4017,7 @@ function planWithoutPeriod(plan: QueryPlan): QueryPlan {
  */
 async function tabularPorPeriodo(plan: QueryPlan): Promise<TabulationResult> {
   if (!dbfHeader) throw new Error('Abra os arquivos antes de tabular por ano.');
-  const periodos = (activeDatasetSources.length > 1 ? mapPeriodList() : activeDatasetSources.map((source) => ({
+  const periodos = (activeDatasetSources.length > 1 ? filePeriodList() : activeDatasetSources.map((source) => ({
     name: source.name, label: describeDatasusFile(source.name)?.periodShort ?? source.name,
   }))).filter((periodo) => !arquivosDoPainel || arquivosDoPainel.includes(periodo.name));
   if (!periodos.length) throw new Error('Nenhum arquivo marcado para tabular por ano.');
@@ -6870,7 +6875,7 @@ function renderGeoFieldOptions(candidatos: readonly GeographicCandidate[], escol
   mapGeoFieldSelect.value = escolhido;
 }
 
-async function tabulateForMap(sourceNames?: string[]): Promise<TabulationResult | null> {
+async function tabulateForMap(sourceNames?: string[], columns?: { field: string; conversionId: string; startPosition: number }): Promise<TabulationResult | null> {
   if (!dbfHeader) return null;
   const candidatos = findGeographicFields(dbfHeader.fields);
   // O primeiro é o padrão — residência —, mas a pessoa manda. A diferença não
@@ -6888,6 +6893,7 @@ async function tabulateForMap(sourceNames?: string[]): Promise<TabulationResult 
   const plan = compilarPlano({
     compatibilityProfile: currentCompatibilityProfile,
     rows: { field: escolhido.field },
+    ...(columns ? { columns } : {}),
     measure: { kind: 'count' as const },
     filters: configuredFilters.map(cloneFilter),
     ...(configuredCrossFieldRules.length
@@ -7105,8 +7111,47 @@ let mapPeriodLoading = '';
 
 interface MapPeriodItem { name: string; label: string }
 
-/** Os arquivos abertos, do mais antigo ao mais novo, com o período que o nome diz (RDAC2401.dbc → jan/2024). */
+/**
+ * A escala de tempo do controle do mapa: `arquivo` (um período por arquivo
+ * aberto) ou um eixo de data do painel (`data:mes:DT_NOTIFIC`…), que funciona
+ * até com um arquivo só — o mês de cada notificação, a semana epidemiológica.
+ */
+let mapTimeScale = '';
+/** Os períodos de uma escala de data, com dado, na ordem do calendário. */
+let mapDatePeriods: MapPeriodItem[] = [];
+
+function mapTimeScales(): Array<{ id: string; label: string }> {
+  const escalas: Array<{ id: string; label: string }> = [];
+  if (activeDatasetSources.length > 1) escalas.push({ id: 'arquivo', label: 'Arquivos abertos (um período por arquivo)' });
+  for (const eixo of eixosDeData) {
+    if (!eixo.id.startsWith('data:ano:')) escalas.push({ id: eixo.id, label: eixo.label });
+  }
+  return escalas;
+}
+
+function currentMapTimeScale(): string {
+  const escalas = mapTimeScales();
+  if (!escalas.some((escala) => escala.id === mapTimeScale)) mapTimeScale = escalas[0]?.id ?? '';
+  return mapTimeScale;
+}
+
+/** Os períodos da escala escolhida (arquivos ou meses/semanas com dado). */
 function mapPeriodList(): MapPeriodItem[] {
+  const escala = currentMapTimeScale();
+  if (!escala) return [];
+  return escala === 'arquivo' ? filePeriodList() : mapDatePeriods;
+}
+
+/** Palavra para os períodos da escala atual: "anos", "meses", "semanas". */
+function mapPeriodUnit(plural = true): string {
+  const escala = currentMapTimeScale();
+  if (escala.startsWith('data:mes:')) return plural ? 'meses' : 'mês';
+  if (escala.startsWith('data:semana:')) return plural ? 'semanas' : 'semana';
+  return plural ? 'anos' : 'ano';
+}
+
+/** Os arquivos abertos, do mais antigo ao mais novo, com o período que o nome diz (RDAC2401.dbc → jan/2024). */
+function filePeriodList(): MapPeriodItem[] {
   if (activeDatasetSources.length < 2) return [];
   const itens = activeDatasetSources.map((source) => ({
     name: source.name,
@@ -7132,20 +7177,31 @@ function selectMapPeriod(name: string): void {
 }
 
 function renderMapPeriodBar(): void {
+  const escalas = mapTimeScales();
   const periodos = mapPeriodList();
-  if (periodos.length < 2) {
+  const lendoEscala = currentMapTimeScale() !== 'arquivo' && Boolean(mapPeriodLoading);
+  if (!escalas.length || (periodos.length < 2 && !lendoEscala)) {
     mapPeriodBar.hidden = true;
     stopMapPeriodPlayback();
+    // Uma escala de data sem dois períodos com dado não tem o que passar; se
+    // houver outra escala, a faixa reaparece quando ela for escolhida.
+    if (escalas.length > 1 && !lendoEscala) {
+      mapPeriodBar.hidden = false;
+      mapPeriodStatus.textContent = `Esta data só tem um período com registros. Escolha outra em "Passar por".`;
+      mapPeriodChart.replaceChildren();
+    }
+    renderTimeScaleOptions(escalas);
     return;
   }
   mapPeriodBar.hidden = false;
+  renderTimeScaleOptions(escalas);
   const prontos = periodos.filter((periodo) => mapPeriodResults.has(periodo.name));
 
   const chaves = periodos.map((periodo) => periodo.name).join('|');
   if (mapPeriodSelect.dataset.chaves !== chaves) {
     mapPeriodSelect.dataset.chaves = chaves;
     mapPeriodSelect.replaceChildren(
-      new Option(`Todos os ${periodos.length} arquivos juntos`, ''),
+      new Option(currentMapTimeScale() === 'arquivo' ? `Todos os ${periodos.length} arquivos juntos` : `Todos os ${mapPeriodUnit()} juntos`, ''),
       ...periodos.map((periodo) => new Option(periodo.label, periodo.name)),
     );
     mapPeriodSlider.max = String(periodos.length - 1);
@@ -7160,19 +7216,24 @@ function renderMapPeriodBar(): void {
   const atual = periodos.find((periodo) => periodo.name === mapPeriod);
   const lendo = periodos.find((periodo) => periodo.name === mapPeriodLoading)?.label;
   mapPeriodStatus.textContent = faltam
-    ? `Lendo os anos${lendo ? ` (agora ${lendo})` : ''}: ${prontos.length} de ${periodos.length} prontos.`
+    ? (currentMapTimeScale() === 'arquivo'
+      ? `Lendo os anos${lendo ? ` (agora ${lendo})` : ''}: ${prontos.length} de ${periodos.length} prontos.`
+      : `Lendo os ${mapPeriodUnit()}…`)
     : atual && mapVariationMode() && mapPreviousPeriod(atual.name)
       ? `Cores: ${mapVariationMode() === 'pct' ? 'variação percentual' : 'diferença'} de ${mapPreviousPeriod(atual.name)!.label} para ${atual.label}. Laranja aumentou, azul diminuiu, claro ficou igual; a escala é a mesma para todos os anos.`
     : atual && mapVariationMode()
       ? `${atual.label} é o primeiro ano: não há ano anterior para comparar. Escolha um ano depois dele.`
     : atual
-      ? `Mostrando ${atual.label}, com a mesma escala de cores para todos os anos: dá para comparar a cor de um ano com a de outro.`
+      ? `Mostrando ${atual.label}, com a mesma escala de cores para todos os ${mapPeriodUnit()}: dá para comparar a cor de um ${mapPeriodUnit(false)} com a de outro.`
       : mapVariationMode()
-        ? 'Para ver a variação, escolha um ano (que não seja o primeiro) ou mova o controle.'
-        : 'Mostrando todos os arquivos juntos. Escolha um ano, ou mova o controle, para comparar.';
+        ? `Para ver a variação, escolha um ${mapPeriodUnit(false)} (que não seja o primeiro) ou mova o controle.`
+        : currentMapTimeScale() === 'arquivo'
+          ? 'Mostrando todos os arquivos juntos. Escolha um ano, ou mova o controle, para comparar.'
+          : `Mostrando todos os ${mapPeriodUnit()} juntos. Mova o controle para ver um de cada vez.`;
 
-  // Uma barra por ano: o total do que o mapa pinta, para ver a tendência antes
-  // de clicar. O total é o do recorte atual (estado isolado, filtros).
+  // A evolução: o total do que o mapa pinta em cada período, numa linha, com o
+  // período mostrado em destaque. O total é o do recorte atual (estado
+  // isolado, filtros). Clicar num ponto escolhe aquele período.
   const coluna = mapValueColumn.value || undefined;
   const totais = periodos.map((periodo) => {
     const resultado = mapPeriodResults.has(periodo.name) ? mapDrawableResult(periodo.name) : null;
@@ -7180,27 +7241,111 @@ function renderMapPeriodBar(): void {
     const indiceColuna = chooseMapColumn(resultado.columns.map((c) => c.key), coluna).index;
     return resultado.cells.reduce((soma, linha) => soma + (linha[indiceColuna] ?? 0), 0);
   });
-  const maior = Math.max(1, ...totais.map((total) => total ?? 0));
-  mapPeriodChart.replaceChildren(...periodos.map((periodo, posicao) => {
-    const total = totais[posicao];
-    const botao = document.createElement('button');
-    botao.type = 'button';
-    botao.className = 'map-period-bar';
-    botao.disabled = total === undefined;
-    botao.setAttribute('aria-pressed', String(periodo.name === mapPeriod));
-    botao.title = total === undefined ? `${periodo.label}: lendo…` : `${periodo.label}: ${numberFormat.format(total)}`;
-    const barra = document.createElement('i');
-    barra.style.height = `${total === undefined ? 0 : Math.max(3, Math.round((total / maior) * 100))}%`;
-    const rotulo = document.createElement('span');
-    rotulo.textContent = periodo.label;
-    botao.append(barra, rotulo);
-    botao.addEventListener('click', () => { stopMapPeriodPlayback(); selectMapPeriod(periodo.name); });
-    return botao;
-  }));
+  const escolher = (indice: number): void => { stopMapPeriodPlayback(); selectMapPeriod(periodos[indice]!.name); };
+  const partes: Element[] = [evolutionChart(periodos.map((periodo) => periodo.label), totais, indice, escolher,
+    `Evolução por ${mapPeriodUnit(false)}`, mapPeriodChart.clientWidth || mapPeriodBar.clientWidth - 24)];
+  // Com poucos períodos, um botão por período (com o nome) ajuda o toque.
+  if (periodos.length <= 16) {
+    const chips = document.createElement('div');
+    chips.className = 'map-period-chips';
+    periodos.forEach((periodo, posicao) => {
+      const total = totais[posicao];
+      const botao = document.createElement('button');
+      botao.type = 'button';
+      botao.className = 'map-period-bar';
+      botao.disabled = total === undefined;
+      botao.setAttribute('aria-pressed', String(periodo.name === mapPeriod));
+      botao.title = total === undefined ? `${periodo.label}: lendo…` : `${periodo.label}: ${numberFormat.format(total)}`;
+      const rotulo = document.createElement('span');
+      rotulo.textContent = periodo.label;
+      botao.append(document.createElement('i'), rotulo);
+      botao.addEventListener('click', () => escolher(posicao));
+      chips.append(botao);
+    });
+    partes.push(chips);
+  }
+  mapPeriodChart.replaceChildren(...partes);
+}
+
+function renderTimeScaleOptions(escalas: Array<{ id: string; label: string }>): void {
+  const rotulo = mapTimeScaleSelect.closest('label');
+  if (rotulo) (rotulo as HTMLElement).hidden = escalas.length < 2;
+  const chaves = escalas.map((escala) => escala.id).join('|');
+  if (mapTimeScaleSelect.dataset.chaves !== chaves) {
+    mapTimeScaleSelect.dataset.chaves = chaves;
+    mapTimeScaleSelect.replaceChildren(...escalas.map((escala) => new Option(escala.label, escala.id)));
+  }
+  mapTimeScaleSelect.value = currentMapTimeScale();
+}
+
+/**
+ * Gráfico de linha da evolução: um ponto por período, o atual em destaque, e o
+ * valor dele escrito. Serve à faixa do mapa e ao cartão do município.
+ */
+function evolutionChart(
+  rotulos: readonly string[],
+  valores: ReadonlyArray<number | undefined>,
+  atual: number,
+  escolher?: (indice: number) => void,
+  titulo = 'Evolução',
+  larguraDisponivel = 600,
+): SVGSVGElement {
+  const ns = 'http://www.w3.org/2000/svg';
+  // Desenhado na largura real (em px): esticar um desenho fixo achatava o texto
+  // e transformava os pontos em elipses no celular.
+  const largura = Math.max(260, Math.round(larguraDisponivel));
+  const altura = 118;
+  const margem = { esquerda: 10, direita: 10, topo: 18, base: 20 };
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('class', 'map-evolucao');
+  svg.setAttribute('viewBox', `0 0 ${largura} ${altura}`);
+  svg.setAttribute('role', 'img');
+  svg.setAttribute('aria-label', `${titulo}: ${rotulos.map((rotulo, i) => `${rotulo} ${valores[i] === undefined ? 'lendo' : numberFormat.format(valores[i]!)}`).join(', ')}`);
+  const maior = Math.max(1, ...valores.map((valor) => valor ?? 0));
+  const n = rotulos.length;
+  const x = (i: number) => margem.esquerda + (n <= 1 ? (largura - margem.esquerda - margem.direita) / 2 : (i * (largura - margem.esquerda - margem.direita)) / (n - 1));
+  const y = (valor: number) => altura - margem.base - (valor / maior) * (altura - margem.topo - margem.base);
+  const pontos = valores.map((valor, i) => (valor === undefined ? null : { x: x(i), y: y(valor), i, valor }));
+  const definidos = pontos.filter((ponto): ponto is NonNullable<typeof ponto> => Boolean(ponto));
+  const elemento = (tag: string, atributos: Record<string, string>): SVGElement => {
+    const novo = document.createElementNS(ns, tag);
+    for (const [nome, valor] of Object.entries(atributos)) novo.setAttribute(nome, valor);
+    return novo;
+  };
+  if (definidos.length) {
+    const base = altura - margem.base;
+    const linha = definidos.map((ponto) => `${ponto.x.toFixed(1)},${ponto.y.toFixed(1)}`).join(' ');
+    svg.append(elemento('polygon', { class: 'evo-area', points: `${definidos[0]!.x.toFixed(1)},${base} ${linha} ${definidos.at(-1)!.x.toFixed(1)},${base}` }));
+    svg.append(elemento('polyline', { class: 'evo-linha', points: linha }));
+  }
+  const destaque = pontos[atual];
+  if (destaque) {
+    svg.append(elemento('line', { class: 'evo-marca', x1: destaque.x.toFixed(1), x2: destaque.x.toFixed(1), y1: String(margem.topo - 4), y2: String(altura - margem.base) }));
+    const texto = elemento('text', { class: 'evo-valor', x: destaque.x.toFixed(1), y: String(Math.max(11, destaque.y - 7)), 'text-anchor': destaque.x < 60 ? 'start' : destaque.x > largura - 60 ? 'end' : 'middle' });
+    texto.textContent = numberFormat.format(destaque.valor);
+    svg.append(texto);
+  }
+  for (const ponto of definidos) {
+    const circulo = elemento('circle', { class: ponto.i === atual ? 'evo-ponto atual' : 'evo-ponto', cx: ponto.x.toFixed(1), cy: ponto.y.toFixed(1), r: ponto.i === atual ? '5' : '3.2' });
+    const dica = document.createElementNS(ns, 'title');
+    dica.textContent = `${rotulos[ponto.i]}: ${numberFormat.format(ponto.valor)}`;
+    circulo.append(dica);
+    if (escolher) circulo.addEventListener('click', () => escolher(ponto.i));
+    svg.append(circulo);
+  }
+  // Rótulos: todos quando cabem; senão o primeiro, o último e o atual.
+  const mostrar = new Set<number>(n <= 12 ? rotulos.map((_, i) => i) : [0, n - 1, ...(atual >= 0 ? [atual] : [])]);
+  for (const i of mostrar) {
+    const texto = elemento('text', { class: 'evo-rotulo', x: x(i).toFixed(1), y: String(altura - 5), 'text-anchor': i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle' });
+    texto.textContent = rotulos[i] ?? '';
+    svg.append(texto);
+  }
+  return svg;
 }
 
 function mapPeriodSignatureNow(): string {
-  return JSON.stringify([mapInputSignature(), mapSource, mapGeoField?.field ?? '', mapPeriodList().map((p) => p.name)]);
+  const escala = currentMapTimeScale();
+  return JSON.stringify([mapInputSignature(), mapSource, mapGeoField?.field ?? '', escala, escala === 'arquivo' ? filePeriodList().map((p) => p.name) : '']);
 }
 
 /**
@@ -7208,6 +7353,10 @@ function mapPeriodSignatureNow(): string {
  * O mapa de todos os anos juntos já está na tela enquanto isso.
  */
 async function loadMapPeriods(): Promise<void> {
+  if (currentMapTimeScale().startsWith('data:')) {
+    await loadMapDatePeriods();
+    return;
+  }
   const periodos = mapPeriodList();
   if (periodos.length < 2 || !dbfHeader) {
     mapPeriod = '';
@@ -7251,6 +7400,65 @@ async function loadMapPeriods(): Promise<void> {
   } finally {
     mapPeriodLoading = '';
     renderMapPeriodBar();
+  }
+}
+
+/**
+ * Uma escala de data (mês, semana) numa leitura só: o campo geográfico (ou as
+ * Linhas da tabela) cruzado com o mês/semana da data, e cada coluna vira o
+ * mapa de um período.
+ */
+async function loadMapDatePeriods(): Promise<void> {
+  const eixo = eixosDeData.find((candidato) => candidato.id === mapTimeScale);
+  if (!eixo || !dbfHeader) return;
+  const assinatura = mapPeriodSignatureNow();
+  if (assinatura === mapPeriodSignature && mapDatePeriods.length) {
+    renderMapPeriodBar();
+    return;
+  }
+  if (mapPeriodLoading) return;
+  mapPeriodSignature = assinatura;
+  mapPeriodResults.clear();
+  mapDatePeriods = [];
+  stopMapPeriodPlayback();
+  mapPeriod = '';
+  const colunas = { field: eixo.field, conversionId: eixo.conversionId!, startPosition: eixo.startPosition ?? 1 };
+  mapPeriodLoading = eixo.id;
+  renderMapPeriodBar();
+  try {
+    let cruzado: TabulationResult | null;
+    if (mapSource === 'tabela') {
+      if (!currentPlan) return;
+      const base = planWithoutPeriod(currentPlan);
+      const { measures: _medidas, ...resto } = base.spec;
+      const plano = compilarPlano({ ...resto, columns: colunas, suppressZeroColumns: false });
+      ({ result: cruzado } = await askDataset<{ result: TabulationResult }>(
+        { type: 'tabulate', plan: plano, conversions: conversionsForPlan(plano) },
+        { label: `Mapa por ${eixo.label}` },
+      ));
+    } else {
+      cruzado = await tabulateForMap(undefined, colunas);
+    }
+    if (mapPeriodSignatureNow() !== assinatura || !cruzado) return;
+    const periodos: MapPeriodItem[] = [];
+    cruzado.columns.forEach((coluna, indice) => {
+      const total = cruzado!.cells.reduce((soma, linha) => soma + (linha[indice] ?? 0), 0);
+      if (!total) return;
+      const nome = `${eixo.id}#${coluna.key}`;
+      periodos.push({ name: nome, label: coluna.label });
+      mapPeriodResults.set(nome, {
+        ...cruzado!,
+        columns: [{ key: 'total', label: coluna.label, source: 'derived' as const }],
+        cells: cruzado!.cells.map((linha) => [linha[indice] ?? 0]),
+      });
+    });
+    mapDatePeriods = periodos;
+  } catch (error) {
+    mapPeriodStatus.textContent = `Não deu para ler ${eixo.label}: ${error instanceof Error ? error.message : String(error)}`;
+  } finally {
+    mapPeriodLoading = '';
+    renderMapPeriodBar();
+    if (currentView === 'map' && activeMap) renderMap();
   }
 }
 
@@ -7310,6 +7518,8 @@ function renderMapFocusCard(): void {
   resumo.textContent = linhasDeTexto.join(' ');
 
   mapCard.replaceChildren(cabecalho, resumo);
+  // Visível antes de medir: escondido, a largura é zero e o gráfico sairia mínimo.
+  mapCard.hidden = false;
 
   // A série: o valor desta área em cada ano, para ver a trajetória dela.
   const periodos = mapPeriodList();
@@ -7321,23 +7531,21 @@ function renderMapFocusCard(): void {
       const posicao = resultado.rows.findIndex((row) => row.key.trim().toLowerCase() === chave);
       return posicao >= 0 ? (resultado.cells[posicao]?.[indice] ?? 0) : 0;
     });
-    const maior = Math.max(1, ...valores.map((valor) => valor ?? 0));
+    const indiceAtual = periodos.findIndex((periodo) => periodo.name === mapPeriod);
+    mapCard.append(evolutionChart(periodos.map((periodo) => periodo.label), valores, indiceAtual,
+      (indice) => { stopMapPeriodPlayback(); selectMapPeriod(periodos[indice]!.name); },
+      `${objeto.name || mapFocusGeocode} por ${mapPeriodUnit(false)}`, mapCard.clientWidth - 26));
     const serie = document.createElement('div');
-    serie.className = 'map-period-chart map-card-series';
-    serie.setAttribute('role', 'img');
-    serie.setAttribute('aria-label', `${objeto.name || mapFocusGeocode} por ano: ${periodos.map((p, i) => `${p.label} ${valores[i] ?? 'lendo'}`).join(', ')}`);
-    periodos.forEach((periodo, posicao) => {
+    serie.className = 'map-period-chips map-card-series';
+    if (periodos.length <= 16) periodos.forEach((periodo, posicao) => {
       const valor = valores[posicao];
-      const coluna = document.createElement('div');
-      coluna.className = 'map-period-bar';
-      coluna.setAttribute('aria-pressed', String(periodo.name === mapPeriod));
-      coluna.title = valor === undefined ? `${periodo.label}: lendo…` : `${periodo.label}: ${numberFormat.format(valor)}`;
-      const barra = document.createElement('i');
-      barra.style.height = `${valor === undefined ? 0 : valor === 0 ? 2 : Math.max(3, Math.round((valor / maior) * 100))}%`;
+      const item = document.createElement('div');
+      item.className = 'map-period-bar';
+      item.setAttribute('aria-pressed', String(periodo.name === mapPeriod));
       const rotulo = document.createElement('span');
       rotulo.textContent = valor === undefined ? periodo.label : `${periodo.label} · ${numberFormat.format(valor)}`;
-      coluna.append(barra, rotulo);
-      serie.append(coluna);
+      item.append(rotulo);
+      serie.append(item);
     });
     mapCard.append(serie);
   }
@@ -10861,6 +11069,15 @@ mapModeSelect.addEventListener('change', () => {
   void ensureMap();
 });
 mapPeriodSelect.addEventListener('change', () => { stopMapPeriodPlayback(); selectMapPeriod(mapPeriodSelect.value); });
+mapTimeScaleSelect.addEventListener('change', () => {
+  mapTimeScale = mapTimeScaleSelect.value;
+  mapPeriod = '';
+  mapPeriodSignature = '';
+  mapPeriodResults.clear();
+  mapDatePeriods = [];
+  stopMapPeriodPlayback();
+  void loadMapPeriods().then(() => { if (activeMap && currentResult && currentView === 'map') renderMap(); });
+});
 mapVariationSelect.addEventListener('change', () => {
   // Mostrar variação sem ano escolhido não tem o que mostrar: vai para o último ano.
   const lista = mapPeriodList().filter((periodo) => mapPeriodResults.has(periodo.name));

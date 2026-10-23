@@ -2562,3 +2562,26 @@ test('as datas do arquivo viram Mês, Ano e Semana no painel, conferidas nos val
   await page.locator('.painel-executar').click();
   await expect(corpo.locator('tr', { hasText: 'Semana 03' })).toContainText('2');
 });
+
+test('mapa com um arquivo só: o controle passa pelos meses da data de notificação e mostra a evolução', async ({ page }) => {
+  await page.addInitScript(() => { try { localStorage.setItem('tabsis.aberto.group-campos', '1'); } catch { /* ignora */ } });
+  await page.goto('/');
+  await page.locator('#file-input').setInputFiles('e2e/fixtures/DENGSP24.dbf');
+  await expect(page.locator('#run-button')).toBeEnabled();
+  await page.locator('[data-view="map"]').click();
+
+  const faixa = page.locator('#map-period');
+  await expect(faixa).toBeVisible({ timeout: 15000 });
+  // Três meses com registros: janeiro (3), março (5), junho (1).
+  await expect(page.locator('#map-period-select option')).toHaveText(['Todos os meses juntos', 'Janeiro', 'Março', 'Junho']);
+  await expect(page.locator('#map-period-chart svg.map-evolucao circle')).toHaveCount(3);
+
+  await page.locator('#map-period-slider').fill('1');
+  await expect(page.locator('#map-period-status')).toContainText('Mostrando Março');
+  await expect(page.locator('#map-period-chart .evo-valor')).toHaveText('5');
+  await expect(page.locator('#map-legend')).toBeVisible();
+
+  // Em variação, março comparado a janeiro.
+  await page.locator('#map-variation').selectOption('abs');
+  await expect(page.locator('#map-period-status')).toContainText('de Janeiro para Março');
+});
