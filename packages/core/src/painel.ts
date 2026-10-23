@@ -103,6 +103,15 @@ export class PainelErro extends Error {
 
 export const FREQUENCIA_ID = 'freq';
 
+/**
+ * Campo virtual "Ano (um por arquivo)": com vários arquivos juntos, cada
+ * arquivo é um período, e ele pode ir em Linhas ou em Colunas. Não existe no
+ * DBF — quem tabula separa os arquivos e monta a tabela (ver `tabularPorPeriodo`
+ * no aplicativo).
+ */
+export const PERIODO_FIELD = '__TABSIS_PERIODO__';
+export const PERIODO_EIXO_ID = 'periodo:arquivo';
+
 export interface ResolvedorDeRecursos {
   /** Loaded CNV name for a DEF path like `CNV\br_uf.cnv`, if it was loaded. */
   conversao(arquivo: string): string | undefined;
@@ -251,7 +260,8 @@ export function catalogoDosCampos(
 
 /** TabWin's defaults when the panel opens. */
 export function estadoInicial(catalogo: PainelCatalogo): PainelEstado {
-  const linha = catalogo.linhas.find((eixo) => eixo.disponivel) ?? catalogo.linhas[0];
+  // O Ano virtual não é o começo natural de uma tabela: começa no primeiro campo de verdade.
+  const linha = catalogo.linhas.find((eixo) => eixo.disponivel && eixo.id !== PERIODO_EIXO_ID) ?? catalogo.linhas[0];
   return {
     linha: linha?.id ?? '',
     coluna: null,

@@ -516,6 +516,16 @@ de outro. O ano vem do nome do arquivo (`DENGBR23.dbc` é 2023); se os nomes nã
 dizem o ano, a faixa mostra os nomes. Cada ano é lido uma vez, em segundo
 plano, enquanto o mapa de todos juntos já está na tela.
 
+**O ano na tabela e no gráfico.** Com dois ou mais arquivos juntos, aparece
+**Ano (um por arquivo aberto)** no topo de *Linhas* e de *Colunas* do painel.
+Em **Linhas**, a tabela vira a série ano a ano (e o gráfico, linhas ao longo
+dos anos — com uma Coluna, como Sexo, uma linha para cada categoria). Em
+**Colunas**, os anos ficam lado a lado em cada categoria (e o gráfico, barras
+com os anos juntos). Os filtros valem em todos os anos; uma categoria que só
+aparece em alguns anos entra com zero nos outros. Para tabular só alguns anos,
+desmarque os outros em *Arquivos de dados* no painel. Com Ano e outra variável,
+vale o primeiro Incremento marcado.
+
 **A diferença entre os anos.** Na faixa Período, **Cores mostram** troca os
 valores de cada ano pela **diferença para o ano anterior** (em casos) ou pela
 **variação %**. A escala é simétrica em torno de zero e é a mesma para todos os

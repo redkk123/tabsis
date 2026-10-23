@@ -29,6 +29,8 @@ import type {
 } from '../../../packages/core/src/model.ts';
 import {
   FREQUENCIA_ID,
+  PERIODO_EIXO_ID,
+  PERIODO_FIELD,
   PainelErro,
   catalogoDoDef,
   catalogoDosCampos,
@@ -309,12 +311,25 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
     const campos = deps.campos();
     const defNome = deps.defAtivo();
     const def = defNome ? deps.defs().get(defNome) : undefined;
+    let base: PainelCatalogo | null = null;
     if (def) {
       const nomes = campos ? new Set(campos.map((campo) => campo.name.toUpperCase())) : undefined;
-      return catalogoDoDef(def, recursos(), nomes);
+      base = catalogoDoDef(def, recursos(), nomes);
+    } else if (campos) {
+      base = catalogoDosCampos(campos, (campo) => deps.rotuloDoCampo(campo));
     }
-    if (!campos) return null;
-    return catalogoDosCampos(campos, (campo) => deps.rotuloDoCampo(campo));
+    if (!base || deps.arquivos().length < 2) return base;
+    // Com vários arquivos juntos, o Ano entra no topo de Linhas e de Colunas:
+    // Linhas = Ano dá a série ano a ano; Colunas = Ano põe os anos lado a lado.
+    const ano: PainelEixo = { id: PERIODO_EIXO_ID, label: 'Ano (um por arquivo aberto)', field: PERIODO_FIELD, disponivel: true };
+    return { ...base, linhas: [ano, ...base.linhas], colunas: [ano, ...base.colunas] };
+  }
+
+  /** Os períodos dos arquivos abertos, na ordem: "2023", "2024"… (ou o nome do arquivo). */
+  function periodosAbertos(): string[] {
+    const arquivos = [...deps.arquivos()].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { numeric: true }));
+    const rotulos = arquivos.map((arquivo) => describeDatasusFile(arquivo.name)?.periodShort ?? arquivo.name);
+    return new Set(rotulos).size === rotulos.length ? rotulos : arquivos.map((arquivo) => arquivo.name);
   }
 
   function rotuloOpcao(eixo: PainelEixo): string {
@@ -409,6 +424,14 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
     destino.replaceChildren();
     if (!eixo) {
       destino.append(papel === 'colunas' ? 'Sem colunas: uma coluna só, com o total de cada linha.' : '');
+      return;
+    }
+    if (eixo.field === PERIODO_FIELD) {
+      const periodos = periodosAbertos();
+      destino.append(el('b', {}, `${periodos.length} ${papel}: `), periodos.join(' · '),
+        el('small', {}, papel === 'linhas'
+          ? 'um período por arquivo aberto — bom para ver a série ano a ano (e o gráfico de linhas)'
+          : 'um período por arquivo aberto — os anos lado a lado, para comparar'));
       return;
     }
     const categorias = categoriasDe(eixo);
