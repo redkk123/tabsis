@@ -28,6 +28,38 @@ tempo, no navegador, com o mapa no tempo?
 | Mapa: os meses de notificação (uma leitura cruzada) | 10,7 s | 1.926 MB |
 | Mapa: foco em São Paulo | 0,1 s | 1.952 MB |
 
+## Com dados reais (2026-10-23, download autorizado pelo Red)
+
+Dengue nacional do SINAN (`SINAN/DADOS/FINAIS`, mais de 100 campos por
+registro), arquivos DBC originais, mesma máquina:
+
+| Conjunto | Registros | Abrir e juntar + 1ª tabela | Linhas = Ano | Sexo × Mês | Mapa por ano | Mapa por mês | Memória máx. |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| DENGBR22 + 23 + 25 (190 MB de DBC) | 4.694.266 | 26,5 s | 15,4 s | 14,3 s | 9,1 s | 15,4 s | 1.121 MB |
+| DENGBR23 + 24 (346 MB de DBC; 2024 é o maior ano) | 8.210.880 | 49,8 s | 25,7 s | 25,2 s | 14,2 s | 25,7 s | 1.312 MB |
+
+O DBC fica guardado comprimido e é lido em lotes a cada pergunta, por isso a
+memória cresce bem menos que o número de registros. O maior ano de dengue
+(274 MB de DBC, 6,6 milhões de registros) abre dentro do limite de 512 MB por
+arquivo, que vale para o DBC, não para o DBF descomprimido.
+
+**População real do IBGE** (`IBGE/POPTCU/POPTBR23.zip` e
+`IBGE/POPSVS/POPSBR23.zip`): o TabSis achou sozinho as colunas nos dois
+formatos — `MUNIC_RES`/`POPULACAO`/`ANO` (TCU, 5.570 linhas) e
+`COD_MUN`/`POP`/`ANO` (SVS por sexo e idade, 902.340 linhas somadas por
+município). Dengue 2023 por UF: de 37 a 3.572 notificações por 100 mil
+habitantes.
+
+**Defeitos achados com os dados reais, corrigidos:**
+
+- A primeira tabela automática do SINAN era por `MUNICIPIO`, que no SINAN é o
+  município do **hospital**; o mapa seguia essa tabela e mostrava só as
+  internações (MG com 7.760 em vez de 406.525), sem dizer. Agora a primeira
+  tabela começa pelo município de residência, e o mapa sempre diz qual
+  variável da tabela está pintando.
+- A população do SVS (902 mil linhas) passava do limite de leitura de 500 mil
+  e vinha em `.zip`: agora lê tudo e aceita o `.zip` do DATASUS.
+
 ## Defeito achado e corrigido nesta medida
 
 Com arquivos grandes, abrir vários de uma vez recusava o 2º arquivo ("Outra
@@ -44,8 +76,7 @@ arquivo do gesto.
   campos que cada pergunta usa, então o tempo cresce menos que o tamanho, mas a
   memória dos arquivos guardados cresce junto com eles.
 - **DBC custa a descompressão**, que estes DBF não pagam.
-- **Limite por arquivo: 512 MB.** Um arquivo nacional de um ano muito grande
-  (dengue de 2024, por exemplo) pode passar disso; aí o caminho é o recorte por
-  UF no próprio catálogo, ou o Parquet leve.
-- Próximo passo, com autorização para baixar: repetir com 3 a 5 anos reais de
-  um agravo nacional do SINAN.
+- **Limite por arquivo: 512 MB de DBC.** O maior ano de dengue (2024) tem
+  274 MB e cabe; um arquivo maior pede o recorte por UF no catálogo, ou o
+  Parquet leve.
+- Feito com dados reais: ver a seção acima.

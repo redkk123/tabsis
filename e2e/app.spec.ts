@@ -2685,3 +2685,13 @@ test('taxa por 100 mil: a população aberta no mapa troca contagem por taxa, e 
   await expect(page.locator('#map-legend')).not.toContainText('Por 100 mil');
   await expect(page.locator('#map-period-chart .evo-valor')).toHaveText('9');
 });
+
+test('a primeira tabela começa pela residência, não pelo município do hospital, e o mapa diz o que pinta', async ({ page }) => {
+  await page.goto('/');
+  // No SINAN, MUNICIPIO é o município do hospital; ele vem antes no arquivo.
+  await page.locator('#file-input').setInputFiles('e2e/fixtures/HOSPBR24.dbf');
+  await expect(page.locator('#result-table tbody')).toContainText('Belém (150140)');
+  await page.locator('[data-view="map"]').click();
+  await expect(page.locator('#map-message')).toContainText('Mapa da tabela:');
+  await expect(page.locator('#map-message')).toContainText('(ID_MN_RESI)');
+});

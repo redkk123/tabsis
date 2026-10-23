@@ -161,9 +161,9 @@ Falta, para isso ser **a** forma de explorar os dados e não um recurso do mapa:
       escrito no nome.
 - [x] **Escala espacial** (feito: UF, Região e UF, Região de saúde e Macrorregião de qualquer campo de município; comparar dois lugares no cartão do mapa): além de Brasil → UF → município, região de saúde e
       macrorregião; comparar dois lugares lado a lado.
-- [x] **Medir com volume real** (feito com 5 × 1,5 milhão de registros sintéticos: ver MEDIDA_VOLUME.md; falta repetir com SINAN real, que precisa de download autorizado): 5 a 10 anos de SINAN nacional (memória do
+- [x] **Medir com volume real** (feito: sintético de 7,5 milhões e dengue real de 2022–2025, até 8,2 milhões de registros juntos; ver MEDIDA_VOLUME.md): 5 a 10 anos de SINAN nacional (memória do
       navegador, tempo de leitura por ano), com orçamento de memória e aviso.
-- [x] **Indicadores, não só contagem** (feito: taxa por 100 mil no mapa com a população aberta; falta conferir com um arquivo real do IBGE): taxa por 100 mil (população por
+- [x] **Indicadores, não só contagem** (feito e conferido com a população real do IBGE, TCU e SVS): taxa por 100 mil (população por
       município/ano), para a comparação entre lugares e anos fazer sentido.
 
 ---
