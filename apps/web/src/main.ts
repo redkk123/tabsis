@@ -1,4 +1,4 @@
-import { zip, zipSync } from 'fflate';
+import { unzipSync, zip, zipSync } from 'fflate';
 import {
   readDbfHeader,
   readDbfRecords,
@@ -1187,6 +1187,10 @@ function selectionLabel(fieldName: string): string {
 }
 
 function chooseDefaultField(fields: DbfHeader['fields']): string {
+  // Residência antes de tudo: no SINAN, `MUNICIPIO` é o município do HOSPITAL,
+  // e começar por ele pintava o mapa com as internações, não com os casos.
+  const geografico = findGeographicFields(fields).find((campo) => campo.level === 'municipality');
+  if (geografico) return geografico.field;
   const names = new Set(fields.map((field) => field.name.toUpperCase()));
   for (const preferred of ['MUNIC_RES', 'MUNIC_MOV', 'MUNICIPIO', 'UF_ZI', 'SEXO']) {
     if (names.has(preferred)) return preferred;
@@ -6709,16 +6713,22 @@ function renderMap(): void {
     // O recorte (`por estado`, `em Pará`) só existe no mapa próprio. Dizê-lo
     // no caminho da tabela seria descrever um agrupamento que não aconteceu:
     // ali o mapa desenha as linhas que a pessoa tabulou, uma a uma.
-    const recorteDito = mapSource === 'proprio'
+    const recorteDito = mapLevel === 'municipality' && !mapClassic
       ? (mapUfFilter ? `, em ${ufNameForCode(mapUfFilter)}` : ', por estado')
       : '';
-    mapMessage.textContent = mapGeoField
-      ? `Mapa por ${mapGeoField.reason} (${mapGeoField.field})${recorteDito}`
-        + ` · ${integerFormat.format(matched)} áreas com dado${colunaDita}. A tabela ao lado continua como você a montou.`
-      : colunaDita
-        ? `${integerFormat.format(matched)} áreas com dado${colunaDita}.`
-        : '';
-    mapMessage.hidden = !mapGeoField && !colunaDita;
+    // Na tabela, o que o mapa pinta é a variável de Linhas dela — que pode ser
+    // o município do hospital, e não o de residência: dizer qual é.
+    const campoDaTabela = currentPlan?.spec.rows.field ?? '';
+    mapMessage.textContent = mapSource === 'tabela' && campoDaTabela
+      ? `Mapa da tabela: ${currentRowLabel || friendlyFieldLabel(campoDaTabela)} (${campoDaTabela})${recorteDito}`
+        + ` · ${integerFormat.format(matched)} áreas com dado${colunaDita}. Para mapear outro campo (residência, notificação, hospital), mude as Linhas.`
+      : mapGeoField
+        ? `Mapa por ${mapGeoField.reason} (${mapGeoField.field})${recorteDito}`
+          + ` · ${integerFormat.format(matched)} áreas com dado${colunaDita}. A tabela ao lado continua como você a montou.`
+        : colunaDita
+          ? `${integerFormat.format(matched)} áreas com dado${colunaDita}.`
+          : '';
+    mapMessage.hidden = !mapMessage.textContent;
     // Com o mapa desenhado o texto é legenda, no topo: no meio ele cobria o
     // mapa e engolia o clique e o tooltip.
     mapMessage.classList.add('is-caption');
@@ -7451,9 +7461,14 @@ function evolutionChart(
   }
   // Rótulos: todos quando cabem; senão o primeiro, o último e o atual.
   const mostrar = new Set<number>(n <= 12 ? rotulos.map((_, i) => i) : [0, n - 1, ...(atual >= 0 ? [atual] : [])]);
+  // Sem espaço para o nome inteiro (doze meses num celular), as três primeiras
+  // letras: "Janeiro" vira "Jan" em vez de cair por cima de "Fevereiro".
+  const espaco = (largura - margem.esquerda - margem.direita) / Math.max(1, mostrar.size);
+  const maiorRotulo = Math.max(...[...mostrar].map((i) => (rotulos[i] ?? '').length));
+  const curto = maiorRotulo * 6 > espaco - 4;
   for (const i of mostrar) {
     const texto = elemento('text', { class: 'evo-rotulo', x: x(i).toFixed(1), y: String(altura - 5), 'text-anchor': i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle' });
-    texto.textContent = rotulos[i] ?? '';
+    texto.textContent = curto && !/^\d+$/.test(rotulos[i] ?? '') ? (rotulos[i] ?? '').slice(0, 3) : (rotulos[i] ?? '');
     svg.append(texto);
   }
   return svg;
@@ -7587,7 +7602,18 @@ let mapClassic = false;
 /** População aberta para a taxa por 100 mil (ver `population.ts`). */
 let populacao: PopulationTable | null = null;
 
-async function lerArquivoDePopulacao(file: File): Promise<void> {
+async function lerArquivoDePopulacao(arquivoAberto: File): Promise<void> {
+  let file = arquivoAberto;
+  if (extensionOf(file.name) === 'ZIP') {
+    // O DATASUS publica a população em .zip (POPTBR23.zip traz um DBF por UF e
+    // o do Brasil): vale o do Brasil, ou o maior DBF/CSV do pacote.
+    const entradas = Object.entries(unzipSync(new Uint8Array(await file.arrayBuffer())))
+      .filter(([nome]) => /\.(dbf|csv|tsv)$/i.test(nome));
+    if (!entradas.length) throw new Error(`${file.name}: o pacote não tem DBF nem CSV de população.`);
+    const [nome, bytes] = entradas.find(([candidato]) => /BR\d{2}\.dbf$/i.test(candidato.split('/').pop() ?? ''))
+      ?? entradas.sort((a, b) => b[1].byteLength - a[1].byteLength)[0]!;
+    file = new File([bytes.slice()], nome.split('/').pop() ?? nome);
+  }
   const extensao = extensionOf(file.name);
   let registros: Array<Record<string, unknown>>;
   let campos: string[];
@@ -7608,7 +7634,8 @@ async function lerArquivoDePopulacao(file: File): Promise<void> {
         { label: 'População', transfer: fonte.kind === 'binary' || fonte.kind === 'parquet' ? [fonte.bytes] : [] });
       campos = aberto.header.fields.map((campo) => campo.name);
       registros = (await askDatasetWorker<{ records: Array<Record<string, unknown>> }>(trabalhador,
-        { type: 'records', fields: campos, maxRecords: 500_000 }, { label: 'População' })).records;
+        // POP por sexo e idade (SVS) tem 900 mil linhas: lê tudo.
+        { type: 'records', fields: campos, maxRecords: 5_000_000 }, { label: 'População' })).records;
     } finally {
       trabalhador.terminate();
     }

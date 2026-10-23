@@ -897,7 +897,7 @@
             <div class="map-taxa" id="map-taxa">
               <label class="check-label"><input id="map-taxa-check" type="checkbox" disabled /><span>Por 100 mil habitantes</span></label>
               <button class="secondary-button" id="map-populacao-button" type="button">Abrir população (IBGE)…</button>
-              <input id="map-populacao-input" type="file" accept=".dbf,.dbc,.parquet,.csv,.tsv" hidden />
+              <input id="map-populacao-input" type="file" accept=".zip,.dbf,.dbc,.parquet,.csv,.tsv" hidden />
               <small id="map-populacao-status">Para comparar lugares de tamanhos diferentes, abra a população por município (ex.: <i>IBGE · Bases populacionais</i> em Buscar no DATASUS, ou um CSV).</small>
             </div>
             <div class="map-focus" id="map-focus" hidden>
@@ -915,10 +915,10 @@
                   <select id="map-period-select" title="Um período, ou todos juntos"></select>
                 </label>
                 <label class="map-period-select-label">Cores mostram
-                  <select id="map-variation" title="Os valores de cada ano, ou como cada área mudou em relação ao ano anterior">
-                    <option value="">Os valores de cada ano</option>
-                    <option value="abs">A diferença para o ano anterior</option>
-                    <option value="pct">A variação % sobre o ano anterior</option>
+                  <select id="map-variation" title="Os valores de cada período, ou como cada área mudou em relação ao anterior">
+                    <option value="">Os valores de cada período</option>
+                    <option value="abs">A diferença para o período anterior</option>
+                    <option value="pct">A variação % sobre o período anterior</option>
                   </select>
                 </label>
                 <input id="map-period-slider" type="range" min="0" max="0" step="1" value="0" aria-label="Mover entre os anos" />
