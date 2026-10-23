@@ -534,6 +534,14 @@ Funciona nos dois formatos do DATASUS: `AAAAMMDD` (SINAN, SIH) e `DDMMAAAA`
 (SIM, SINASC). Ex.: Linhas = *Mês de Data da internação* e Colunas = *Ano (um
 por arquivo aberto)* mostra a sazonalidade de vários anos lado a lado.
 
+**No mapa, mês a mês (mesmo com um arquivo só).** A faixa **Período** do mapa
+também passa pelos meses (ou pelas semanas epidemiológicas) de uma data do
+arquivo: em **Passar por**, escolha *Arquivos abertos* (um período por arquivo)
+ou *Mês de Data de notificação*, *Semana epidemiológica de …* e afins. Mova o
+controle ou use ▶ Reproduzir; embaixo, o **gráfico de evolução** mostra o total
+de cada período numa linha, com o período do mapa em destaque — toque num ponto
+para ir até ele. O cartão do município traz a mesma linha, só daquele município.
+
 **A diferença entre os anos.** Na faixa Período, **Cores mostram** troca os
 valores de cada ano pela **diferença para o ano anterior** (em casos) ou pela
 **variação %**. A escala é simétrica em torno de zero e é a mesma para todos os

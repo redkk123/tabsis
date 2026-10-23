@@ -1022,3 +1022,20 @@ dialog p { color: #676d74; font-size: 13px; line-height: 1.6; }
 .dataset-add-button { width: 100%; }
 .dataset-files-hint { margin: 7px 0 0; color: var(--muted); font-size: 11.5px; line-height: 1.45; }
 @media (pointer: coarse) { .dataset-file-tirar { min-width: 40px; min-height: 40px; } }
+
+/* Evolução no tempo, embaixo do controle do mapa e no cartão do município. */
+.map-evolucao { display: block; width: 100%; height: 118px; margin-top: 4px; }
+.map-evolucao .evo-area { fill: color-mix(in srgb, #0d6b57 12%, transparent); }
+.map-evolucao .evo-linha { fill: none; stroke: #0d6b57; stroke-width: 2.2; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.map-evolucao .evo-ponto { fill: #fff; stroke: #0d6b57; stroke-width: 2; cursor: pointer; }
+.map-evolucao .evo-ponto.atual { fill: #0d6b57; }
+.map-evolucao .evo-rotulo { fill: #676d74; font: 10px var(--sans); }
+.map-evolucao .evo-valor { fill: var(--ink); font: 700 11px var(--sans); }
+.map-evolucao .evo-marca { stroke: #0d6b57; stroke-dasharray: 3 3; stroke-width: 1; }
+.map-period-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.map-period-chips .map-period-bar { flex: 0 0 auto; height: auto; min-width: 0; max-width: none; padding: 3px 8px; border: 1px solid var(--line); border-radius: 999px; background: #fff; }
+.map-period-chips .map-period-bar[aria-pressed="true"] { border-color: #0d6b57; background: #0d6b57; color: #fff; }
+.map-period-chips .map-period-bar i { display: none; }
+
+.map-period-chart { display: block; height: auto; }
+.map-evolucao { height: auto; }
