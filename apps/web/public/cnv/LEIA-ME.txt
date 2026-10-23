@@ -1,0 +1,11 @@
+Tabelas de conversão oficiais do DATASUS, copiadas sem alteração do pacote
+auxiliar TAB_SIH (ftp.datasus.gov.br/dissemin/publicos/SIHSUS/200801_/Auxiliar),
+para o TabSis oferecer UF, Região e UF, Região de saúde (CIR) e Macrorregião de
+saúde de qualquer campo de município, em qualquer sistema:
+
+  BR_UF.CNV        código de município (2 primeiros dígitos) → UF
+  BR_REGIAOUF.CNV  código de município (2 primeiros dígitos) → Região e UF
+  BR_REGSAUD.CNV   código de município (6 dígitos) → Região de saúde (CIR)
+  BR_MACSAUD.CNV   código de município (6 dígitos) → Macrorregião de saúde
+
+Quando o DEF oficial já aponta para uma delas, é esta mesma tabela que ele usa.

@@ -63,8 +63,8 @@ export interface PainelDeps {
   /** Sem DEF, o campo que a abertura escolheu como plausível (UF, município…). */
   campoInicial?(): string | undefined;
   arquivos(): PainelArquivo[];
-  /** Eixos derivados dos campos de data (Mês, Ano, Semana de um campo), conferidos nos dados. */
-  eixosDeData?(): PainelEixo[];
+  /** Eixos derivados: Mês/Ano/Semana das datas e UF/Região/Região de saúde dos campos de município. */
+  eixosDerivados?(): PainelEixo[];
   valoresDistintos(campo: string): Promise<{ values: string[]; truncated: boolean }>;
   /** As primeiras linhas do arquivo, só com os campos pedidos ("Ver arquivo .DBF"). */
   primeirosRegistros?(campos: string[], limite: number): Promise<Array<Record<string, unknown>>>;
@@ -323,7 +323,11 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
     if (!base) return base;
     // Mês, Ano e Semana a partir das datas do arquivo vêm logo no começo: são
     // as escalas de tempo que quem tabula procura primeiro.
-    const datas = deps.eixosDeData?.() ?? [];
+    // Um derivado que o DEF já oferece (mesmo campo, mesma tabela) não se repete.
+    const doDef = (eixo: PainelEixo, extra: PainelEixo): boolean => eixo.field.toUpperCase() === extra.field.toUpperCase()
+      && Boolean(extra.conversionId) && [eixo.conversionId, eixo.resourceFile && nomeBaseDoRecurso(eixo.resourceFile)]
+        .some((nome) => nome && nome.toUpperCase() === extra.conversionId!.toUpperCase());
+    const datas = (deps.eixosDerivados?.() ?? []).filter((extra) => !base.linhas.some((eixo) => doDef(eixo, extra)));
     // Com vários arquivos juntos, o Ano (um por arquivo) entra no topo de Linhas
     // e de Colunas: Linhas = Ano dá a série ano a ano; Colunas = Ano põe os anos
     // lado a lado.

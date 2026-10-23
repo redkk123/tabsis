@@ -2399,7 +2399,7 @@ test('modo foco: o clique no município abre o cartão com a posição e a séri
   await expect(cartao.locator('.map-card-series .map-period-bar span')).toHaveText(['2023 · 2', '2024 · 6', '2025 · 4']);
 
   // Clicar de novo, ou no ✕, fecha o cartão.
-  await cartao.locator('button').click();
+  await cartao.getByRole('button', { name: 'Fechar o cartão' }).click();
   await expect(cartao).toBeHidden();
 });
 
@@ -2584,4 +2584,80 @@ test('mapa com um arquivo só: o controle passa pelos meses da data de notifica�
   // Em variação, março comparado a janeiro.
   await page.locator('#map-variation').selectOption('abs');
   await expect(page.locator('#map-period-status')).toContainText('de Janeiro para Março');
+});
+
+test('qualquer campo de município ganha UF, Região e UF, Região de saúde e Macrorregião', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#file-input').setInputFiles('e2e/fixtures/DENGSP24.dbf');
+  const linhas = page.locator('#painel-linhas');
+  await expect(linhas.locator('option[value="regiao:saude:ID_MN_RESI"]')).toHaveCount(1, { timeout: 15000 });
+  await expect(linhas.locator('option[value="regiao:macro:ID_MN_RESI"]')).toHaveCount(1);
+  // Também como filtro, em Seleções.
+  await expect(page.locator('#painel-selecoes-disponiveis option[value="regiao:saude:ID_MN_RESI"]')).toHaveCount(1);
+
+  await linhas.selectOption('regiao:saude:ID_MN_RESI');
+  // São 474 regiões de saúde no país: só as que têm registro.
+  await page.getByLabel('Suprimir linhas zeradas').check();
+  await page.locator('.painel-executar').click();
+  const corpo = page.locator('#result-table tbody');
+  // 6 registros na capital paulista (região de saúde 35016 São Paulo).
+  await expect(corpo.locator('tr', { hasText: '35016 São Paulo' }).locator('td').last()).toHaveText(/^\s*5\s*$/);
+
+  await linhas.selectOption('regiao:macro:ID_MN_RESI');
+  await page.locator('.painel-executar').click();
+  await expect(corpo.locator('tr', { hasText: 'RRAS6' }).locator('td').last()).toHaveText(/^\s*5\s*$/);
+
+  await linhas.selectOption('regiao:uf:ID_MN_RESI');
+  await page.locator('.painel-executar').click();
+  await expect(corpo.locator('tr', { hasText: 'Pará' }).locator('td').last()).toHaveText(/^\s*3\s*$/);
+});
+
+test('cartão do município: comparar dois lugares lado a lado, com as duas linhas de evolução', async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.goto('/');
+  await page.locator('#file-input').setInputFiles('e2e/fixtures/COMPSP24.dbf');
+  await page.locator('[data-view="map"]').click();
+  await expect(page.locator('#map-uf option[value="35"]')).toHaveCount(1, { timeout: 15000 });
+  await page.locator('#map-uf').selectOption('35');
+  await expect(page.locator('#map-focus-trail')).toHaveText('Brasil › São Paulo');
+  await expect(page.locator('#map-legend')).toContainText('2 áreas associadas', { timeout: 15000 });
+  await expect(page.locator('#map-period-chart svg')).toHaveCount(1, { timeout: 15000 });
+
+  const acharPorDica = (trecho: string) => page.evaluate((procura) => {
+    const canvas = document.querySelector<HTMLCanvasElement>('#map-canvas')!;
+    const tooltip = document.querySelector<HTMLElement>('#map-tooltip')!;
+    const box = canvas.getBoundingClientRect();
+    const cx = box.width * 0.6;
+    const cy = box.height * 0.62;
+    for (let y = Math.max(0, cy - 140); y < Math.min(box.height, cy + 140); y += 3) {
+      for (let x = Math.max(0, cx - 180); x < Math.min(box.width, cx + 180); x += 3) {
+        canvas.dispatchEvent(new PointerEvent('pointermove', { clientX: box.left + x, clientY: box.top + y, bubbles: true }));
+        if (!tooltip.hidden && tooltip.textContent?.startsWith(procura)) return { x, y };
+      }
+    }
+    return null;
+  }, trecho);
+
+  const capital = await acharPorDica('São Paulo ·');
+  expect(capital).not.toBeNull();
+  await page.locator('#map-canvas').click({ position: capital! });
+  const cartao = page.locator('#map-card');
+  await expect(cartao).toContainText('São Paulo · São Paulo');
+
+  await cartao.getByRole('button', { name: /Comparar/ }).click();
+  await expect(cartao).toContainText('Toque em outro município');
+  const campinas = await acharPorDica('Campinas ·');
+  expect(campinas).not.toBeNull();
+  await page.locator('#map-canvas').click({ position: campinas! });
+
+  await expect(cartao.locator('.map-card-col--b')).toContainText('Campinas');
+  await expect(cartao.locator('.map-card-col--a')).toContainText('6');
+  await expect(cartao.locator('.map-card-col--b')).toContainText('4');
+  // Duas linhas: janeiro/março de cada um.
+  await expect(cartao.locator('svg polyline.evo-linha-b')).toHaveCount(1);
+  await expect(cartao.locator('.map-card-series .map-period-bar span')).toHaveText(['Janeiro · 4', 'Março · 2']);
+  await expect(cartao.locator('.map-card-series-b .map-period-bar span')).toHaveText(['Janeiro · 1', 'Março · 3']);
+
+  await cartao.getByRole('button', { name: 'Tirar a comparação' }).click();
+  await expect(cartao.locator('.map-card-col--b')).toHaveCount(0);
 });

@@ -159,7 +159,7 @@ Falta, para isso ser **a** forma de explorar os dados e não um recurso do mapa:
 - [x] **Escalas além do ano do nome do arquivo** (feito: Mês, Ano e Semana epidemiológica dos campos de data, formato conferido nos valores; dia da semana fica para depois): mês/semana/dia a partir de um
       campo de data do arquivo (DT_NOTIFIC, DT_SIN_PRI…), não só o período
       escrito no nome.
-- [ ] **Escala espacial**: além de Brasil → UF → município, região de saúde e
+- [x] **Escala espacial** (feito: UF, Região e UF, Região de saúde e Macrorregião de qualquer campo de município; comparar dois lugares no cartão do mapa): além de Brasil → UF → município, região de saúde e
       macrorregião; comparar dois lugares lado a lado.
 - [ ] **Medir com volume real**: 5 a 10 anos de SINAN nacional (memória do
       navegador, tempo de leitura por ano), com orçamento de memória e aviso.
