@@ -1039,3 +1039,23 @@ dialog p { color: #676d74; font-size: 13px; line-height: 1.6; }
 
 .map-period-chart { display: block; height: auto; }
 .map-evolucao { height: auto; }
+
+/* Cartão: comparar dois lugares lado a lado. */
+.map-card-acoes { display: flex; gap: 6px; align-items: center; }
+.map-card-armado { border-color: #c2571a; color: #c2571a; }
+.map-card-cols { display: grid; gap: 4px 14px; }
+.map-card-cols--dois { grid-template-columns: 1fr 1fr; }
+.map-card-cols--dois .map-card-col--a { border-left: 3px solid #0d6b57; padding-left: 8px; }
+.map-card-cols--dois .map-card-col--b { border-left: 3px dashed #c2571a; padding-left: 8px; }
+.map-card-nome-b { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 6px; }
+.map-card-nome-b strong { color: #9a4413; font-size: 14px; }
+.map-card-tirar-b { min-width: 28px; padding: 1px 6px; }
+.map-card-dica { grid-column: 1 / -1; margin: 2px 0 6px; color: #9a4413; font-size: 12.5px; }
+.map-evolucao .evo-linha-b { fill: none; stroke: #c2571a; stroke-width: 2; stroke-dasharray: 6 4; }
+.map-evolucao .evo-ponto-b { fill: #fff; stroke: #c2571a; stroke-width: 2; }
+.map-evolucao .evo-legenda-a { fill: #0d6b57; font: 600 10.5px var(--sans); }
+.map-evolucao .evo-legenda-b { fill: #c2571a; font: 600 10.5px var(--sans); }
+.map-card-series-b .map-period-bar span { color: #9a4413; }
+@media (max-width: 520px) { .map-card-cols--dois { grid-template-columns: 1fr; } }
+.map-card-series, .map-card-series-b { height: auto; }
+.map-card-series .map-period-bar, .map-card-series-b .map-period-bar { height: auto; max-width: none; }

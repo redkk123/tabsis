@@ -542,6 +542,19 @@ controle ou use ▶ Reproduzir; embaixo, o **gráfico de evolução** mostra o t
 de cada período numa linha, com o período do mapa em destaque — toque num ponto
 para ir até ele. O cartão do município traz a mesma linha, só daquele município.
 
+**Regiões de saúde.** Todo campo de município (residência, ocorrência,
+notificação…) ganha, no painel, **UF de …**, **Região e UF de …**, **Região
+de saúde (CIR) de …** e **Macrorregião de saúde de …**, em Linhas, Colunas e
+Seleções — em qualquer sistema, pelas tabelas oficiais do DATASUS que o TabSis
+já traz (as mesmas do pacote TAB_SIH). Se o DEF já oferece a mesma tabela para
+o mesmo campo, ela não aparece repetida.
+
+**Comparar dois lugares.** No cartão do município, toque em **Comparar** e
+depois em outro município do mapa: os dois ficam lado a lado (valor, posição,
+participação), com as duas linhas de evolução no mesmo gráfico — o segundo
+tracejado em laranja, e contornado em laranja no mapa. O ✕ ao lado do segundo
+tira a comparação.
+
 **A diferença entre os anos.** Na faixa Período, **Cores mostram** troca os
 valores de cada ano pela **diferença para o ano anterior** (em casos) ou pela
 **variação %**. A escala é simétrica em torno de zero e é a mesma para todos os

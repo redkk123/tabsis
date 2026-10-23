@@ -2810,6 +2810,61 @@ async function removeDatasetSource(name: string): Promise<void> {
 }
 
 /**
+ * UF, Região e UF, Região de saúde (CIR) e Macrorregião de saúde de cada campo
+ * de município do arquivo, pelas tabelas oficiais do DATASUS (TAB_SIH) que o
+ * TabSis traz em `public/cnv/`. Valem em qualquer sistema — inclusive no SINAN
+ * e no SIM, cujos pacotes nem sempre trazem essas tabelas.
+ */
+let eixosRegionais: PainelEixo[] = [];
+
+const TABELAS_REGIONAIS: ReadonlyArray<{ id: string; arquivo: string; rotulo: string }> = [
+  { id: 'uf', arquivo: 'BR_UF.CNV', rotulo: 'UF' },
+  { id: 'regiaouf', arquivo: 'BR_REGIAOUF.CNV', rotulo: 'Região e UF' },
+  { id: 'saude', arquivo: 'BR_REGSAUD.CNV', rotulo: 'Região de saúde (CIR)' },
+  { id: 'macro', arquivo: 'BR_MACSAUD.CNV', rotulo: 'Macrorregião de saúde' },
+];
+
+let tabelasRegionaisCarregadas: Promise<boolean> | undefined;
+function carregarTabelasRegionais(): Promise<boolean> {
+  tabelasRegionaisCarregadas ??= (async () => {
+    try {
+      for (const tabela of TABELAS_REGIONAIS) {
+        if (cnvByName.has(tabela.arquivo)) continue;
+        const resposta = await fetch(new URL(`cnv/${tabela.arquivo}`, document.baseURI), { cache: 'force-cache' });
+        if (!resposta.ok) return false;
+        cnvByName.set(tabela.arquivo, parseCnv(textDecoder.decode(new Uint8Array(await resposta.arrayBuffer()))));
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  })();
+  return tabelasRegionaisCarregadas;
+}
+
+async function detectarCamposRegionais(): Promise<void> {
+  const header = dbfHeader;
+  if (!header) return;
+  const municipios = findGeographicFields(header.fields).filter((campo) => campo.level === 'municipality').slice(0, 4);
+  if (!municipios.length) {
+    eixosRegionais = [];
+    return;
+  }
+  if (!await carregarTabelasRegionais() || dbfHeader !== header) return;
+  eixosRegionais = municipios.flatMap((campo) => TABELAS_REGIONAIS.map((tabela) => ({
+    id: `regiao:${tabela.id}:${campo.field.toUpperCase()}`,
+    label: `${tabela.rotulo} de ${friendlyFieldLabel(campo.field)}`,
+    field: campo.field,
+    conversionId: tabela.arquivo,
+    startPosition: 1,
+    resourceFile: tabela.arquivo,
+    disponivel: true,
+  })));
+  populateConversions();
+  painel?.atualizar();
+}
+
+/**
  * Mês, Ano e Semana epidemiológica dos campos de data do arquivo, para o painel.
  *
  * O formato de cada campo é conferido numa amostra dos primeiros registros
@@ -2923,6 +2978,7 @@ function resetAnalysisState(): void {
   // A geografia é do arquivo: guardá-la entre arquivos mostraria o mapa de um
   // com os números do outro.
   eixosDeData = [];
+  eixosRegionais = [];
   mapResult = null;
   mapGeoField = null;
   mapUfFilter = '';
@@ -2973,6 +3029,7 @@ async function decodeDbf(bytes: Uint8Array, file: File, isDbc: boolean, source: 
   void refreshGeoFilter();
   // As datas do arquivo viram Mês, Ano e Semana no painel (conferidas numa amostra).
   void detectarCamposDeData();
+  void detectarCamposRegionais();
   renderConfiguredFilters();
   renderCrossFieldRules();
   renderExtraMeasures();
@@ -6477,7 +6534,13 @@ function renderMap(): void {
     if (object.type === 'polygon' || object.type === 'polygon-with-seat') {
       context.fillStyle = scaleModel.colorFor(value);
       context.fill('evenodd');
-      if (mapSelection.includes(object.geocode) || (mapFocusGeocode && object.geocode.trim() === mapFocusGeocode)) {
+      if (mapCompareGeocode && object.geocode.trim() === mapCompareGeocode) {
+        context.save();
+        context.strokeStyle = '#c2571a';
+        context.lineWidth = Math.max(1.6, 2.4 / scale);
+        context.stroke();
+        context.restore();
+      } else if (mapSelection.includes(object.geocode) || (mapFocusGeocode && object.geocode.trim() === mapFocusGeocode)) {
         context.save();
         context.strokeStyle = '#123f36';
         context.lineWidth = Math.max(1.1, 1.8 / scale);
@@ -7059,6 +7122,8 @@ function setMapFocus(uf: string): void {
   mapPanY = 0;
   activeMap = null;
   mapFocusGeocode = '';
+  mapCompareGeocode = '';
+  mapCompareArmed = false;
   mapTooltip.hidden = true;
   if (uf) void loadUfOutline();
   void ensureMap();
@@ -7289,6 +7354,7 @@ function evolutionChart(
   escolher?: (indice: number) => void,
   titulo = 'Evolução',
   larguraDisponivel = 600,
+  segunda?: { valores: ReadonlyArray<number | undefined>; rotulo: string; rotuloA?: string },
 ): SVGSVGElement {
   const ns = 'http://www.w3.org/2000/svg';
   // Desenhado na largura real (em px): esticar um desenho fixo achatava o texto
@@ -7301,7 +7367,7 @@ function evolutionChart(
   svg.setAttribute('viewBox', `0 0 ${largura} ${altura}`);
   svg.setAttribute('role', 'img');
   svg.setAttribute('aria-label', `${titulo}: ${rotulos.map((rotulo, i) => `${rotulo} ${valores[i] === undefined ? 'lendo' : numberFormat.format(valores[i]!)}`).join(', ')}`);
-  const maior = Math.max(1, ...valores.map((valor) => valor ?? 0));
+  const maior = Math.max(1, ...valores.map((valor) => valor ?? 0), ...(segunda?.valores ?? []).map((valor) => valor ?? 0));
   const n = rotulos.length;
   const x = (i: number) => margem.esquerda + (n <= 1 ? (largura - margem.esquerda - margem.direita) / 2 : (i * (largura - margem.esquerda - margem.direita)) / (n - 1));
   const y = (valor: number) => altura - margem.base - (valor / maior) * (altura - margem.topo - margem.base);
@@ -7317,6 +7383,24 @@ function evolutionChart(
     const linha = definidos.map((ponto) => `${ponto.x.toFixed(1)},${ponto.y.toFixed(1)}`).join(' ');
     svg.append(elemento('polygon', { class: 'evo-area', points: `${definidos[0]!.x.toFixed(1)},${base} ${linha} ${definidos.at(-1)!.x.toFixed(1)},${base}` }));
     svg.append(elemento('polyline', { class: 'evo-linha', points: linha }));
+  }
+  if (segunda) {
+    // O segundo lugar, tracejado em laranja, na mesma escala.
+    const pontosB = segunda.valores.map((valor, i) => (valor === undefined ? null : `${x(i).toFixed(1)},${y(valor).toFixed(1)}`)).filter(Boolean);
+    if (pontosB.length) svg.append(elemento('polyline', { class: 'evo-linha-b', points: pontosB.join(' ') }));
+    segunda.valores.forEach((valor, i) => {
+      if (valor === undefined) return;
+      const circulo = elemento('circle', { class: 'evo-ponto-b', cx: x(i).toFixed(1), cy: y(valor).toFixed(1), r: i === atual ? '4.5' : '3' });
+      const dica = document.createElementNS(ns, 'title');
+      dica.textContent = `${segunda.rotulo} · ${rotulos[i]}: ${numberFormat.format(valor)}`;
+      circulo.append(dica);
+      svg.append(circulo);
+    });
+    const legendaA = elemento('text', { class: 'evo-legenda-a', x: String(margem.esquerda), y: '11' });
+    legendaA.textContent = `— ${segunda.rotuloA ?? 'este lugar'}`;
+    const legendaB = elemento('text', { class: 'evo-legenda-b', x: String(largura - margem.direita), y: '11', 'text-anchor': 'end' });
+    legendaB.textContent = `- - ${segunda.rotulo}`;
+    svg.append(legendaA, legendaB);
   }
   const destaque = pontos[atual];
   if (destaque) {
@@ -7468,6 +7552,27 @@ let mapFocusGeocode = '';
 /** Mapa clássico: um mapa só, com todos os municípios de uma vez, sem descer por estado. */
 let mapClassic = false;
 
+/** Segundo lugar do cartão, para comparar lado a lado; `mapCompareArmed` espera o próximo toque. */
+let mapCompareGeocode = '';
+let mapCompareArmed = false;
+
+/** O valor de uma área num período (ou no atual), lido da tabulação inteira, sem o recorte do estado. */
+function mapAreaValue(geocode: string, periodName?: string): number | undefined {
+  const periodo = periodName ?? mapPeriod;
+  const base = periodo ? mapPeriodResults.get(periodo) : (mapSource === 'tabela' ? currentResult : mapResult);
+  if (!base) return undefined;
+  const coluna = chooseMapColumn(base.columns.map((c) => c.key), mapValueColumn.value || undefined).index;
+  const chave = geocode.toLowerCase();
+  const linha = base.rows.findIndex((row) => row.key.trim().toLowerCase() === chave);
+  return linha >= 0 ? (base.cells[linha]?.[coluna] ?? 0) : 0;
+}
+
+function mapAreaName(geocode: string): string {
+  const objeto = activeMap?.objects.find((candidato) => candidato.geocode.trim() === geocode);
+  const uf = ufCodeOf(geocode);
+  return `${objeto?.name || geocode}${uf && mapLevel === 'municipality' ? ` · ${ufNameForCode(uf)}` : ''}`;
+}
+
 function renderMapFocusCard(): void {
   const objeto = mapFocusGeocode && activeMap
     ? activeMap.objects.find((candidato) => candidato.geocode.trim() === mapFocusGeocode)
@@ -7476,80 +7581,116 @@ function renderMapFocusCard(): void {
   if (!objeto || !atual) {
     mapCard.hidden = true;
     mapCard.replaceChildren();
+    mapCompareGeocode = '';
+    mapCompareArmed = false;
     return;
   }
   const coluna = chooseMapColumn(atual.columns.map((c) => c.key), mapValueColumn.value || undefined).index;
-  const chave = mapFocusGeocode.toLowerCase();
   const linhas = atual.rows
     .map((row, index) => ({ chave: row.key.trim().toLowerCase(), valor: atual.cells[index]?.[coluna] ?? 0 }));
-  const propria = linhas.find((linha) => linha.chave === chave);
   const comDado = linhas.filter((linha) => linha.valor > 0);
   const soma = comDado.reduce((total, linha) => total + linha.valor, 0);
+  const periodoAtual = mapPeriodList().find((periodo) => periodo.name === mapPeriod);
+  const onde = mapUfFilter && mapLevel === 'municipality' ? `de ${ufNameForCode(mapUfFilter)}` : 'do mapa';
+
+  // Valor, posição entre as áreas com dado e participação no recorte.
+  const descrever = (geocode: string): string => {
+    const valor = mapAreaValue(geocode) ?? 0;
+    const prefixo = periodoAtual ? `${periodoAtual.label}: ` : '';
+    if (!valor) return `${prefixo}sem registros nesta área.`;
+    const dentro = linhas.some((linha) => linha.chave === geocode.toLowerCase());
+    if (!dentro) return `${prefixo}${numberFormat.format(valor)}`;
+    const posicao = 1 + comDado.filter((linha) => linha.valor > valor).length;
+    return `${prefixo}${numberFormat.format(valor)} · ${integerFormat.format(posicao)}º entre ${integerFormat.format(comDado.length)} áreas com dado`
+      + ` · ${numberFormat.format((valor / soma) * 100)}% ${onde}`;
+  };
+  const botao = (texto: string, titulo: string, acao: () => void, classe = 'secondary-button'): HTMLButtonElement => {
+    const elemento = document.createElement('button');
+    elemento.type = 'button';
+    elemento.className = classe;
+    elemento.textContent = texto;
+    elemento.title = titulo;
+    elemento.setAttribute('aria-label', titulo);
+    elemento.addEventListener('click', acao);
+    return elemento;
+  };
 
   const cabecalho = document.createElement('div');
   cabecalho.className = 'map-card-head';
   const nome = document.createElement('strong');
-  const uf = ufCodeOf(mapFocusGeocode);
-  nome.textContent = `${objeto.name || mapFocusGeocode}${uf && mapLevel === 'municipality' ? ` · ${ufNameForCode(uf)}` : ''}`;
-  const fechar = document.createElement('button');
-  fechar.type = 'button';
-  fechar.className = 'secondary-button';
-  fechar.textContent = '✕';
-  fechar.title = 'Fechar o cartão';
-  fechar.setAttribute('aria-label', 'Fechar o cartão');
-  fechar.addEventListener('click', () => { mapFocusGeocode = ''; renderMap(); });
-  cabecalho.append(nome, fechar);
-
-  const periodoAtual = mapPeriodList().find((periodo) => periodo.name === mapPeriod);
-  const linhasDeTexto: string[] = [];
-  if (propria && propria.valor > 0) {
-    const posicao = 1 + comDado.filter((linha) => linha.valor > propria.valor).length;
-    const onde = mapUfFilter && mapLevel === 'municipality' ? ufNameForCode(mapUfFilter) : 'o mapa';
-    linhasDeTexto.push(
-      `${periodoAtual ? `${periodoAtual.label}: ` : ''}${numberFormat.format(propria.valor)}`
-      + ` · ${integerFormat.format(posicao)}º entre ${integerFormat.format(comDado.length)} áreas com dado`
-      + ` · ${numberFormat.format((propria.valor / soma) * 100)}% d${onde === 'o mapa' ? 'o mapa' : `e ${onde}`}`,
-    );
-  } else {
-    linhasDeTexto.push(`${periodoAtual ? `${periodoAtual.label}: ` : ''}sem registros nesta área.`);
+  nome.textContent = mapAreaName(mapFocusGeocode);
+  const acoes = document.createElement('div');
+  acoes.className = 'map-card-acoes';
+  if (!mapCompareGeocode) {
+    acoes.append(botao(mapCompareArmed ? 'Toque em outro lugar…' : 'Comparar', 'Comparar com outro lugar: toque nele no mapa', () => {
+      mapCompareArmed = !mapCompareArmed;
+      renderMapFocusCard();
+    }, mapCompareArmed ? 'secondary-button map-card-armado' : 'secondary-button'));
   }
+  acoes.append(botao('✕', 'Fechar o cartão', () => { mapFocusGeocode = ''; mapCompareGeocode = ''; mapCompareArmed = false; renderMap(); }));
+  cabecalho.append(nome, acoes);
+
+  const colunas = document.createElement('div');
+  colunas.className = mapCompareGeocode ? 'map-card-cols map-card-cols--dois' : 'map-card-cols';
+  const coluna1 = document.createElement('div');
+  coluna1.className = 'map-card-col map-card-col--a';
   const resumo = document.createElement('p');
   resumo.className = 'map-card-text';
-  resumo.textContent = linhasDeTexto.join(' ');
-
-  mapCard.replaceChildren(cabecalho, resumo);
+  resumo.textContent = descrever(mapFocusGeocode);
+  coluna1.append(resumo);
+  colunas.append(coluna1);
+  if (mapCompareGeocode) {
+    const coluna2 = document.createElement('div');
+    coluna2.className = 'map-card-col map-card-col--b';
+    const nomeB = document.createElement('div');
+    nomeB.className = 'map-card-nome-b';
+    const tituloB = document.createElement('strong');
+    tituloB.textContent = mapAreaName(mapCompareGeocode);
+    nomeB.append(tituloB, botao('✕', 'Tirar a comparação', () => { mapCompareGeocode = ''; renderMap(); }, 'secondary-button map-card-tirar-b'));
+    const resumoB = document.createElement('p');
+    resumoB.className = 'map-card-text';
+    resumoB.textContent = descrever(mapCompareGeocode);
+    coluna2.append(nomeB, resumoB);
+    colunas.append(coluna2);
+  }
+  if (mapCompareArmed) {
+    const dica = document.createElement('p');
+    dica.className = 'map-card-dica';
+    dica.textContent = 'Toque em outro município no mapa para pôr os dois lado a lado.';
+    colunas.append(dica);
+  }
+  mapCard.replaceChildren(cabecalho, colunas);
   // Visível antes de medir: escondido, a largura é zero e o gráfico sairia mínimo.
   mapCard.hidden = false;
 
-  // A série: o valor desta área em cada ano, para ver a trajetória dela.
+  // A série: o valor de cada lugar em cada período, para ver as trajetórias.
   const periodos = mapPeriodList();
   if (periodos.length > 1) {
-    const valores = periodos.map((periodo) => {
-      const resultado = mapPeriodResults.has(periodo.name) ? mapDrawableResult(periodo.name) : null;
-      if (!resultado) return undefined;
-      const indice = chooseMapColumn(resultado.columns.map((c) => c.key), mapValueColumn.value || undefined).index;
-      const posicao = resultado.rows.findIndex((row) => row.key.trim().toLowerCase() === chave);
-      return posicao >= 0 ? (resultado.cells[posicao]?.[indice] ?? 0) : 0;
-    });
+    const serieDe = (geocode: string) => periodos.map((periodo) => (mapPeriodResults.has(periodo.name) ? mapAreaValue(geocode, periodo.name) : undefined));
+    const valores = serieDe(mapFocusGeocode);
     const indiceAtual = periodos.findIndex((periodo) => periodo.name === mapPeriod);
     mapCard.append(evolutionChart(periodos.map((periodo) => periodo.label), valores, indiceAtual,
       (indice) => { stopMapPeriodPlayback(); selectMapPeriod(periodos[indice]!.name); },
-      `${objeto.name || mapFocusGeocode} por ${mapPeriodUnit(false)}`, mapCard.clientWidth - 26));
-    const serie = document.createElement('div');
-    serie.className = 'map-period-chips map-card-series';
-    if (periodos.length <= 16) periodos.forEach((periodo, posicao) => {
-      const valor = valores[posicao];
-      const item = document.createElement('div');
-      item.className = 'map-period-bar';
-      item.setAttribute('aria-pressed', String(periodo.name === mapPeriod));
-      const rotulo = document.createElement('span');
-      rotulo.textContent = valor === undefined ? periodo.label : `${periodo.label} · ${numberFormat.format(valor)}`;
-      item.append(rotulo);
-      serie.append(item);
-    });
-    mapCard.append(serie);
+      `${objeto.name || mapFocusGeocode} por ${mapPeriodUnit(false)}`, mapCard.clientWidth - 26,
+      mapCompareGeocode ? { valores: serieDe(mapCompareGeocode), rotulo: mapAreaName(mapCompareGeocode), rotuloA: mapAreaName(mapFocusGeocode) } : undefined));
+    const chips = (classe: string, serie: ReadonlyArray<number | undefined>): HTMLElement => {
+      const linha = document.createElement('div');
+      linha.className = `map-period-chips ${classe}`;
+      if (periodos.length <= 16) periodos.forEach((periodo, posicao) => {
+        const valor = serie[posicao];
+        const item = document.createElement('div');
+        item.className = 'map-period-bar';
+        item.setAttribute('aria-pressed', String(periodo.name === mapPeriod));
+        const rotulo = document.createElement('span');
+        rotulo.textContent = valor === undefined ? periodo.label : `${periodo.label} · ${numberFormat.format(valor)}`;
+        item.append(rotulo);
+        linha.append(item);
+      });
+      return linha;
+    };
+    mapCard.append(chips('map-card-series', valores));
+    if (mapCompareGeocode) mapCard.append(chips('map-card-series-b', serieDe(mapCompareGeocode)));
   }
-  mapCard.hidden = false;
 }
 
 /** O que as cores mostram: os valores de cada ano, ou como cada área mudou em relação ao ano anterior. */
@@ -11173,9 +11314,16 @@ mapCanvas.addEventListener('pointerup', (event) => {
       if (uf) {
         if (mapFocusStates.has(uf)) setMapFocus(uf);
         else showToast(`${ufNameForCode(uf)} não tem registros neste arquivo.`, true);
+      } else if (!event.shiftKey && object.geocode.trim() && mapCompareArmed && mapFocusGeocode && object.geocode.trim() !== mapFocusGeocode) {
+        // Comparando: o toque escolhe o segundo lugar, sem trocar o primeiro.
+        mapCompareGeocode = object.geocode.trim();
+        mapCompareArmed = false;
+        renderMap();
       } else if (!event.shiftKey && object.geocode.trim()) {
         // Clicar na área em foco de novo fecha o cartão.
         mapFocusGeocode = mapFocusGeocode === object.geocode.trim() ? '' : object.geocode.trim();
+        mapCompareGeocode = '';
+        mapCompareArmed = false;
         renderMap();
       } else toggleMapSelection(object);
     }
@@ -11384,7 +11532,7 @@ painel = criarPainel(element<HTMLElement>('#painel'), {
   rotuloDoCampo: (campo) => fieldLabel(campo),
   campoInicial: () => rowField.value || undefined,
   arquivos: () => activeDatasetSources.map((source) => ({ name: source.name, size: source.size })),
-  eixosDeData: () => eixosDeData,
+  eixosDerivados: () => [...eixosDeData, ...eixosRegionais],
   valoresDistintos: (campo) => askDataset<{ values: string[]; truncated: boolean }>(
     { type: 'distinct', field: campo, limit: 2000 },
     { label: 'Leitura de valores' },
