@@ -90,7 +90,7 @@ function parseOption(
     return {
       kind: 'conversion',
       directive,
-      label: fields[0],
+      label: fields[0].slice(0, 30).trimEnd(),
       field: fields[1],
       roles: rolesForDirective(directive),
       startPosition: 1,
@@ -106,7 +106,11 @@ function parseOption(
     );
   }
 
-  const [label = '', field = '', third = '', fourth = '', ...trailingFields] = fields;
+  const [rawLabel = '', field = '', third = '', fourth = '', ...trailingFields] = fields;
+  // O TabWin mostra o nome da variável com no máximo 30 caracteres — no painel,
+  // no título e no .tab ("Região de Saúde (CIR) de Resid.", 31, vira "…de
+  // Resid"; testado com nomes de 29, 31 e 40 em 2026-10-24).
+  const label = rawLabel.slice(0, 30).trimEnd();
   const retainedTrailingFields = trailingFields.length ? { trailingFields } : {};
   if (strict && !label) throw new DefParseError(`${directive} directive has no display label`, sourceLine);
   // Linha-título sem campo ("X* EQUIPES_AC *,    , TITULO , TITULO_…" no

@@ -636,3 +636,37 @@ test('a malformed transform pipeline is rejected when the recipe is read, not wh
     /repeats id a/,
   );
 });
+
+test('tabela DBF como o TabWin: primeiro campo, maiúsculas, prefixo, agrupamento e registro com quebra de linha', async () => {
+  const { lookupDefinitionFromDefOption: lookup, resolveDimensionValue: resolve } = await import('../dist/packages/core/src/index.js');
+  const opcao = (extra) => ({ kind: 'dbf-lookup', directive: 'L', label: 'X', roles: ['row'], sourceLine: 1, ...extra });
+
+  // Sem campo com o nome do campo dos dados, a chave é o PRIMEIRO campo do DBF;
+  // o campo do rótulo vale sem diferença de maiúsculas.
+  const cbo = lookup(opcao({ field: 'PA_CBOCOD', lookupLabelField: 'ds_cbo', lookupFile: 'DBF\\CBO.dbf' }),
+    [{ CBO: '1312C1', DS_CBO: 'Sanitarista' }, { CBO: '225125', DS_CBO: 'Medico clinico' }]);
+  assert.equal(cbo.entries[0].label, '1312C1 Sanitarista');
+
+  // O começo do valor, do tamanho da chave: procedimento de 10 dígitos no grupo "03".
+  const grupos = lookup(opcao({ field: 'PA_PROC_ID', lookupLabelField: 'NO_GRUPO', lookupFile: 'DBF/TB_GRUPO.DBF' }), [
+    { CO_GRUPO: '02', NO_GRUPO: 'Diagnostica' },
+    { CO_GRUPO: '03', NO_GRUPO: 'Clinicos' },
+    { CO_GRUPO: '09', NO_GRUPO: '\r\nOfertas de Cuidados Integrados' },
+  ]);
+  // O registro com quebra de linha dentro do nome some, como no TabWin.
+  assert.deepEqual(grupos.entries.map((e) => e.key), ['02', '03']);
+  const registry = { G: grupos };
+  assert.equal(resolve({ PA_PROC_ID: '0301010072' }, { field: 'PA_PROC_ID', lookupId: 'G' }, registry).label, '03 Clinicos');
+
+  // Par rótulo/DBF repetido no DEF: agrupa pelo rótulo e mostra só ele.
+  const cid = lookup(opcao({ field: 'PA_CIDPRI', lookupLabelField: 'CD_DESCR', lookupFile: 'DBF/S_CID.DBF', trailingFields: ['CD_DESCR', 'DBF/S_CID.DBF'] }), [
+    { CD_COD: 'A00', CD_DESCR: 'A00   Colera' },
+    { CD_COD: 'A000', CD_DESCR: 'A00.0 Colera dev Vibrio cholerae' },
+    { CD_COD: 'C34', CD_DESCR: 'Pulmao' },
+    { CD_COD: 'C340', CD_DESCR: 'Pulmao' },
+  ]);
+  assert.deepEqual(cid.entries.map((e) => e.label), ['A00   Colera', 'A00.0 Colera dev Vibrio cholerae', 'Pulmao']);
+  const r = { C: cid };
+  assert.equal(resolve({ PA_CIDPRI: 'C340' }, { field: 'PA_CIDPRI', lookupId: 'C' }, r).key, 'Pulmao');
+  assert.equal(resolve({ PA_CIDPRI: 'C34' }, { field: 'PA_CIDPRI', lookupId: 'C' }, r).key, 'Pulmao');
+});

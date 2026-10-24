@@ -22,11 +22,17 @@ export interface CnvDiagnostic {
 export function validateCnvDefinition(definition: CnvDefinition): CnvDiagnostic[] {
   const diagnostics: CnvDiagnostic[] = [];
 
-  if (definition.categories.length !== definition.categoryCount) {
+  const comRegra = new Set(definition.rules.map((rule) => rule.categorySequence));
+  // Número que o cabeçalho conta e nenhuma linha define: o leitor cria uma
+  // categoria vazia (o TabWin mostra a linha em branco). Avisa uma vez, no
+  // cabeçalho, em vez de uma vez por buraco.
+  const lacuna = (category: CnvDefinition['categories'][number]): boolean => !category.label && !comRegra.has(category.sequence);
+  const definidas = definition.categories.filter((category) => !lacuna(category)).length;
+  if (definidas !== definition.categoryCount) {
     diagnostics.push({
       scope: 'header',
       severity: 'warning',
-      message: `header declares ${definition.categoryCount} categories but ${definition.categories.length} are defined`,
+      message: `header declares ${definition.categoryCount} categories but ${definidas} are defined`,
     });
   }
 
@@ -39,6 +45,7 @@ export function validateCnvDefinition(definition: CnvDefinition): CnvDiagnostic[
   const rulesByCategory = new Map(definition.rules.map((rule) => [rule.categorySequence, rule]));
 
   for (const category of definition.categories) {
+    if (lacuna(category)) continue;
     if ((sequenceCounts.get(category.sequence) ?? 0) > 1) {
       diagnostics.push({
         scope: 'category', categorySequence: category.sequence, severity: 'error',

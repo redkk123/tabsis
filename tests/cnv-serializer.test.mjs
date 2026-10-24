@@ -45,7 +45,11 @@ test('a category built by an editor with a category count mismatch still round-t
   const original = parseCnv(['3 2', row(1, 'Um', '01'), row(2, 'Dois', '02')].join('\n'));
   assert.match(original.warnings[0] ?? '', /declares 3 categories but 2/);
   const reparsed = parseCnv(serializeCnv(original));
-  assert.equal(reparsed.categories.length, 2);
+  // O número que o cabeçalho conta e nenhuma linha define vira categoria vazia,
+  // como a linha em branco do TabWin; o arquivo continua o mesmo.
+  assert.equal(reparsed.categories.length, 3);
+  assert.deepEqual(reparsed.categories[2], { sequence: 3, label: '' });
+  assert.equal(reparsed.rules.length, 2);
 });
 
 test('new-format (N) definitions remain non-serializable after safe read-only parsing was added', () => {
@@ -79,4 +83,28 @@ test('a rule with no codes and no ranges still produces a reparsable line (padde
   const text = serializeCnv(original);
   const reparsed = parseCnv(text);
   assert.equal(reparsed.categories[0]?.label, 'Vazio');
+});
+
+test('número de categoria repetido: vale o último rótulo e o último subtotal, e os códigos se somam (como o TabWin)', () => {
+  const cnv = parseCnv([
+    '5 3',
+    row(1, 'Neoplasias malignas', 'C00-C97'),
+    row(2, '. Localizações especificadas', 'C00-C75', '1'),
+    row(3, '... Órgãos digestivos', 'C15-C26', '2'),
+    row(3, '. Tecido linfático', 'C81-C96', '1'),
+    row(4, '... Continuação sem rótulo', 'C30-C39', '2'),
+    row(4, '', 'C97', ''),
+  ].join('\n'));
+  const tres = cnv.categories.find((c) => c.sequence === 3);
+  assert.equal(tres.label, '. Tecido linfático');
+  assert.equal(tres.subtotalTarget, 1);
+  // Linha de continuação (sem rótulo) só acrescenta códigos: o rótulo e o pai ficam.
+  const quatro = cnv.categories.find((c) => c.sequence === 4);
+  assert.equal(quatro.label, '... Continuação sem rótulo');
+  assert.equal(quatro.subtotalTarget, 2);
+  // Os códigos das duas definições do 3 classificam nele.
+  assert.equal(classifyCnv(cnv, 'C20')?.sequence, 3);
+  assert.equal(classifyCnv(cnv, 'C85')?.sequence, 3);
+  // O 5, contado no cabeçalho e nunca definido, é uma linha vazia.
+  assert.deepEqual(cnv.categories.find((c) => c.sequence === 5), { sequence: 5, label: '' });
 });

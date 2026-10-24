@@ -81,6 +81,39 @@ function getConversion(registry: ConversionRegistry, id: string): CnvDefinition 
   return definition;
 }
 
+interface LookupIndex {
+  byKey: Map<string, { key: string; label: string }>;
+  /** Comprimentos das chaves, do maior para o menor. */
+  lengths: number[];
+}
+const lookupIndexes = new WeakMap<DimensionLookupDefinition, LookupIndex>();
+
+/**
+ * A linha da tabela DBF para um valor do registro. Primeiro a chave inteira;
+ * sem ela, o começo do valor do tamanho da chave, como o TabWin: no SIA,
+ * PA_PROC_ID "0301010072" cai no grupo "03" (TB_GRUPO.DBF), no subgrupo "0301"
+ * e na forma de organização "030101" (varredura de 2026-10-24).
+ */
+function lookupEntry(lookup: DimensionLookupDefinition, value: string): { key: string; label: string } | undefined {
+  let index = lookupIndexes.get(lookup);
+  if (!index) {
+    const byKey = new Map<string, { key: string; label: string }>();
+    for (const entry of lookup.entries) {
+      for (const code of entry.codes ?? [entry.key]) if (!byKey.has(code)) byKey.set(code, entry);
+    }
+    index = { byKey, lengths: [...new Set([...byKey.keys()].map((code) => code.length))].sort((a, b) => b - a) };
+    lookupIndexes.set(lookup, index);
+  }
+  const exact = index.byKey.get(value);
+  if (exact) return exact;
+  for (const length of index.lengths) {
+    if (length >= value.length) continue;
+    const entry = index.byKey.get(value.slice(0, length));
+    if (entry) return entry;
+  }
+  return undefined;
+}
+
 function getLookup(registry: ConversionRegistry, id: string): DimensionLookupDefinition {
   const definition = registry[id];
   if (!definition) throw new Error(`missing DBF lookup: ${id}`);
@@ -169,7 +202,7 @@ export function resolveDimensionValue(
   );
   if (lookup) {
     const key = String(raw ?? '').trim();
-    const entry = lookup.entries.find((candidate) => candidate.key === key);
+    const entry = lookupEntry(lookup, key);
     if (!entry) return unclassifiedValue(dimension, key, true);
     return { key: entry.key, label: entry.label };
   }
@@ -254,7 +287,9 @@ function axisFromDimension(
     );
     const items: ResultAxisItem[] = definition.categories.map((category) => ({
       key: String(category.sequence),
-      label: category.label || String(category.sequence),
+      // Sem rótulo, a linha fica em branco, como no TabWin (número que o
+      // cabeçalho da CNV conta e nenhuma linha define).
+      label: category.label,
       source: 'conversion',
       ...(category.subtotalTarget !== undefined
         ? { subtotalTargetKey: String(category.subtotalTarget) }
@@ -397,17 +432,23 @@ function propagateRowSubtotals(rows: ResultAxisItem[], cells: number[][]): void 
   const depth = (key: string, trail = new Set<string>()): number => {
     const cached = depthMemo.get(key);
     if (cached !== undefined) return cached;
-    if (trail.has(key)) throw new Error(`subtotal cycle detected at row ${key}`);
+    // CNV com defeito que aponta uma linha para ela mesma (CID10_01_ST.CNV do
+    // SIM: "0455 0455") ou num ciclo maior: o TabWin tabula mesmo assim. O
+    // ciclo é cortado aqui em vez de recusar a tabela inteira.
+    if (trail.has(key)) return 0;
     trail.add(key);
     const target = rowByKey.get(key)?.subtotalTargetKey;
-    const value = target && rowByKey.has(target) ? 1 + depth(target, trail) : 0;
+    const value = target && target !== key && rowByKey.has(target) ? 1 + depth(target, trail) : 0;
     trail.delete(key);
     depthMemo.set(key, value);
     return value;
   };
 
   // Deepest details move first. A parent therefore already contains all of its
-  // descendants when it is propagated to a higher-level subtotal.
+  // descendants when it is propagated to a higher-level subtotal. A row that is
+  // its own subtotal adds itself after its children — it doubles, exactly as
+  // the TabWin shows (CID10_01_ST.CNV: B190 = 2 and B199 = 1 give 6 on the
+  // "0537 0537" row; varredura de 2026-10-23).
   const ordered = [...rows].sort((a, b) => depth(b.key) - depth(a.key));
   for (const row of ordered) {
     const targetKey = row.subtotalTargetKey;
