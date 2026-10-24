@@ -2695,3 +2695,35 @@ test('a primeira tabela começa pela residência, não pelo município do hospit
   await expect(page.locator('#map-message')).toContainText('Mapa da tabela:');
   await expect(page.locator('#map-message')).toContainText('(ID_MN_RESI)');
 });
+
+test('mapa: opções recolhidas, pintar por região de saúde no estado e imagem com título e legenda', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#file-input').setInputFiles('e2e/fixtures/COMPSP24.dbf');
+  await page.locator('[data-view="map"]').click();
+  // As opções de cor e camadas ficam recolhidas: o mapa aparece logo.
+  await expect(page.locator('#map-opcoes')).not.toHaveAttribute('open', '');
+  await expect(page.locator('#map-classification')).toBeHidden();
+  await page.locator('#map-opcoes summary').click();
+  await expect(page.locator('#map-classification')).toBeVisible();
+
+  await expect(page.locator('#map-uf option[value="35"]')).toHaveCount(1, { timeout: 15000 });
+  await expect(page.locator('#map-area-label')).toBeHidden();
+  await page.locator('#map-uf').selectOption('35');
+  await expect(page.locator('#map-legend')).toContainText('2 áreas associadas', { timeout: 15000 });
+  await expect(page.locator('#map-area-label')).toBeVisible();
+
+  // Por região de saúde: a capital é uma região só; Campinas pinta os 19 municípios da região dela.
+  await page.locator('#map-area-level').selectOption('BR_REGSAUD.CNV');
+  await expect(page.locator('#map-legend')).toContainText('Região de saúde (CIR)');
+  await expect(page.locator('#map-legend')).toContainText('20 áreas associadas');
+
+  // A imagem leva título, período e legenda: é mais alta que o desenho.
+  const download = page.waitForEvent('download');
+  await page.locator('#map-png-button').click();
+  const arquivo = await (await download).path();
+  const bytes = (await import('node:fs')).readFileSync(arquivo);
+  expect(bytes.subarray(1, 4).toString()).toBe('PNG');
+  const alturaImagem = bytes.readUInt32BE(20);
+  const alturaDesenho = await page.locator('#map-canvas').evaluate((c: HTMLCanvasElement) => c.height);
+  expect(alturaImagem).toBeGreaterThan(alturaDesenho + 100);
+});

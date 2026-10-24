@@ -1065,3 +1065,13 @@ dialog p { color: #676d74; font-size: 13px; line-height: 1.6; }
 .map-taxa small { flex: 1 1 260px; color: #676d74; font-size: 12px; line-height: 1.4; }
 .map-taxa .check-label { min-height: 0; padding: 0; }
 .map-taxa .check-label span { color: var(--ink); font-weight: 600; }
+
+/* Opções do mapa: recolhidas, para o mapa aparecer logo. */
+.map-opcoes { margin: 0 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); }
+.map-opcoes > summary { padding: 8px 12px; cursor: pointer; font-weight: 600; color: var(--ink); }
+.map-opcoes > summary span { margin-left: 6px; color: #676d74; font-size: 12px; font-weight: 400; }
+.map-opcoes-grade { display: flex; flex-wrap: wrap; align-items: end; gap: 10px 14px; padding: 4px 12px 12px; }
+.map-opcoes-grade label { display: grid; gap: 5px; color: #676d74; font-size: 12px; font-weight: 600; }
+.map-opcoes-grade select, .map-opcoes-grade input[type="text"] { min-width: 120px; padding: 7px 9px; border: 1px solid #d8dadd; border-radius: 4px; color: var(--ink); background: #fff; }
+.map-opcoes-grade .check-label { display: flex; min-height: 0; }
+@media (max-width: 620px) { .map-zoom-actions { margin-left: 0; width: 100%; } }

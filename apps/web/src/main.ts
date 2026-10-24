@@ -50,6 +50,7 @@ import {
   GeoJsonMapError,
   listGeoJsonFeatureProperties,
   optionsForRole,
+  classifyCnv,
   parseCnv,
   parseDelimited,
   parseDef,
@@ -588,7 +589,9 @@ const geoFilterSearch = element<HTMLInputElement>('#geo-filter-search');
 const geoFilterList = element<HTMLElement>('#geo-filter-list');
 const geoFilterClear = element<HTMLButtonElement>('#geo-filter-clear');
 const geoFilterApply = element<HTMLButtonElement>('#geo-filter-apply');
-const mapUfLabel = element<HTMLLabelElement>('.map-uf-label');
+const mapUfLabel = element<HTMLLabelElement>('#map-uf-label');
+const mapAreaLevelSelect = element<HTMLSelectElement>('#map-area-level');
+const mapAreaLabel = element<HTMLLabelElement>('#map-area-label');
 const mapFocusBar = element<HTMLElement>('#map-focus');
 const mapFocusBack = element<HTMLButtonElement>('#map-focus-back');
 const mapFocusTrail = element<HTMLElement>('#map-focus-trail');
@@ -2890,7 +2893,9 @@ function registrarCnvDeData(part: DataParte): string {
 async function detectarCamposDeData(): Promise<void> {
   const header = dbfHeader;
   if (!header) return;
-  const candidatos = dateFieldCandidates(header.fields.map((field) => ({ name: field.name, type: field.type, length: field.length }))).slice(0, 16);
+  // As primeiras datas do arquivo (no SINAN: notificação, primeiros sintomas,
+  // nascimento…): com todas, o painel ganhava dezenas de "Mês de…".
+  const candidatos = dateFieldCandidates(header.fields.map((field) => ({ name: field.name, type: field.type, length: field.length }))).slice(0, 6);
   if (!candidatos.length) {
     eixosDeData = [];
     return;
@@ -6744,7 +6749,7 @@ function renderMap(): void {
   const title = document.createElement('strong');
   title.textContent = variacao
     ? `Variação${mapValueSuffix} · ${integerFormat.format(matched)} áreas`
-    : `${mapTaxaAtiva() ? 'Por 100 mil hab. · ' : ''}${integerFormat.format(matched)} áreas associadas`;
+    : `${mapTaxaAtiva() ? 'Por 100 mil hab. · ' : ''}${mapAreaCnv() ? `${mapAreaLevelSelect.selectedOptions[0]?.textContent ?? 'Região'} · ` : ''}${integerFormat.format(matched)} áreas associadas`;
   const gradient = document.createElement('div');
   gradient.className = 'legend-gradient';
   gradient.style.background = variacao
@@ -6758,6 +6763,14 @@ function renderMap(): void {
   high.textContent = variacao ? signedFormat(scaleModel.max, modoVariacao === 'pct' ? '%' : '') : numberFormat.format(scaleModel.max);
   range.append(low, high);
   mapLegend.append(title, gradient, range);
+  ultimaLegenda = {
+    titulo: title.textContent ?? '',
+    baixo: low.textContent ?? '',
+    alto: high.textContent ?? '',
+    cores: variacao
+      ? [scaleModel.classes[0]?.color ?? '#225ea8', scaleModel.colorFor(0), scaleModel.classes.at(-1)?.color ?? '#b84a12']
+      : [scaleModel.classes[0]?.color ?? '#dfe8e5', scaleModel.classes.at(-1)?.color ?? '#08634f'],
+  };
   if (!variacao && mapClassification.value !== 'continuous') {
     const classList = document.createElement('div');
     classList.className = 'legend-classes';
@@ -7097,6 +7110,7 @@ function renderMapUfOptions(): void {
   if (rotuloModo) rotuloModo.hidden = !(fonte && mapLevel === 'municipality');
   if (!podeDescer || !fonte) {
     mapFocusBar.hidden = true;
+    mapAreaLabel.hidden = true;
     return;
   }
 
@@ -7141,6 +7155,9 @@ function renderMapFocusBar(): void {
   const dentro = Boolean(mapUfFilter);
   mapFocusBack.hidden = !dentro;
   mapFocusTrail.textContent = dentro ? `Brasil › ${ufNameForCode(mapUfFilter)}` : 'Brasil';
+  // Pintar por região só dentro de um estado, e só com as tabelas de região.
+  const podeRegiao = dentro && mapLevel === 'municipality' && !mapClassic && cnvByName.has('BR_REGSAUD.CNV');
+  mapAreaLabel.hidden = !podeRegiao;
   // No celular não há Shift: a dica só fala do que o toque faz.
   const toque = window.matchMedia?.('(pointer: coarse)').matches ?? false;
   mapFocusHint.textContent = dentro
@@ -7867,6 +7884,7 @@ function signedFormat(value: number, unit: string): string {
  */
 function mapDrawableResult(periodOverride?: string): TabulationResult | null {
   const bruto = mapDrawableResultBruto(periodOverride);
+  if (bruto && mapAreaCnv()) return regionalizar(bruto, periodOverride ?? mapPeriod);
   if (!bruto || !mapTaxaAtiva()) return bruto;
   const periodo = periodOverride ?? mapPeriod;
   const rotulo = mapPeriodList().find((item) => item.name === periodo)?.label ?? '';
@@ -7875,6 +7893,54 @@ function mapDrawableResult(periodOverride?: string): TabulationResult | null {
     cells: bruto.rows.map((row, linha) => {
       const habitantes = populationFor(populacao!, row.key, rotulo);
       return (bruto.cells[linha] ?? []).map((valor) => ratePer100k(valor, habitantes) ?? Number.NaN);
+    }),
+  };
+}
+
+/**
+ * Pintar por região de saúde (ou macrorregião), no estado em foco: cada
+ * município recebe o valor da região dele — a soma da região, ou, em taxa, os
+ * casos da região sobre a população da região inteira (inclusive dos municípios
+ * sem caso). O desenho continua sendo o dos municípios; o que muda é a cor.
+ */
+function mapAreaCnv(): CnvDefinition | undefined {
+  const nome = mapAreaLevelSelect.value;
+  if (!nome || !mapUfFilter || mapLevel !== 'municipality' || mapClassic) return undefined;
+  return cnvByName.get(nome);
+}
+
+/** Município → nome da região dele, para a dica do mapa. */
+let mapRegionLabels = new Map<string, string>();
+
+function regionalizar(bruto: TabulationResult, periodo: string): TabulationResult {
+  const cnv = mapAreaCnv()!;
+  const regiaoDe = new Map<string, { sequence: number; label: string }>();
+  for (const objeto of visibleMapObjects()) {
+    const geocodigo = objeto.geocode.trim();
+    const regiao = geocodigo ? classifyCnv(cnv, geocodigo.slice(0, 6)) : undefined;
+    if (regiao) regiaoDe.set(geocodigo, regiao);
+  }
+  const porMunicipio = new Map(bruto.rows.map((row, linha) => [row.key.trim().slice(0, 6), bruto.cells[linha] ?? []]));
+  const rotulo = mapPeriodList().find((item) => item.name === periodo)?.label ?? '';
+  const somas = new Map<number, number[]>();
+  const habitantes = new Map<number, number>();
+  for (const [geocodigo, regiao] of regiaoDe) {
+    const casos = porMunicipio.get(geocodigo.slice(0, 6));
+    const soma = somas.get(regiao.sequence) ?? bruto.columns.map(() => 0);
+    if (casos) casos.forEach((valor, coluna) => { soma[coluna] = (soma[coluna] ?? 0) + valor; });
+    somas.set(regiao.sequence, soma);
+    if (mapTaxaAtiva()) habitantes.set(regiao.sequence, (habitantes.get(regiao.sequence) ?? 0) + (populationFor(populacao!, geocodigo, rotulo) ?? 0));
+  }
+  // "35016 São Paulo" → "São Paulo": o código da região não ajuda na dica.
+  mapRegionLabels = new Map([...regiaoDe].map(([geocodigo, regiao]) => [geocodigo, regiao.label.replace(/^[\d\s.]+/, '').trim() || regiao.label]));
+  // Região sem nenhum caso fica sem cor, como o município sem registro.
+  const comDado = [...regiaoDe].filter(([, regiao]) => (somas.get(regiao.sequence) ?? []).some((valor) => valor !== 0));
+  return {
+    ...bruto,
+    rows: comDado.map(([geocodigo]) => ({ key: geocodigo, label: geocodigo, source: 'derived' as const })),
+    cells: comDado.map(([, regiao]) => {
+      const soma = somas.get(regiao.sequence)!;
+      return mapTaxaAtiva() ? soma.map((valor) => ratePer100k(valor, habitantes.get(regiao.sequence)) ?? Number.NaN) : [...soma];
     }),
   };
 }
@@ -10706,10 +10772,80 @@ async function copyPresentedTable(): Promise<void> {
   showToast(`${integerFormat.format(currentTableRowIndexes().length)} linhas copiadas`);
 }
 
+/** A legenda do último desenho, para a imagem exportada levar a mesma. */
+let ultimaLegenda: { titulo: string; baixo: string; alto: string; cores: string[] } | null = null;
+
+/**
+ * A imagem do mapa que se leva para um relatório: título, onde e quando (o
+ * recorte e o período), o desenho, a legenda e a fonte. Só o desenho, como
+ * antes, não dizia o que era nem de quando.
+ */
 function exportMapPng(): void {
   if (!activeMap || !currentResult) return;
-  mapCanvas.toBlob((blob) => {
-    if (blob) downloadBlob(blob, `${exportBaseName()}-mapa.png`);
+  const escala = Math.min(window.devicePixelRatio || 1, 2);
+  const largura = mapCanvas.width;
+  const cabecalho = Math.round(76 * escala);
+  const rodape = Math.round(78 * escala);
+  const tela = document.createElement('canvas');
+  tela.width = largura;
+  tela.height = cabecalho + mapCanvas.height + rodape;
+  const g = tela.getContext('2d');
+  if (!g) return;
+  const margem = 16 * escala;
+  const caber = (texto: string, maximo: number): string => {
+    if (g.measureText(texto).width <= maximo) return texto;
+    let corte = texto;
+    while (corte.length > 4 && g.measureText(`${corte}…`).width > maximo) corte = corte.slice(0, -1);
+    return `${corte}…`;
+  };
+  g.fillStyle = '#ffffff';
+  g.fillRect(0, 0, tela.width, tela.height);
+
+  const titulo = tableTitle.value.trim() || resultTitle.textContent?.trim() || 'Mapa';
+  const periodo = mapPeriodList().find((item) => item.name === mapPeriod)?.label;
+  const onde = mapUfFilter && mapLevel === 'municipality' && !mapClassic ? ufNameForCode(mapUfFilter) : 'Brasil';
+  const detalhes = [
+    onde,
+    periodo ?? (mapPeriodList().length > 1 ? `todos os ${mapPeriodUnit()} juntos` : ''),
+    mapAreaCnv() ? `por ${(mapAreaLevelSelect.selectedOptions[0]?.textContent ?? 'Região').replace(/^./, (letra) => letra.toLowerCase())}` : '',
+    mapTaxaAtiva() ? 'por 100 mil habitantes' : '',
+    mapVariationMode() && periodo ? (mapVariationMode() === 'pct' ? 'variação % sobre o período anterior' : 'diferença para o período anterior') : '',
+  ].filter(Boolean).join(' · ');
+  g.fillStyle = '#1d2733';
+  g.font = `600 ${18 * escala}px system-ui, sans-serif`;
+  g.fillText(caber(titulo, largura - 2 * margem), margem, 28 * escala);
+  g.fillStyle = '#3d4650';
+  g.font = `${13 * escala}px system-ui, sans-serif`;
+  g.fillText(caber(detalhes, largura - 2 * margem), margem, 50 * escala);
+  g.fillStyle = '#6b737b';
+  g.font = `${11 * escala}px system-ui, sans-serif`;
+  g.fillText(caber(mapMessage.hidden ? '' : mapMessage.textContent ?? '', largura - 2 * margem), margem, 68 * escala);
+
+  g.drawImage(mapCanvas, 0, cabecalho);
+
+  const base = cabecalho + mapCanvas.height;
+  if (ultimaLegenda) {
+    g.fillStyle = '#1d2733';
+    g.font = `600 ${12 * escala}px system-ui, sans-serif`;
+    g.fillText(caber(ultimaLegenda.titulo, largura - 2 * margem), margem, base + 20 * escala);
+    const barra = Math.min(280 * escala, largura - 2 * margem);
+    const degrade = g.createLinearGradient(margem, 0, margem + barra, 0);
+    ultimaLegenda.cores.forEach((cor, indice) => degrade.addColorStop(ultimaLegenda!.cores.length === 1 ? 0 : indice / (ultimaLegenda!.cores.length - 1), cor));
+    g.fillStyle = degrade;
+    g.fillRect(margem, base + 28 * escala, barra, 10 * escala);
+    g.fillStyle = '#3d4650';
+    g.font = `${11 * escala}px system-ui, sans-serif`;
+    g.fillText(ultimaLegenda.baixo, margem, base + 52 * escala);
+    const larguraAlto = g.measureText(ultimaLegenda.alto).width;
+    g.fillText(ultimaLegenda.alto, margem + barra - larguraAlto, base + 52 * escala);
+  }
+  g.fillStyle = '#8a9198';
+  g.font = `${10 * escala}px system-ui, sans-serif`;
+  const fonte = caber(`TabSis · ${datasetName} · ${new Date().toLocaleDateString('pt-BR')}`, largura - 2 * margem);
+  g.fillText(fonte, largura - margem - g.measureText(fonte).width, base + 70 * escala);
+
+  tela.toBlob((blob) => {
+    if (blob) downloadBlob(blob, `${exportBaseName()}-mapa${periodo ? `-${periodo.replace(/[^\w-]+/g, '')}` : ''}.png`);
   }, 'image/png');
 }
 
@@ -10739,7 +10875,8 @@ function showMapTooltip(event: PointerEvent): void {
   const value = lastMapValues.get(object);
   const desce = mapCanFocus() && mapFocusStates.has(object.geocode.trim());
   mapCanvas.classList.toggle('map-can-focus', desce);
-  mapTooltip.textContent = `${object.name || object.geocode} · ${value === undefined ? 'sem valor associado' : `${formatMapValue(value)}${mapValueSuffix}`}${desce ? ' · clique para ver os municípios' : ''}`;
+  const regiao = mapAreaCnv() ? mapRegionLabels.get(object.geocode.trim()) : undefined;
+  mapTooltip.textContent = `${regiao ? `${regiao} (${object.name || object.geocode})` : object.name || object.geocode} · ${value === undefined ? 'sem valor associado' : `${formatMapValue(value)}${mapValueSuffix}`}${desce ? ' · clique para ver os municípios' : ''}`;
   mapTooltip.style.left = `${Math.min(point.x + 12, mapCanvas.clientWidth - 240)}px`;
   mapTooltip.style.top = `${Math.max(8, point.y - 34)}px`;
   mapTooltip.hidden = false;
@@ -11331,6 +11468,9 @@ mapValueColumn.addEventListener('change', () => {
 
 mapUfSelect.addEventListener('change', () => setMapFocus(mapUfSelect.value));
 mapFocusBack.addEventListener('click', () => setMapFocus(''));
+mapAreaLevelSelect.addEventListener('change', () => {
+  if (activeMap && currentResult && currentView === 'map') { renderMapPeriodBar(); renderMap(); }
+});
 mapPopulacaoButton.addEventListener('click', () => mapPopulacaoInput.click());
 mapPopulacaoInput.addEventListener('change', () => {
   const arquivo = mapPopulacaoInput.files?.[0];

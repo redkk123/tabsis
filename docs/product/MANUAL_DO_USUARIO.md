@@ -542,6 +542,14 @@ controle ou use ▶ Reproduzir; embaixo, o **gráfico de evolução** mostra o t
 de cada período numa linha, com o período do mapa em destaque — toque num ponto
 para ir até ele. O cartão do município traz a mesma linha, só daquele município.
 
+**Arrumação do mapa.** À mostra ficam o que se usa sempre — *Modo do mapa*,
+*Recorte*, o zoom e **Baixar imagem**; cores, número de classes, paleta, campo
+do lugar, sedes, camada de referência e GeoJSON ficam em **Opções do mapa**.
+**Baixar imagem** salva o mapa com título, lugar, período, legenda e fonte.
+Dentro de um estado, **Pintar por** troca a cor de cada município pela da sua
+**região de saúde (CIR)** ou **macrorregião** (a soma da região, ou, em taxa,
+os casos da região sobre a população da região inteira).
+
 **Regiões de saúde.** Todo campo de município (residência, ocorrência,
 notificação…) ganha, no painel, **UF de …**, **Região e UF de …**, **Região
 de saúde (CIR) de …** e **Macrorregião de saúde de …**, em Linhas, Colunas e
