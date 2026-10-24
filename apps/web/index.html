@@ -588,7 +588,7 @@
           <nav class="view-tabs" aria-label="Visualização do resultado">
             <button class="active" data-view="table" type="button" title="O resultado da tabulação, mais totais, percentuais e formatação">Tabela</button>
             <button data-view="chart" type="button" title="Barras, linhas e pizza a partir da tabela, com exportação SVG e PNG">Gráfico</button>
-            <button data-view="map" type="button" title="Mapa temático por área, a partir de MAP legado ou GeoJSON">Mapa</button>
+            <button data-view="map" type="button" title="Toque num estado para ver os municípios dele; com vários anos ou datas, o controle Período passa pelo tempo.">Mapa</button>
             <button data-view="statistics" type="button" title="Descritivas, correlação, regressão e taxas com padronização">Estatística</button>
             <button data-view="compare" type="button" title="Alinha duas tabelas por chave e mostra as diferenças">Comparar</button>
             <button data-view="investigate" type="button" title="Procura estranheza estatística no grupo filtrado, contra o resto">Investigar</button>
@@ -856,44 +856,56 @@
                   <option value="classic">Clássico: todos os municípios de uma vez</option>
                 </select>
               </label>
-              <label class="map-uf-label" for="map-geo-field">Geografia
-                <select id="map-geo-field" title="Qual campo do arquivo define o lugar"></select>
-              </label>
-              <label class="map-uf-label" for="map-value-column">Valor
-                <select id="map-value-column" title="Qual coluna da tabela o mapa pinta"></select>
-              </label>
-              <label class="map-uf-label" for="map-uf">Recorte
+              <label class="map-uf-label" id="map-uf-label" for="map-uf">Recorte
                 <select id="map-uf" title="Ver o Brasil por estado, ou um estado por município">
                   <option value="">Brasil · por estado</option>
                 </select>
               </label>
-              <label>Método<select id="map-classification">
-                <option value="continuous">Contínuo</option>
-                <option value="equal-interval">Intervalos iguais</option>
-                <option value="quantile">Quantis</option>
-                <option value="manual">Quebras manuais</option>
-              </select></label>
-              <label id="map-manual-breaks-label" hidden>Quebras<input id="map-manual-breaks" type="text" inputmode="decimal" placeholder="10; 25; 50" /></label>
-              <label class="check-label map-toggle"><input id="map-show-seats" type="checkbox" /><span>Sedes</span></label>
-              <button class="secondary-button" id="map-layer-button" type="button">Camada de referência</button>
-              <input id="map-layer-input" type="file" accept=".map,.MAP,.json,.geojson" hidden />
-              <label>Classes<select id="map-class-count">
-                <option>3</option><option>4</option><option selected>5</option><option>6</option><option>7</option>
-              </select></label>
-              <label>Paleta<select id="map-palette">
-                <option value="green">Verde</option><option value="blue">Azul</option>
-                <option value="orange">Laranja</option><option value="purple">Roxo</option>
-              </select></label>
-              <label class="check-label" title="Para indicador em que o valor alto é bom, como cobertura vacinal"><input id="map-invert-palette" type="checkbox"><span>Inverter cor</span></label>
+              <label class="map-uf-label" id="map-area-label" for="map-area-level" hidden>Pintar por
+                <select id="map-area-level" title="No estado: cada município, ou a região de saúde (ou macrorregião) a que ele pertence">
+                  <option value="">Município</option>
+                  <option value="BR_REGSAUD.CNV">Região de saúde (CIR)</option>
+                  <option value="BR_MACSAUD.CNV">Macrorregião de saúde</option>
+                </select>
+              </label>
+              <label class="map-uf-label" for="map-value-column">Valor
+                <select id="map-value-column" title="Qual coluna da tabela o mapa pinta"></select>
+              </label>
               <div class="panel-actions map-zoom-actions">
                 <button class="secondary-button" id="map-zoom-out" type="button" title="Afastar">−</button>
-                <button class="secondary-button" id="map-zoom-reset" type="button">Ajustar</button>
+                <button class="secondary-button" id="map-zoom-reset" type="button" title="Voltar ao enquadramento inteiro">Ajustar</button>
                 <button class="secondary-button" id="map-zoom-in" type="button" title="Aproximar">+</button>
-                <button class="secondary-button" id="map-geojson-button" type="button">Importar GeoJSON</button>
-                <button class="secondary-button" id="map-png-button" type="button" disabled>PNG</button>
+                <button class="secondary-button" id="map-png-button" type="button" title="Baixar a imagem do mapa, com título, período e legenda" disabled>Baixar imagem</button>
               </div>
-              <input id="geojson-input" type="file" accept=".geojson,.json" hidden />
             </div>
+            <details class="map-opcoes" id="map-opcoes">
+              <summary>Opções do mapa <span>cores, classes, campo do lugar, camadas</span></summary>
+              <div class="map-opcoes-grade">
+                <label class="map-uf-label" for="map-geo-field">Campo do lugar
+                  <select id="map-geo-field" title="Qual campo do arquivo define o lugar (residência, ocorrência…)"></select>
+                </label>
+                <label title="Como os valores viram cores">Cores por<select id="map-classification">
+                  <option value="continuous">Escala contínua</option>
+                  <option value="equal-interval">Intervalos iguais</option>
+                  <option value="quantile">Quantis (mesmo número de áreas por cor)</option>
+                  <option value="manual">Quebras que eu escolho</option>
+                </select></label>
+                <label id="map-manual-breaks-label" hidden>Quebras<input id="map-manual-breaks" type="text" inputmode="decimal" placeholder="10; 25; 50" /></label>
+                <label>Número de cores<select id="map-class-count">
+                  <option>3</option><option>4</option><option selected>5</option><option>6</option><option>7</option>
+                </select></label>
+                <label>Paleta<select id="map-palette">
+                  <option value="green">Verde</option><option value="blue">Azul</option>
+                  <option value="orange">Laranja</option><option value="purple">Roxo</option>
+                </select></label>
+                <label class="check-label" title="Para indicador em que o valor alto é bom, como cobertura vacinal"><input id="map-invert-palette" type="checkbox"><span>Inverter cor (valor alto é bom)</span></label>
+                <label class="check-label map-toggle" title="Marca a sede de cada município"><input id="map-show-seats" type="checkbox" /><span>Mostrar sedes</span></label>
+                <button class="secondary-button" id="map-layer-button" type="button" title="Desenha por cima o contorno de outro mapa (.MAP ou GeoJSON)">Camada de referência</button>
+                <input id="map-layer-input" type="file" accept=".map,.MAP,.json,.geojson" hidden />
+                <button class="secondary-button" id="map-geojson-button" type="button" title="Usar o seu próprio mapa (GeoJSON) no lugar do mapa do Brasil">Importar GeoJSON</button>
+                <input id="geojson-input" type="file" accept=".geojson,.json" hidden />
+              </div>
+            </details>
             <div class="map-taxa" id="map-taxa">
               <label class="check-label"><input id="map-taxa-check" type="checkbox" disabled /><span>Por 100 mil habitantes</span></label>
               <button class="secondary-button" id="map-populacao-button" type="button">Abrir população (IBGE)…</button>

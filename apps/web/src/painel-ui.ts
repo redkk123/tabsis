@@ -368,6 +368,14 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
     lista.replaceChildren();
     if (naoAtiva) lista.add(new Option('Não ativa', '', false, escolhido === null));
     const fora: PainelEixo[] = [];
+    // Com eixos derivados (Ano por arquivo, Mês/Ano/Semana das datas, regiões),
+    // a lista ganha grupos com nome: sem eles, trinta "Mês de…" no topo
+    // escondiam as variáveis de verdade.
+    const grupoDe = (eixo: PainelEixo): string => eixo.id === PERIODO_EIXO_ID || eixo.id.startsWith('data:')
+      ? 'Tempo (dos arquivos e das datas)'
+      : eixo.id.startsWith('regiao:') ? 'Lugar (UF e regiões de saúde)' : '';
+    const agrupar = eixos.some((eixo) => grupoDe(eixo));
+    const grupos = new Map<string, HTMLOptGroupElement>();
     for (const eixo of eixos) {
       const visivel = !termo || semAcento(`${eixo.label} ${eixo.field}`).includes(termo) || eixo.id === escolhido;
       if (!visivel) continue;
@@ -376,7 +384,16 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
       // Passar o mouse diz o que a opção é: as categorias que ela gera
       // ("Oport invetig (120d)" → "Até 120 dias (invest oportuna) · 121 a 150 dias…").
       option.title = dicaDaOpcao(eixo);
-      lista.add(option);
+      if (!agrupar) { lista.add(option); continue; }
+      const nome = grupoDe(eixo) || (catalogo?.origem === 'def' ? 'Variáveis do DEF' : 'Campos do arquivo');
+      let grupo = grupos.get(nome);
+      if (!grupo) {
+        grupo = document.createElement('optgroup');
+        grupo.label = nome;
+        grupos.set(nome, grupo);
+        lista.append(grupo);
+      }
+      grupo.append(option);
     }
     // As indisponíveis, quando pedidas, vão juntas no fim, num grupo com nome.
     if (mostrarIndisponiveis && fora.length) {
@@ -684,7 +701,10 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
       // Troca de DEF ou de arquivo: começa como o TabWin começa.
       estado = estadoInicial(catalogo);
       const campo = catalogo.origem === 'campos' ? deps.campoInicial?.() : undefined;
-      const eixoDoCampo = campo ? catalogo.linhas.find((eixo) => eixo.field === campo) : undefined;
+      // O próprio campo, e não um derivado dele ("UF de…", "Mês de…").
+      const eixoDoCampo = campo
+        ? catalogo.linhas.find((eixo) => eixo.field === campo && eixo.id !== PERIODO_EIXO_ID && !eixo.id.startsWith('data:') && !eixo.id.startsWith('regiao:'))
+        : undefined;
       if (eixoDoCampo) estado.linha = eixoDoCampo.id;
       valoresLidos.clear();
       selecaoEmFoco = null;
