@@ -23,7 +23,9 @@ const arquivos = new Map();
 for (const pasta of [g001, path.join(g001, 'CNV'), path.join(g001, 'DBF')]) {
   try { for (const nome of await readdir(pasta)) if (!arquivos.has(nome.toLowerCase())) arquivos.set(nome.toLowerCase(), path.join(pasta, nome)); } catch { /* opcional */ }
 }
-const dadosPath = arquivos.get(dadosNome.toLowerCase());
+// Dados podem estar numa subpasta (SIA\DADOS, CNES\ESTABEL): caminho relativo à pasta.
+const relativo = path.join(g001, dadosNome.replace(/\\/g, '/'));
+const dadosPath = (await readFile(relativo).then(() => true, () => false)) ? relativo : arquivos.get(dadosNome.toLowerCase());
 let dadosBytes = new Uint8Array(await readFile(dadosPath));
 if (/\.dbc$/i.test(dadosPath)) dadosBytes = dbcToDbf(dadosBytes);
 const layout = readDbfHeader(dadosBytes).fields.map((f) => ({ field: f.name, type: f.type, length: f.length, decimals: f.decimalCount }));
@@ -60,7 +62,15 @@ function lerTab(texto) {
 
 // Rótulo de lookup é "código nome": compara pelo código (o TabWin converte o CP850 do jeito dele).
 // …e sem aspas internas, como o .tab que o TabWin e o TabSis gravam.
-const chaveRotulo = (rotulo) => (/^\d{7}( |$)/.test(rotulo) ? rotulo.slice(0, 7) : rotulo.replace(/"/g, '').trim());
+// Rótulo de tabela DBF ("código nome"): compara pelo código. O TabWin lê o DBF
+// como Windows-1252 mesmo quando ele está em UTF-8 ("IMPORTAÃÃO") e deixa o
+// espaço da chave; o TabSis mostra o nome certo. Isso não muda contagem.
+const chaveRotulo = (rotulo) => {
+  const codigo = /^(\d{2,})\s/.exec(rotulo);
+  // Sem os caracteres fora do ASCII: o TabWin mostra o CP850 lido como
+  // Windows-1252 ("SÝndrome"), o TabSis o nome certo ("Síndrome").
+  return codigo ? codigo[1] : rotulo.replace(/"/g, '').replace(/[^\x20-\x7e]/g, '').trim();
+};
 
 const entradas = (await readFile(registroPath, 'utf8')).trim().split('\n').map((l) => JSON.parse(l));
 const vistos = new Map();

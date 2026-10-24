@@ -52,7 +52,12 @@ export interface DimensionSpec {
 /** Immutable, renderer-independent lookup table loaded from a DEF-related DBF. */
 export interface DimensionLookupDefinition {
   kind: 'dbf-lookup';
-  entries: Array<{ key: string; label: string }>;
+  /**
+   * Uma linha por categoria. Sem `codes`, a chave é o próprio código; com
+   * `codes`, a categoria junta vários códigos (o TabWin agrupa pelo rótulo
+   * quando o DEF repete o par rótulo/DBF: "CD_DESCR, DBF\S_CID.DBF").
+   */
+  entries: Array<{ key: string; label: string; codes?: string[] }>;
 }
 
 interface FilterSpecBase {

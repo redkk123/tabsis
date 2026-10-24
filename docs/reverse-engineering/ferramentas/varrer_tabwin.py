@@ -95,11 +95,13 @@ def main():
             alvo.unlink()
         texto = f';Varredura TabSis {nome}\r\nAC:\\TabWin\\{PASTA}\\{dados}\r\n{linha}\r\n'
         # Um nome novo por variável: o TabWin guarda o DEF aberto pelo nome e,
-        # com o mesmo nome, reabria a variável anterior. Só um AAA*.DEF por vez,
-        # para ele ser sempre o primeiro da lista.
-        for antigo in G001.glob('AAA*.DEF'):
+        # com o mesmo nome, reabria a variável anterior. Só um por vez, para ele ser
+        # sempre o primeiro da lista.
+        # Começa com '0' para vir antes de qualquer DEF da pasta (no CNES há
+        # DEFs de teste AA4C/AA4L, que vinham antes de 'AAA').
+        for antigo in list(G001.glob('AAA*.DEF')) + list(G001.glob('0VZ*.DEF')):
             antigo.unlink()
-        (G001 / f'AAA{indice:03d}.DEF').write_bytes(texto.encode('cp1252'))
+        (G001 / f'0VZ{indice:03d}.DEF').write_bytes(texto.encode('cp1252'))
         ok = False
         try:
             # Um Log que sobrou da variável anterior enganaria a espera abaixo.
@@ -111,7 +113,8 @@ def main():
               'c:420,325', 's:0.4', 'c:535,555', 's:1')
             # Espera o painel; no caminho, "Salvar Tabela Atual?" (já há tabela
             # aberta) recebe Não.
-            for _ in range(20):
+            # CNV grande (CIRBR, 5.570 municípios) demora a carregar: até 40 s.
+            for _ in range(80):
                 if pergunta_aberta():
                     x('c:725,495', 's:1')
                     continue

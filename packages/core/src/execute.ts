@@ -81,6 +81,39 @@ function getConversion(registry: ConversionRegistry, id: string): CnvDefinition 
   return definition;
 }
 
+interface LookupIndex {
+  byKey: Map<string, { key: string; label: string }>;
+  /** Comprimentos das chaves, do maior para o menor. */
+  lengths: number[];
+}
+const lookupIndexes = new WeakMap<DimensionLookupDefinition, LookupIndex>();
+
+/**
+ * A linha da tabela DBF para um valor do registro. Primeiro a chave inteira;
+ * sem ela, o começo do valor do tamanho da chave, como o TabWin: no SIA,
+ * PA_PROC_ID "0301010072" cai no grupo "03" (TB_GRUPO.DBF), no subgrupo "0301"
+ * e na forma de organização "030101" (varredura de 2026-10-24).
+ */
+function lookupEntry(lookup: DimensionLookupDefinition, value: string): { key: string; label: string } | undefined {
+  let index = lookupIndexes.get(lookup);
+  if (!index) {
+    const byKey = new Map<string, { key: string; label: string }>();
+    for (const entry of lookup.entries) {
+      for (const code of entry.codes ?? [entry.key]) if (!byKey.has(code)) byKey.set(code, entry);
+    }
+    index = { byKey, lengths: [...new Set([...byKey.keys()].map((code) => code.length))].sort((a, b) => b - a) };
+    lookupIndexes.set(lookup, index);
+  }
+  const exact = index.byKey.get(value);
+  if (exact) return exact;
+  for (const length of index.lengths) {
+    if (length >= value.length) continue;
+    const entry = index.byKey.get(value.slice(0, length));
+    if (entry) return entry;
+  }
+  return undefined;
+}
+
 function getLookup(registry: ConversionRegistry, id: string): DimensionLookupDefinition {
   const definition = registry[id];
   if (!definition) throw new Error(`missing DBF lookup: ${id}`);
@@ -169,7 +202,7 @@ export function resolveDimensionValue(
   );
   if (lookup) {
     const key = String(raw ?? '').trim();
-    const entry = lookup.entries.find((candidate) => candidate.key === key);
+    const entry = lookupEntry(lookup, key);
     if (!entry) return unclassifiedValue(dimension, key, true);
     return { key: entry.key, label: entry.label };
   }
