@@ -280,30 +280,40 @@ export function parseCnv(text: string, options: ParseCnvOptions = {}): CnvDefini
     const existing = categories.get(parsed.category.sequence);
     if (!existing) {
       categories.set(parsed.category.sequence, parsed.category);
-    } else {
-      if (!existing.label && parsed.category.label) existing.label = parsed.category.label;
-      if (
-        existing.subtotalTarget !== undefined &&
-        parsed.category.subtotalTarget !== undefined &&
-        existing.subtotalTarget !== parsed.category.subtotalTarget
-      ) {
-        warnings.push(
-          `category ${existing.sequence} has conflicting subtotal targets (${existing.subtotalTarget} vs ${parsed.category.subtotalTarget})`,
-        );
-      } else if (existing.subtotalTarget === undefined && parsed.category.subtotalTarget !== undefined) {
-        existing.subtotalTarget = parsed.category.subtotalTarget;
+    } else if (parsed.category.label) {
+      // O mesmo número com outro rótulo redefine a categoria, como no TabWin:
+      // vale o rótulo e o subtotal da ÚLTIMA linha, e os códigos das duas se
+      // somam (CID10GRUPO.CNV do SIH repete 24, 25 e 26: o TabWin mostra o
+      // rótulo e o pai da segunda definição e conta os códigos das duas;
+      // varredura de 2026-10-23).
+      if (existing.label !== parsed.category.label || existing.subtotalTarget !== parsed.category.subtotalTarget) {
+        warnings.push(`category ${existing.sequence} redefined on line ${i + 1}: the last label and subtotal win, codes accumulate`);
       }
+      existing.label = parsed.category.label;
+      if (parsed.category.subtotalTarget !== undefined) existing.subtotalTarget = parsed.category.subtotalTarget;
+      else delete existing.subtotalTarget;
+      if (parsed.category.excludeFromTotal) existing.excludeFromTotal = true;
+      else delete existing.excludeFromTotal;
+    } else {
+      // Linha de continuação, sem rótulo: só acrescenta códigos.
       if (parsed.category.excludeFromTotal) existing.excludeFromTotal = true;
     }
     rules.push(parsed.rule);
   }
 
-  const categoryList = [...categories.values()].sort((a, b) => a.sequence - b.sequence);
-  if (categoryList.length !== header.categoryCount) {
+  if (categories.size !== header.categoryCount) {
     warnings.push(
-      `header declares ${header.categoryCount} categories but ${categoryList.length} unique category sequences were parsed`,
+      `header declares ${header.categoryCount} categories but ${categories.size} unique category sequences were parsed`,
     );
   }
+  // Os números que o cabeçalho conta e nenhuma linha define viram categorias
+  // sem rótulo e sem código: o TabWin as mostra como linhas vazias, com zero
+  // (CID10GRUPO.CNV: 276 no cabeçalho, 261 definidas; a tabela do TabWin tem
+  // 276 linhas).
+  for (let sequence = 1; sequence <= header.categoryCount; sequence++) {
+    if (!categories.has(sequence)) categories.set(sequence, { sequence, label: '' });
+  }
+  const categoryList = [...categories.values()].sort((a, b) => a.sequence - b.sequence);
 
   const sequenceSet = new Set(categoryList.map((category) => category.sequence));
   for (const category of categoryList) {

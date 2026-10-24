@@ -254,7 +254,9 @@ function axisFromDimension(
     );
     const items: ResultAxisItem[] = definition.categories.map((category) => ({
       key: String(category.sequence),
-      label: category.label || String(category.sequence),
+      // Sem rótulo, a linha fica em branco, como no TabWin (número que o
+      // cabeçalho da CNV conta e nenhuma linha define).
+      label: category.label,
       source: 'conversion',
       ...(category.subtotalTarget !== undefined
         ? { subtotalTargetKey: String(category.subtotalTarget) }

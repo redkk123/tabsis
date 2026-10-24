@@ -53,7 +53,9 @@ function defaultTotals(result: TabulationResult): number[] {
 }
 
 function quote(text: string): string {
-  return `"${text.replace(/"/g, "'")}"`;
+  // O TabWin tira as aspas de dentro do rótulo ao salvar (CNAE.CNV: `"In Natura"`
+  // sai `In Natura`; varredura de 2026-10-23).
+  return `"${text.replace(/"/g, '')}"`;
 }
 
 function matrix(result: TabulationResult, context: TabwinFormatContext, separator: string, decimalMark: string): string[] {
