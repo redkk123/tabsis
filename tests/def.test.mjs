@@ -118,3 +118,9 @@ test('linhas-título do CNES não derrubam o DEF: X sem campo e I com vírgula s
   assert.equal(def.options[0]?.field, '');
   assert.deepEqual(def.increments.map((increment) => [increment.label, increment.field]), [['* ATENDIMIMENTO PRESTADO *', 'ATEND_PR'], ['INTERNAÇÃO/SUS', 'AP01CV01']]);
 });
+
+test('nome da variável com no máximo 30 caracteres, como o TabWin mostra', () => {
+  const def = parseDef(';x\nAX\\RD*.DBC\nLNatureza 40 abcdefghijklmnopqrstuvwxyzAB, NAT_JUR ,1,CNV\\NATJUR.CNV\nLUnid da Federação de Resid.      ,  MUNIC_RES, 1 ,BR_UF.CNV\n');
+  assert.equal(def.options[0].label, 'Natureza 40 abcdefghijklmnopqr');
+  assert.equal(def.options[1].label, 'Unid da Federação de Resid.');
+});

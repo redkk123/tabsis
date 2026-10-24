@@ -168,6 +168,16 @@ Falta, para isso ser **a** forma de explorar os dados e não um recurso do mapa:
 
 ---
 
+## Varredura ampla TabSis × TabWin (2026-10-24) ✅
+
+Cada variável de Linha de 7 DEFs oficiais (SIH, SIM, SINASC, SINAN, SIA, CNES
+estabelecimentos e leitos) tabulada no TabWin 4.15 real e no TabSis: **840 de
+840 iguais**, depois de corrigir o que a varredura achou (CNV com número
+repetido, linhas vazias, auto-subtotal, aspas, corte de 30 caracteres e cinco
+regras de tabela DBF). Detalhes em `docs/reverse-engineering/varredura/`.
+
+---
+
 ## Bloco 1 — Download resistente ao DATASUS lento ✅
 
 Motivo: o usuário viu "o download veio incompleto" no DNBR2025 pelo celular.

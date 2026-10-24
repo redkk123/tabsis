@@ -31,6 +31,12 @@ zeradas, suprime colunas zeradas, Não classificados = Ignorar.
 | --- | --- | ---: | ---: | --- |
 | SIH `RD2008.DEF` | `RDAC2401.dbc` (4.315 AIH) | 116 | **116** | [SIH_RD2008.md](./SIH_RD2008.md) |
 | SIM `Obito_1996_CID10.def` | `DOAC2024.dbc` (óbitos do Acre, 2024) | 335 (+3 que o próprio TabWin recusa) | **335** | [SIM_Obito_1996_CID10.md](./SIM_Obito_1996_CID10.md) |
+| SINASC `NASCIDO.def` | `DNAC2022.dbc` (nascidos vivos do Acre, 2022) | 241 (+11 que o TabWin recusa) | **241** | [SINASC_NASCIDO.md](./SINASC_NASCIDO.md) |
+| SINAN `HansNET.def` | `HANSBR23.dbc` (hanseníase, Brasil, 2023) | 39 (+2 que o TabWin recusa) | **39** | [SINAN_HansNET.md](./SINAN_HansNET.md) |
+| SIA `Producao_Ambulatorial.DEF` | `PAAC2501.dbc` (154.136 procedimentos) | 65 (+2) | **65** | [SIA_Producao_Ambulatorial.md](./SIA_Producao_Ambulatorial.md) |
+| CNES `Estabelecimento.def` | `STAC2501.dbc` | 29 (+2 linhas-título) | **29** | [CNES_Estabelecimento.md](./CNES_Estabelecimento.md) |
+| CNES `Leitos_Especialidade.def` | `LTAC2501.dbc` | 15 | **15** | [CNES_Leitos.md](./CNES_Leitos.md) |
+| **Total** | | **840** | **840** | |
 
 ## O que a varredura achou (e foi corrigido)
 
@@ -47,9 +53,24 @@ zeradas, suprime colunas zeradas, Não classificados = Ignorar.
   de subtotal"); o TabWin tabula, e a linha soma os filhos e depois a si mesma
   — dobra (B190 = 2 e B199 = 1 dão 6 na linha "0537 0537"). O TabSis agora faz
   igual, e um ciclo maior não derruba mais a tabela.
-- Observado, sem mudar contagem: o nome da variável aparece cortado em 30
-  caracteres no TabWin ("Região de Saúde (CIR) de Resid.", 31, vira "…de
-  Resid"). A conferir com um teste próprio.
-- O que o próprio TabWin recusa (e o TabSis também não tabula): `MUNICDF.CNV`
+- **Nome da variável com no máximo 30 caracteres** ("Região de Saúde (CIR) de
+  Resid.", 31, vira "…de Resid"; confirmado com nomes de 29, 31 e 40): o TabSis
+  agora corta igual (painel, título e `.tab`).
+- **Tabelas DBF (SIA)**, quatro regras que o TabSis não tinha:
+  - sem campo com o nome do campo dos dados, a chave é o **primeiro campo** do
+    DBF (`PA_CNPJ_CC` em `S_FORNEC.DBF` casa pelo `FOR_CNPJ`) — o TabSis recusava;
+  - o valor casa pelo **começo, do tamanho da chave**: procedimento de 10
+    dígitos no grupo `03`, subgrupo `0301`, forma `030101` — o TabSis dava zero;
+  - nome de campo **sem diferença de maiúsculas** (`ds_cbo`) — a CBO saía sem nome;
+  - DEF que **repete o par rótulo/DBF** (`CD_DESCR, DBF\S_CID.DBF, CD_DESCR,
+    DBF\S_CID.DBF`) agrupa pelo rótulo e mostra só ele: 14.705 códigos da CID
+    viram 14.257 linhas, como no TabWin;
+  - registro com quebra de linha dentro do nome (`TB_GRUPO.DBF`, grupo 09)
+    fica de fora, como no TabWin.
+- Onde o TabSis é **mais certo** que o TabWin (não muda contagem): acentos de
+  DBF em CP850 ou UTF-8, que o TabWin mostra quebrados ("IMPORTAÃÃO",
+  "SÝndrome"), e CNVs com tabulação no meio do nome (`CIRBR.cnv` do SINASC),
+  que o TabWin recusa e o TabSis lê.
+- O que o próprio TabWin recusa: `MUNICDF.CNV`
   ("'s' is not a valid integer value"), campo que não existe no arquivo
   (`CODINST` no SIM, `NUMERODN` no SINASC disseminado: "Tabulação cancelada").
