@@ -30,6 +30,7 @@ zeradas, suprime colunas zeradas, Não classificados = Ignorar.
 | DEF | Dados | Variáveis | Iguais | Relatório |
 | --- | --- | ---: | ---: | --- |
 | SIH `RD2008.DEF` | `RDAC2401.dbc` (4.315 AIH) | 116 | **116** | [SIH_RD2008.md](./SIH_RD2008.md) |
+| SIM `Obito_1996_CID10.def` | `DOAC2024.dbc` (óbitos do Acre, 2024) | 335 (+3 que o próprio TabWin recusa) | **335** | [SIM_Obito_1996_CID10.md](./SIM_Obito_1996_CID10.md) |
 
 ## O que a varredura achou (e foi corrigido)
 
@@ -41,5 +42,14 @@ zeradas, suprime colunas zeradas, Não classificados = Ignorar.
   branco no TabWin (276 no cabeçalho, 261 definidas): o TabSis agora também.
 - **Aspas dentro do rótulo** (`"In Natura"` na `CNAE.CNV`): o TabWin as tira
   ao salvar o `.tab`; o TabSis trocava por apóstrofo.
-- Observado, sem mudar contagem: o TabWin tira o ponto final do nome da
-  variável ("…de Resid." → "…de Resid").
+- **Linha que é subtotal dela mesma** (`CID10_01_ST.CNV`, `CID10_09_ST.CNV`,
+  `CID10_12_ST.CNV` do SIM: "0455 0455"): o TabSis recusava a tabela ("ciclo
+  de subtotal"); o TabWin tabula, e a linha soma os filhos e depois a si mesma
+  — dobra (B190 = 2 e B199 = 1 dão 6 na linha "0537 0537"). O TabSis agora faz
+  igual, e um ciclo maior não derruba mais a tabela.
+- Observado, sem mudar contagem: o nome da variável aparece cortado em 30
+  caracteres no TabWin ("Região de Saúde (CIR) de Resid.", 31, vira "…de
+  Resid"). A conferir com um teste próprio.
+- O que o próprio TabWin recusa (e o TabSis também não tabula): `MUNICDF.CNV`
+  ("'s' is not a valid integer value"), campo que não existe no arquivo
+  (`CODINST` no SIM, `NUMERODN` no SINASC disseminado: "Tabulação cancelada").

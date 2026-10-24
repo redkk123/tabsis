@@ -26,6 +26,23 @@ def pergunta_aberta() -> bool:
     r, g, b = (int(v) for v in saida) if len(saida) == 3 else (255, 255, 255)
     return b > 200 and r < 120  # barra de título azul da pergunta
 
+def cor(xp: int, yp: int):
+    saida = subprocess.run([PY, '-I', str(Path(__file__).parent / 'pixel.py'), str(xp), str(yp)], capture_output=True, text=True).stdout.split()
+    return tuple(int(v) for v in saida) if len(saida) == 3 else (255, 255, 255)
+
+def log_aberto() -> bool:
+    r, g, b = cor(600, 293)  # barra de título azul da janela de Log
+    return b > 200 and r < 120
+
+def painel_aberto() -> bool:
+    r, g, b = cor(600, 209)  # barra de título azul do painel (C:\TabWin\…\AAAnnn.DEF)
+    return b > 200 and r < 120
+
+def mensagem_aberta() -> bool:
+    # "Tabulação cancelada" ou erro do TabWin: caixa com barra azul no meio da tela.
+    r, g, b = cor(600, 405)
+    return b > 200 and r < 120
+
 def recurso(caminho: str):
     rel = caminho.strip().replace('\\', '/')
     if (G001 / rel).exists():
@@ -85,15 +102,36 @@ def main():
         (G001 / f'AAA{indice:03d}.DEF').write_bytes(texto.encode('cp1252'))
         ok = False
         try:
+            # Um Log que sobrou da variável anterior enganaria a espera abaixo.
+            if log_aberto():
+                x('c:790,594', 's:0.6')
             # Arquivo → Executar tabulação; entra e sai da pasta CNV para o seletor
             # reler a lista (ele não vê DEF novo sem isso); abre o primeiro.
             x('c:28,41', 's:0.8', 'c:66,185', 's:1.5', 'dc:698,373', 's:0.8', 'dc:695,357', 's:0.8',
-              'c:420,325', 's:0.4', 'c:535,555', 's:2')
-            # "Salvar Tabela Atual?" aparece quando já há tabela aberta: Não.
-            if pergunta_aberta():
-                x('c:725,495', 's:2')
-            x('c:1055,312', 's:3')
-            # A tabulação pode demorar: espera o log aparecer (até 60 s).
+              'c:420,325', 's:0.4', 'c:535,555', 's:1')
+            # Espera o painel; no caminho, "Salvar Tabela Atual?" (já há tabela
+            # aberta) recebe Não.
+            for _ in range(20):
+                if pergunta_aberta():
+                    x('c:725,495', 's:1')
+                    continue
+                if painel_aberto():
+                    break
+                time.sleep(0.5)
+            else:
+                raise RuntimeError('o painel da tabulação não abriu')
+            x('c:1055,312', 's:2')
+            # Só segue para salvar se a janela de Log abriu (tabulação feita). Se o
+            # TabWin cancelou ou deu erro, salvar clicaria no painel — "Salvar
+            # registros" chegou a ser marcado assim.
+            for _ in range(60):
+                if log_aberto():
+                    break
+                if mensagem_aberta():
+                    raise RuntimeError('o TabWin cancelou a tabulação ou deu erro')
+                time.sleep(1)
+            else:
+                raise RuntimeError('o TabWin não abriu o Log (tabulação cancelada ou erro)')
             x('c:790,594', 's:0.6', 'c:28,41', 's:0.6', 'c:50,108', 's:1.2',
               'c:630,414', 'k:Home', 'k:Shift_L+End', f't:{nome}', 'c:797,416', 's:1.2')
             esperado = linha[1:].split(',')[0].strip()
@@ -102,18 +140,24 @@ def main():
                     # Confere que a tabela salva é da variável pedida, e não a anterior.
                     salvo = alvo.read_bytes().decode('cp1252', 'replace')
                     achada = next((l[6:].strip() for l in salvo.splitlines() if l.startswith('Linha=')), '')
-                    # O TabWin tira o ponto final do nome ("…de Resid." vira "…de Resid").
-                    ok = achada.rstrip('.').strip() == esperado.rstrip('.').strip()
+                    # O TabWin corta o nome da variável em 30 caracteres
+                    # ("Região de Saúde (CIR) de Resid.", 31, vira "…de Resid").
+                    ok = achada == esperado or achada == esperado[:30].rstrip()
                     if not ok:
                         print('tabela de outra variável:', achada, '≠', esperado, flush=True)
                     break
                 time.sleep(0.5)
-        except subprocess.CalledProcessError as erro:
-            print('erro de clique', erro, flush=True)
+        except (subprocess.CalledProcessError, RuntimeError) as erro:
+            print('falhou:', erro, flush=True)
         if not ok:
             shot(f'falha-{nome}.png')
-            # Fecha o que estiver aberto (mensagem, diálogo) e segue.
-            x('k:Escape', 's:0.4', 'k:Return', 's:0.4', 'k:Escape', 's:0.4')
+            # Depois de um erro ou cancelamento do TabWin a tela fica imprevisível:
+            # reabre o TabWin do zero e segue limpo (custa ~30 s, e é raro).
+            subprocess.run([str(Path(__file__).parent / 'abrir_tabwin.sh'), PASTA], check=False, capture_output=True)
+            with registro.open('a', encoding='utf-8') as saida:
+                saida.write(json.dumps({'indice': indice, 'nome': nome, 'linhaDef': numero, 'linha': linha, 'recurso': achado, 'ok': False}, ensure_ascii=False) + '\n')
+            print(indice, nome, 'FALHOU', linha[:60], flush=True)
+            continue
         with registro.open('a', encoding='utf-8') as saida:
             saida.write(json.dumps({'indice': indice, 'nome': nome, 'linhaDef': numero, 'linha': linha, 'recurso': achado, 'ok': ok}, ensure_ascii=False) + '\n')
         print(indice, nome, 'ok' if ok else 'FALHOU', linha[:60], flush=True)

@@ -399,17 +399,23 @@ function propagateRowSubtotals(rows: ResultAxisItem[], cells: number[][]): void 
   const depth = (key: string, trail = new Set<string>()): number => {
     const cached = depthMemo.get(key);
     if (cached !== undefined) return cached;
-    if (trail.has(key)) throw new Error(`subtotal cycle detected at row ${key}`);
+    // CNV com defeito que aponta uma linha para ela mesma (CID10_01_ST.CNV do
+    // SIM: "0455 0455") ou num ciclo maior: o TabWin tabula mesmo assim. O
+    // ciclo é cortado aqui em vez de recusar a tabela inteira.
+    if (trail.has(key)) return 0;
     trail.add(key);
     const target = rowByKey.get(key)?.subtotalTargetKey;
-    const value = target && rowByKey.has(target) ? 1 + depth(target, trail) : 0;
+    const value = target && target !== key && rowByKey.has(target) ? 1 + depth(target, trail) : 0;
     trail.delete(key);
     depthMemo.set(key, value);
     return value;
   };
 
   // Deepest details move first. A parent therefore already contains all of its
-  // descendants when it is propagated to a higher-level subtotal.
+  // descendants when it is propagated to a higher-level subtotal. A row that is
+  // its own subtotal adds itself after its children — it doubles, exactly as
+  // the TabWin shows (CID10_01_ST.CNV: B190 = 2 and B199 = 1 give 6 on the
+  // "0537 0537" row; varredura de 2026-10-23).
   const ordered = [...rows].sort((a, b) => depth(b.key) - depth(a.key));
   for (const row of ordered) {
     const targetKey = row.subtotalTargetKey;
