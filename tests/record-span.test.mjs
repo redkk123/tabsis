@@ -72,6 +72,19 @@ test('Seleção com CNV de faixas: o TabWin lê o texto a partir do índice = po
   assert.deepEqual(porLinha(tabular(2, ['3'])), { '0 dias': 0, '1 dia': 1, '8-14 dias': 0 });
 });
 
+test('campo do DEF com outra caixa (CODMUNres, seriescmae) acha o campo do DBF, como no TabWin', () => {
+  const sexo = parseCnv(['2 1', row(1, 'Masculino', '1'), row(2, 'Feminino', '3')].join('\n'));
+  const spec = withRecordLayout({
+    compatibilityProfile: 'tabwin-4.15', rows: { field: 'sexo', conversionId: 'SEXO' }, measure: { kind: 'sum', field: 'Idade' },
+    filters: [{ field: 'cod_idade', acceptedCategories: ['4'] }],
+  }, layout, { SEXO: sexo });
+  assert.equal(spec.rows.field, 'SEXO');
+  assert.equal(spec.measure.field, 'IDADE');
+  assert.equal(spec.filters[0].field, 'COD_IDADE');
+  const result = executeInMemory(records, compileQueryPlan(spec), { SEXO: sexo });
+  assert.deepEqual(result.cells, [[22], [7]]);
+});
+
 test('Incluir: a linha "Não classificados" só aparece se houver algum (TabWin não mostra vazia)', () => {
   const sexo = parseCnv(['2 1', row(1, 'Masculino', '1'), row(2, 'Feminino', '3')].join('\n'));
   const spec = { compatibilityProfile: 'tabwin-4.15', rows: { field: 'SEXO', conversionId: 'SEXO', unclassifiedPolicy: 'discriminate' }, measure: { kind: 'count' }, filters: [] };

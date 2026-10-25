@@ -724,10 +724,21 @@ export function withRecordLayout(
     }
     return { ...rest, recordSpan: span } as T;
   };
+  // O TabWin acha o campo sem olhar maiúsculas: "CODMUNres" e "seriescmae" nos
+  // DEFs do SIM (varredura de combinações, 2026-10-24). Aqui o nome vira o do DBF.
+  const nomeReal = (field: string): string => layout.find((candidate) => candidate.field.toUpperCase() === field.toUpperCase())?.field ?? field;
+  const comNome = <T extends { field: string }>(item: T): T => (nomeReal(item.field) === item.field ? item : { ...item, field: nomeReal(item.field) });
+  const medida = (measure: MeasureSpec): MeasureSpec => ({
+    ...measure,
+    ...(measure.field ? { field: nomeReal(measure.field) } : {}),
+    ...(measure.weightField ? { weightField: nomeReal(measure.weightField) } : {}),
+  });
   return {
     ...spec,
-    rows: spanFor(spec.rows),
-    ...(spec.columns ? { columns: spanFor(spec.columns) } : {}),
-    filters: spec.filters.map((filter) => spanFor(filter, true)),
+    rows: spanFor(comNome(spec.rows)),
+    ...(spec.columns ? { columns: spanFor(comNome(spec.columns)) } : {}),
+    measure: medida(spec.measure),
+    ...(spec.measures ? { measures: spec.measures.map(medida) } : {}),
+    filters: spec.filters.map((filter) => spanFor(comNome(filter), true)),
   };
 }
