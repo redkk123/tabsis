@@ -251,3 +251,33 @@ test('o Ano virtual não é a primeira Linha de uma tabela nova', () => {
   };
   assert.equal(estadoInicial(catalogo).linha, 'campo:SEXO');
 });
+
+test('Seleções com várias categorias: "|" e quebra em 79 caracteres, como no .TAB do TabWin', () => {
+  // Gravado pelo TabWin 4.15 na varredura de combinações (2026-10-24, CRD039).
+  const texto = [
+    '[Seleções_Ativas]',
+    'Procedimentos obstétricos: 0303100010 TRAT COMPLICACOES REL PREDOM PUERPERIO',
+    '    0310010039 PARTO NORMAL',
+    'Raça parcial: Branca|Preta',
+    '[Arquivos]',
+    'RDAC2401.dbc',
+  ].join('\r\n');
+  const log = parseTabwinLog(texto);
+  assert.deepEqual(log.selections, [
+    { label: 'Procedimentos obstétricos', categories: ['0303100010 TRAT COMPLICACOES REL PREDOM PUERPERIO', '0310010039 PARTO NORMAL'] },
+    { label: 'Raça parcial', categories: ['Branca', 'Preta'] },
+  ]);
+  // Junta com "|" e quebra antes de passar de 79 caracteres (LARG001: 79 cabe, 80 quebra).
+  assert.match(serializeTabwinLog(log), /\r\nRaça parcial: Branca\|Preta\r\n/);
+  assert.match(serializeTabwinLog(log), /\r\nProcedimentos obstétricos: 0303100010 TRAT COMPLICACOES REL PREDOM PUERPERIO\r\n {4}0310010039 PARTO NORMAL\r\n/);
+  const municipios = serializeTabwinLog({ increments: [], files: [], selections: [{
+    label: 'Município de Residência',
+    categories: [' MUNICIPIO IGNORADO - RO', "110001 ALTA FLORESTA D'OESTE", '110002 ARIQUEMES', '110003 CABIXI', '110004 CACOAL', '110005 CEREJEIRAS', '110006 COLORADO DO OESTE'],
+  }] }).split('\r\n');
+  // Como o TabWin gravou (SONDA000, 2026-10-24).
+  assert.deepEqual(municipios.slice(municipios.indexOf('[Seleções_Ativas]') + 1, municipios.indexOf('[Arquivos]')), [
+    "Município de Residência:  MUNICIPIO IGNORADO - RO|110001 ALTA FLORESTA D'OESTE",
+    '    110002 ARIQUEMES|110003 CABIXI|110004 CACOAL|110005 CEREJEIRAS',
+    '    110006 COLORADO DO OESTE',
+  ]);
+});

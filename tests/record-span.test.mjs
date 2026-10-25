@@ -54,6 +54,24 @@ test('withRecordLayout não mexe em campo de texto que comporta o código, e val
   assert.throws(() => compileQueryPlan({ ...spec, filters: [{ ...spec.filters[0], recordSpan: [{ field: 'IDADE', type: 'N', length: 2, decimals: 0 }] }] }), /start at its own field/);
 });
 
+test('Seleção com CNV de faixas: o TabWin lê o texto a partir do índice = posição e entra no campo seguinte; a Linha usa o valor', () => {
+  // PERM.CNV ("12 4 F") com DIAS_PERM N5 + MORTE N1, como nas sondas SONDB/SONDC/SONDD (2026-10-24).
+  const perm = parseCnv(['3 4 F', row(1, '0 dias', '0000'), row(2, '1 dia', '0001'), row(3, '8-14 dias', '0014')].join('\n'));
+  const leiaute = [{ field: 'DIAS_PERM', type: 'N', length: 5, decimals: 0 }, { field: 'MORTE', type: 'N', length: 1, decimals: 0 }];
+  // Strings como o leitor de DBF entrega: o campo numérico fica alinhado à direita no registro.
+  const regs = [{ DIAS_PERM: '0', MORTE: '0' }, { DIAS_PERM: '0', MORTE: '1' }, { DIAS_PERM: '1', MORTE: '0' }];
+  const tabular = (startPosition, categorias) => executeInMemory(regs, compileQueryPlan(withRecordLayout({
+    compatibilityProfile: 'tabwin-4.15', rows: { field: 'DIAS_PERM', conversionId: 'PERM', startPosition: 2 }, measure: { kind: 'count' },
+    filters: [{ field: 'DIAS_PERM', conversionId: 'PERM', startPosition, acceptedCategories: categorias }],
+  }, leiaute, { PERM: perm })), { PERM: perm });
+  const porLinha = (r) => Object.fromEntries(r.rows.map((linha, i) => [linha.label, r.cells[i][0]]));
+  // Posição 1: lê "   0", "   1" — o próprio valor.
+  assert.deepEqual(porLinha(tabular(1, ['1', '2'])), { '0 dias': 2, '1 dia': 1, '8-14 dias': 0 });
+  // Posição 2: lê "  0"+MORTE: o óbito com 0 dia vira "1 dia"; 1 dia vira "10" (8-14).
+  assert.deepEqual(porLinha(tabular(2, ['2'])), { '0 dias': 1, '1 dia': 0, '8-14 dias': 0 });
+  assert.deepEqual(porLinha(tabular(2, ['3'])), { '0 dias': 0, '1 dia': 1, '8-14 dias': 0 });
+});
+
 test('Incluir: a linha "Não classificados" só aparece se houver algum (TabWin não mostra vazia)', () => {
   const sexo = parseCnv(['2 1', row(1, 'Masculino', '1'), row(2, 'Feminino', '3')].join('\n'));
   const spec = { compatibilityProfile: 'tabwin-4.15', rows: { field: 'SEXO', conversionId: 'SEXO', unclassifiedPolicy: 'discriminate' }, measure: { kind: 'count' }, filters: [] };

@@ -132,6 +132,8 @@ function fixedWidthText(value: unknown, layout: RecordFieldLayout): string {
     text = layout.decimals > 0 ? value.toFixed(layout.decimals) : String(Math.round(value));
     return text.padStart(width).slice(-width);
   }
+  // Campo numérico lido como texto: no DBF ele fica alinhado à direita.
+  if (typeof value === 'string' && /^[NF]$/i.test(layout.type)) return value.trim().padStart(width).slice(-width);
   if (value instanceof Date) {
     text = `${value.getUTCFullYear()}${String(value.getUTCMonth() + 1).padStart(2, '0')}${String(value.getUTCDate()).padStart(2, '0')}`;
   } else if (typeof value === 'boolean') {
@@ -151,6 +153,22 @@ function spannedCode(record: DataRecord, span: readonly RecordFieldLayout[], sta
   const start = (startPosition ?? 1) - 1;
   const code = raw.slice(start, start + conversion.codeLength);
   return code;
+}
+
+/**
+ * Seleção com CNV de faixas numéricas: o TabWin não classifica o valor (como faz
+ * na Linha), lê `codeLength` caracteres do registro a partir do índice igual à
+ * posição do DEF — contado do zero, um caractere adiante do que a Linha usaria —,
+ * atravessando para o campo seguinte. Medido em 2026-10-24 (sondas SONDB/SONDC/
+ * SONDD, DIAS_PERM N5 + MORTE com PERM.CNV): posição 1 dá o valor; posição 2
+ * lê "  0" + MORTE, e os 6 óbitos com 0 dia caem em "1 dia". Texto em branco não
+ * classifica.
+ */
+function numericRangeSelectionText(record: DataRecord, span: readonly RecordFieldLayout[], startPosition: number | undefined, conversion: CnvDefinition): string | undefined {
+  const raw = span.map((layout) => fixedWidthText(record[layout.field], layout)).join('');
+  const start = startPosition ?? 1;
+  const text = raw.slice(start, start + conversion.codeLength);
+  return text.trim() ? text : undefined;
 }
 
 function extractSourceValue(
@@ -229,7 +247,9 @@ function acceptsFilter(
   const definition = filter.conversionId
     ? getConversion(conversions, filter.conversionId)
     : undefined;
-  const raw = extractSourceValue(record, filter.field, filter.startPosition, definition, filter.recordSpan);
+  const raw = definition?.mode === 'numeric-ranges' && filter.recordSpan
+    ? numericRangeSelectionText(record, filter.recordSpan, filter.startPosition, definition)
+    : extractSourceValue(record, filter.field, filter.startPosition, definition, filter.recordSpan);
   let matches: boolean;
   if (filter.kind === 'numeric-range') {
     const value = typeof raw === 'number' ? raw : Number(String(raw ?? '').replace(',', '.'));
@@ -623,6 +643,12 @@ function materializeTabulation(state: TabulationState): TabulationResult {
       cells.some((row) => (row[columnIndex] ?? 0) !== 0));
     columns = columns.filter((_, index) => keep[index]);
     cells = cells.map((row) => row.filter((_, index) => keep[index]));
+    // O total direto das linhas-subtotal acompanha as colunas que ficaram; sem
+    // isso o Total de cada coluna saía deslocado (varredura de combinações:
+    // CID10 cap 19S × Idade detalhada, sem a coluna "7 anos").
+    rows = rows.map((row) => (row.directTotal
+      ? { ...row, directTotal: row.directTotal.filter((_, index) => keep[index]) }
+      : row));
   }
   // Sem nenhuma coluna com valor, o TabWin não deixa a tabela sem colunas: põe
   // uma "DUMMY" zerada e avisa "NENHUM REGISTRO SELECIONADO" (varredura de
@@ -632,6 +658,7 @@ function materializeTabulation(state: TabulationState): TabulationResult {
   if (noRecordsSelected) {
     columns = [{ key: '__dummy__', label: 'DUMMY', source: 'raw' }];
     cells = rows.map(() => [0]);
+    rows = rows.map((row) => (row.directTotal ? { ...row, directTotal: [0] } : row));
     warnings.add('NENHUM REGISTRO SELECIONADO: nenhuma coluna ficou com valor.');
   }
 
@@ -677,15 +704,18 @@ export function withRecordLayout(
   layout: readonly RecordFieldLayout[],
   conversions: ConversionRegistry,
 ): TabulationSpec {
-  const spanFor = <T extends { field: string; conversionId?: string; startPosition?: number; recordSpan?: RecordFieldLayout[] }>(item: T): T => {
+  const spanFor = <T extends { field: string; conversionId?: string; startPosition?: number; recordSpan?: RecordFieldLayout[] }>(item: T, selecao = false): T => {
     const { recordSpan: _old, ...rest } = item;
     const conversion = item.conversionId ? conversions[item.conversionId] : undefined;
-    if (!conversion || 'kind' in conversion || (conversion.mode !== 'short' && conversion.mode !== 'literal')) return rest as T;
+    if (!conversion || 'kind' in conversion) return rest as T;
+    // Faixas numéricas: só a Seleção lê o texto do registro (ver numericRangeSelectionText).
+    const faixas = conversion.mode === 'numeric-ranges' && selecao;
+    if (!faixas && conversion.mode !== 'short' && conversion.mode !== 'literal') return rest as T;
     const index = layout.findIndex((candidate) => candidate.field === item.field);
     if (index < 0) return rest as T;
     const own = layout[index]!;
-    const needed = (item.startPosition ?? 1) - 1 + conversion.codeLength;
-    if (own.type.toUpperCase() === 'C' && needed <= own.length) return rest as T;
+    const needed = (item.startPosition ?? 1) - (faixas ? 0 : 1) + conversion.codeLength;
+    if (!faixas && own.type.toUpperCase() === 'C' && needed <= own.length) return rest as T;
     const span: RecordFieldLayout[] = [];
     let covered = 0;
     for (let at = index; at < layout.length && (covered < needed || !span.length); at++) {
@@ -698,6 +728,6 @@ export function withRecordLayout(
     ...spec,
     rows: spanFor(spec.rows),
     ...(spec.columns ? { columns: spanFor(spec.columns) } : {}),
-    filters: spec.filters.map((filter) => spanFor(filter)),
+    filters: spec.filters.map((filter) => spanFor(filter, true)),
   };
 }

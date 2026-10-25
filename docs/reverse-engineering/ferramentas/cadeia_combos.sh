@@ -1,7 +1,7 @@
 #!/bin/sh
 # Roda a varredura de combinações em cada base, uma depois da outra.
 cd "$(dirname "$0")"
-while pgrep -f "^python3 varrer_combos.py combos-rd" >/dev/null; do sleep 10; done
+while pgrep -f "^python3 varrer_combos.py" >/dev/null; do sleep 10; done
 rodar() { # pasta combos dados prefixo
   ./abrir_tabwin.sh "$1" >/dev/null 2>&1
   rm -f "$4.jsonl"

@@ -31,7 +31,7 @@ const chaveRotulo = (rotulo) => {
   const codigo = /^(\d{2,})\s/.exec(rotulo);
   return codigo ? codigo[1] : rotulo.replace(/"/g, '').replace(/[^\x20-\x7e]/g, '').trim();
 };
-const ascii = (texto) => texto.replace(/[^\x20-\x7e]/g, '').trim();
+const ascii = (texto) => texto.replace(/[^\x20-\x7e]/g, '').trimEnd();
 
 /** O .tab em partes: cabeçalho (título e log) e matriz. */
 function partes(texto) {
@@ -61,7 +61,7 @@ const resumo = (e) => [
   e.linha.slice(1).split(',')[0].trim(),
   e.coluna ? `× ${e.coluna.slice(1).split(',')[0].trim()}` : '',
   e.incrementos.length ? `[${e.incrementos.map((i) => i.slice(1).split(',')[0].trim()).join(' + ')}]` : '[Frequência]',
-  e.selecao ? `onde ${e.selecao.linha.slice(1).split(',')[0].trim()} = ${e.selecao.rotulos.join(' | ')}` : '',
+  e.selecao ? `onde ${e.selecao.linha.slice(1).split(',')[0].trim()} = ${e.selecao.rotulos.join(' | ') || `#${e.selecao.indices.join(',')}`}` : '',
 ].filter(Boolean).join(' ');
 
 for (const e of [...vistos.values()].sort((a, b) => a.indice - b.indice)) {
@@ -77,7 +77,12 @@ for (const e of [...vistos.values()].sort((a, b) => a.indice - b.indice)) {
       linha: catalogo.linhas[0].id,
       coluna: e.coluna ? catalogo.colunas[0].id : null,
       incrementos: e.incrementos.length ? catalogo.incrementos.slice(1).map((i) => i.id) : [FREQUENCIA_ID],
-      selecoes: e.selecao ? [{ eixo: catalogo.selecoes[0].id, categorias: e.selecao.categorias }] : [],
+      // Sondas escritas à mão trazem só o índice na lista do painel.
+      selecoes: e.selecao ? [{
+        eixo: catalogo.selecoes[0].id,
+        categorias: e.selecao.categorias.length ? e.selecao.categorias
+          : e.selecao.indices.map((i) => categoriasDoEixo(catalogo.selecoes[0], base.cnvs, base.lookups)[i].id),
+      }] : [],
       suprimirLinhasZeradas: false,
       suprimirColunasZeradas: true,
       naoClassificados: 'ignorar',
