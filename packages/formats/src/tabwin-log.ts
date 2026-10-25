@@ -28,7 +28,8 @@
  * The wrap was measured on saved `.TAB` files during the combination sweep
  * (2026-10-24): a line of 79 characters stays whole, one that would reach 80
  * moves the next category to a new line indented by four spaces, without the
- * "|". The first category never moves, however long the line gets.
+ * "|". The first category too: if "Nome: categoria" would pass 79, the line
+ * ends at "Nome:" and the category opens the next one (CNES, CCNES021).
  *
  * Reading accepts the `.TAB` wrapper too (`NEW`, `Titulo1=`, `Titulo2=` and
  * the `;`-separated matrix after `[Arquivos]`), so "restaurar consulta" works
@@ -159,16 +160,15 @@ export function serializeTabwinLog(log: TabwinLog): string {
   if (log.selections.length) {
     lines.push('[Seleções_Ativas]');
     for (const selection of log.selections) {
-      const [primeira = '', ...outras] = selection.categories;
-      let linha = `${selection.label}: ${primeira}`;
-      for (const categoria of outras) {
+      let linha = `${selection.label}:`;
+      selection.categories.forEach((categoria, index) => {
         if (linha.length + 1 + categoria.length > SELECTION_LINE_WIDTH) {
           lines.push(linha);
           linha = `    ${categoria}`;
         } else {
-          linha += `|${categoria}`;
+          linha += `${index === 0 ? ' ' : '|'}${categoria}`;
         }
-      }
+      });
       lines.push(linha);
     }
   }

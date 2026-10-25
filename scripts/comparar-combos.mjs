@@ -40,9 +40,10 @@ function partes(texto) {
   const cabecalho = linhas.slice(0, inicio)
     .filter((l) => !/^(Tempo_Decorrido|DEF|PATH|Titulo1)=/.test(l))
     .map(ascii);
-  // Rótulos não têm ';' nem aspas por dentro (o TabWin as tira ao salvar).
+  // Aspas por dentro o TabWin tira ao salvar; um ';' no rótulo parte a célula
+  // igual nos dois arquivos (o pedaço que não é número compara como texto).
   const matriz = linhas.slice(inicio).map((l) => l.split(';').map((c) => (
-    c.startsWith('"') ? chaveRotulo(c.slice(1, -1)) : c === '' ? '' : Number(c.replace(',', '.')))));
+    c.startsWith('"') ? chaveRotulo(c.slice(1, -1)) : c === '' || Number.isNaN(Number(c.replace(',', '.'))) ? chaveRotulo(c) : Number(c.replace(',', '.')))));
   return { cabecalho, matriz };
 }
 

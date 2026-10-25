@@ -176,6 +176,19 @@ estabelecimentos e leitos) tabulada no TabWin 4.15 real e no TabSis: **840 de
 repetido, linhas vazias, auto-subtotal, aspas, corte de 30 caracteres e cinco
 regras de tabela DBF). Detalhes em `docs/reverse-engineering/varredura/`.
 
+**Parte 2 (Colunas, vários Incrementos, Seleções):** 270 combinações sorteadas
+dos 6 DEFs, o `.tab` inteiro comparado (título, log, cada célula): **264 de 264
+tabuladas iguais**, mais 32 sondas. Achou e corrigiu: coluna DUMMY / "NENHUM
+REGISTRO SELECIONADO", Total deslocado com colunas suprimidas, quebra de linha
+das Seleções em 79 caracteres, Seleção com CNV de faixas lendo o texto do
+registro, campo com outra caixa, Incremento cortado em 30, código `" -9"` como
+faixa do branco.
+
+**Celular e tablet (2026-10-24):** auditoria automática em 360, 412, 768 e
+1024 px (nada sai da tela, sem rolagem lateral, alvos de toque com altura de
+dedo) virou teste e2e; corrigidos botões do gráfico fora da tela, campo do
+token, edição da tabela e fluxos no tablet deitado.
+
 ---
 
 ## Bloco 1 — Download resistente ao DATASUS lento ✅

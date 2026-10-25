@@ -202,7 +202,11 @@ function parseIncrement(rest: string, sourceLine: number, strict: boolean): DefI
   if (strict && fields.length !== 2) {
     throw new DefParseError(`I directive expects label,field; got ${fields.length} fields`, sourceLine);
   }
-  const [label = '', field = ''] = fields;
+  const [rawLabel = '', field = ''] = fields;
+  // Incremento também tem no máximo 30 caracteres ("Qt.Leito Repouso/Obs.Indiferen.",
+  // 31, vira "…Indiferen" no painel, no título e no .tab; Estabelecimento.def
+  // do CNES, varredura de combinações de 2026-10-24).
+  const label = rawLabel.slice(0, 30).trimEnd();
   if (strict && (!label || !field)) throw new DefParseError('I directive requires label and field', sourceLine);
   return { label, field, sourceLine };
 }

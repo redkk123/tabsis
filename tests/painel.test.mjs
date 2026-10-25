@@ -280,4 +280,9 @@ test('Seleções com várias categorias: "|" e quebra em 79 caracteres, como no 
     '    110002 ARIQUEMES|110003 CABIXI|110004 CACOAL|110005 CEREJEIRAS',
     '    110006 COLORADO DO OESTE',
   ]);
+  // Até a primeira categoria muda de linha se "Nome: categoria" passar de 79 (CCNES021).
+  const cnes = serializeTabwinLog({ increments: [], files: [], selections: [{
+    label: 'OUT. Seguro Próprio /Terceiro', categories: ['Estab.sem Atend.OUTROS Seguro Próprio/Seg.Terceiro'],
+  }] });
+  assert.match(cnes, /\r\nOUT\. Seguro Próprio \/Terceiro:\r\n {4}Estab\.sem Atend\.OUTROS Seguro Próprio\/Seg\.Terceiro\r\n/);
 });
