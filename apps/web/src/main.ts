@@ -4779,8 +4779,12 @@ function renderTableHeadline(result: TabulationResult): void {
   };
 
   tableHeadlineTotal.textContent = integerFormat.format(headline.total);
-  tableHeadlineMeasure.textContent = headline.measureLabel;
-  tableHeadlineShare.textContent = describeHeadline(headline, formatadores);
+  // Nenhuma coluna com valor: o TabWin mostra uma coluna "DUMMY" zerada; aqui
+  // a frase diz o que aconteceu, em vez de "DUMMY" como nome de medida.
+  tableHeadlineMeasure.textContent = result.noRecordsSelected ? 'nenhum registro selecionado' : headline.measureLabel;
+  tableHeadlineShare.textContent = result.noRecordsSelected
+    ? 'Nenhuma coluna ficou com valor com estas Seleções e esta Coluna. Mude as Seleções, ou desmarque "Suprimir colunas zeradas" para ver as colunas vazias.'
+    : describeHeadline(headline, formatadores);
 
   const procedencia = describeRecordBasis(headline, formatadores);
   tableHeadlineBasis.textContent = procedencia ?? '';
@@ -6729,7 +6733,7 @@ function renderMap(): void {
         + ` · ${integerFormat.format(matched)} áreas com dado${colunaDita}. Para mapear outro campo (residência, notificação, hospital), mude as Linhas.`
       : mapGeoField
         ? `Mapa por ${mapGeoField.reason} (${mapGeoField.field})${recorteDito}`
-          + ` · ${integerFormat.format(matched)} áreas com dado${colunaDita}. A tabela ao lado continua como você a montou.`
+          + ` · ${integerFormat.format(matched)} áreas com dado${colunaDita}. A tabela continua como você a montou.`
         : colunaDita
           ? `${integerFormat.format(matched)} áreas com dado${colunaDita}.`
           : '';

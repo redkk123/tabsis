@@ -213,6 +213,8 @@ export interface TabulationResult {
   /** Present only when the spec declared cross-field rules, so existing
    *  golden and portable-table payloads stay byte-identical. */
   dataQuality?: DataQualityRuleOutcome[];
+  /** Nenhuma coluna ficou com valor: a única coluna é a "DUMMY" zerada do TabWin. */
+  noRecordsSelected?: boolean;
 }
 
 /**

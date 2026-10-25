@@ -17,12 +17,19 @@
  * Suprime_Colunas_Zeradas=true
  * Não_Classificados=0         (0 Ignorar · 1 Incluir · 2 Discriminar)
  * [Seleções_Ativas]
- * Raça parcial: Branca|Parda  (categories joined by "|")
+ * Raça parcial: Branca|Parda  (categories joined by "|"…)
+ *     Preta|Indígena          (…wrapped past 79 characters, 4 spaces in)
  * [Arquivos]
  * RDAC2401.dbc
  * Registros_Processados= 4315
  * Tempo_Decorrido= 0:00
  * ```
+ *
+ * The wrap was measured on saved `.TAB` files during the combination sweep
+ * (2026-10-24): a line of 79 characters stays whole, one that would reach 80
+ * moves the next category to a new line indented by four spaces, without the
+ * "|". The first category too: if "Nome: categoria" would pass 79, the line
+ * ends at "Nome:" and the category opens the next one (CNES, CCNES021).
  *
  * Reading accepts the `.TAB` wrapper too (`NEW`, `Titulo1=`, `Titulo2=` and
  * the `;`-separated matrix after `[Arquivos]`), so "restaurar consulta" works
@@ -80,6 +87,12 @@ export function parseTabwinLog(text: string): TabwinLog {
     if (line.startsWith('"')) break;
 
     if (section === 'selecoes_ativas') {
+      // Indented line: one more category of the selection above it.
+      const anterior = log.selections[log.selections.length - 1];
+      if (/^\s/.test(line) && anterior) {
+        anterior.categories.push(...line.split('|').map((value) => value.trim()).filter(Boolean));
+        continue;
+      }
       const separator = line.indexOf(':');
       if (separator <= 0) continue;
       const label = line.slice(0, separator).trim();
@@ -130,6 +143,9 @@ export function parseTabwinLog(text: string): TabwinLog {
   return log;
 }
 
+/** Longest `[Seleções_Ativas]` line TabWin writes before wrapping (measured: 79 stays, 80 wraps). */
+const SELECTION_LINE_WIDTH = 79;
+
 /** Writes the log exactly in TabWin's layout and line order, with CRLF. */
 export function serializeTabwinLog(log: TabwinLog): string {
   const lines: string[] = ['[Opções]'];
@@ -143,7 +159,18 @@ export function serializeTabwinLog(log: TabwinLog): string {
   lines.push(`Não_Classificados=${log.unclassified ?? 0}`);
   if (log.selections.length) {
     lines.push('[Seleções_Ativas]');
-    for (const selection of log.selections) lines.push(`${selection.label}: ${selection.categories.join('|')}`);
+    for (const selection of log.selections) {
+      let linha = `${selection.label}:`;
+      selection.categories.forEach((categoria, index) => {
+        if (linha.length + 1 + categoria.length > SELECTION_LINE_WIDTH) {
+          lines.push(linha);
+          linha = `    ${categoria}`;
+        } else {
+          linha += `${index === 0 ? ' ' : '|'}${categoria}`;
+        }
+      });
+      lines.push(linha);
+    }
   }
   lines.push('[Arquivos]');
   for (const file of log.files) lines.push(file);

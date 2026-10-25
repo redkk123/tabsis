@@ -280,3 +280,21 @@ test('NATJUR.CNV do CNES: "    -zzzz" no formato N pega o código que nenhuma ou
   assert.equal(classifyCnv(cnv, '1015')?.sequence, 2);
   assert.equal(classifyCnv(cnv, '1999')?.sequence, 1);
 });
+
+test('CNV literal: " -9" (código uma coluna adiante) é faixa do branco a "9" e para no código já definido, como o TabWin', () => {
+  // Sondas no TabWin com ORGEXPED do CNES (branco 1064, "1" 61, "2" 342), 2026-10-24.
+  const linha = (sequence, label, codes) => `      ${sequence}  ${label.padEnd(50)} ${codes}`;
+  const cnv = (...linhas) => parseCnv(['2 1 L', ...linhas].join('\n'), { strict: false });
+  const rotulo = (definicao, valor) => classifyCnv(definicao, valor)?.label;
+  // Código definido antes: a faixa vale do branco até ele (T4).
+  const t4 = cnv(linha(1, 'Um', '1'), linha(2, 'Faixa', ' -9'));
+  assert.deepEqual([rotulo(t4, ''), rotulo(t4, '1'), rotulo(t4, '2')], ['Faixa', 'Um', undefined]);
+  // Faixa antes: pega o branco e o "2"; o "1" de depois fica com ele (T5).
+  const t5 = cnv(linha(1, 'Faixa', ' -9'), linha(2, 'Um', '1'));
+  assert.deepEqual([rotulo(t5, ''), rotulo(t5, '1'), rotulo(t5, '2')], ['Faixa', 'Um', 'Faixa']);
+  // "0-9" depois do "1": só o "0" (T7). Sem o espaço, "-5" não pega nada (T1).
+  const t7 = cnv(linha(1, 'Um', '1'), linha(2, 'Faixa', '0-9'));
+  assert.deepEqual([rotulo(t7, '0'), rotulo(t7, '1'), rotulo(t7, '2')], ['Faixa', 'Um', undefined]);
+  const t1 = cnv(linha(1, 'Um', '1'), linha(2, 'Menos5', '-5'));
+  assert.equal(rotulo(t1, ''), undefined);
+});

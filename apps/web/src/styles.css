@@ -256,7 +256,7 @@ select:disabled, input:disabled { color: #898d92; background: #f5f5f6; }
 .dialog-link { color: var(--brand); font-weight: 600; }
 /* A barra de lote lidera a lista; a caixa por arquivo fica antes do nome,
    onde o olho procura por seleção. */
-.bridge-controls { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: end; margin-top: 9px; }
+.bridge-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; margin-top: 9px; }
 .bridge-controls label > span { display: block; margin: 0 0 5px 2px; color: #4b535c; font-size: 12px; font-weight: 600; }
 .bridge-controls .secondary-button { min-height: 43px; }
 .bridge-verdict-ok { color: var(--ok); }
@@ -373,7 +373,11 @@ select:disabled, input:disabled { color: #898d92; background: #f5f5f6; }
 .table-editing input,.table-editing select { min-width: 0; min-height: 34px; padding: 6px 8px; border: 1px solid #d8dadd; border-radius: 4px; color: var(--ink); background: #fff; }
 .table-editing .table-key-toggle { min-height: 34px; display: flex; align-items: center; gap: 6px; }
 .table-editing .table-key-toggle input { min-height: 0; }
-.table-edit-actions { display: flex; gap: 5px; }
+.table-edit-actions { display: flex; flex-wrap: wrap; gap: 5px; }
+@media (max-width: 1180px) {
+  .table-column-edit,.table-row-edit { grid-template-columns: minmax(0,1fr) minmax(0,1.5fr); }
+  .table-column-edit > .table-edit-actions,.table-row-edit > .table-edit-actions { grid-column: 1 / -1; }
+}
 .danger-button { color: #7a4c44; border-color: #e3ccc8; background: #fefaf9; }
 table { width: 100%; border-collapse: collapse; font-size: 12px; }
 th, td { padding: 10px 13px; border-bottom: 1px solid #e9eaec; text-align: right; white-space: nowrap; }
@@ -383,7 +387,8 @@ tbody tr { background: white; }
 tbody tr:hover { background: #f6f7f9; }
 tfoot { position: sticky; bottom: 0; color: var(--ink); background: #edeff2; font-weight: 600; }
 .chart { display: grid; gap: 10px; padding: 5px 2px 15px; }
-.chart-toolbar { display: flex; align-items: end; justify-content: space-between; gap: 15px; margin: -5px 0 10px; }
+.chart-toolbar { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 10px 15px; margin: -5px 0 10px; }
+.chart-toolbar .panel-actions { flex-wrap: wrap; margin: 0; }
 .chart-toolbar label { min-width: min(280px, 60%); }
 .chart-toolbar label > span { display: block; margin: 0 0 5px 2px; color: #676d74; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
 .chart-toolbar select { min-height: 38px; }
@@ -441,7 +446,7 @@ tfoot { position: sticky; bottom: 0; color: var(--ink); background: #edeff2; fon
 .flow-panel > summary { cursor: pointer; font-weight: 700; color: var(--ink); }
 .flow-panel > summary span { margin-left: 6px; color: #676d74; font-size: 12px; font-weight: 400; }
 .flow-intro { margin: 8px 0 10px; color: #4a5057; font-size: 13px; line-height: 1.5; }
-.flow-grid { display: grid; grid-template-columns: repeat(4,minmax(140px,1fr)); gap: 8px; align-items: end; }
+.flow-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(150px,1fr)); gap: 8px; align-items: end; }
 .flow-grid label { display: grid; gap: 4px; min-width: 0; color: #676d74; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
 .flow-grid select { min-width: 0; min-height: 34px; padding: 6px 8px; border: 1px solid #d8dadd; border-radius: 4px; background: #fff; color: var(--ink); text-transform: none; letter-spacing: 0; }
 .flow-grid button { align-self: end; min-height: 34px; }
@@ -451,7 +456,6 @@ tfoot { position: sticky; bottom: 0; color: var(--ink); background: #edeff2; fon
 .flow-table { width: 100%; border-collapse: collapse; font-size: 11px; }
 .flow-table th { position: sticky; top: 0; padding: 6px 8px; border-bottom: 1px solid #d8dadd; background: #f9f9fa; color: #676d74; font-size: 11px; text-align: left; text-transform: uppercase; letter-spacing: .04em; }
 .flow-table td { padding: 5px 8px; border-bottom: 1px solid #eeeff1; color: #30353a; }
-@media (max-width: 900px) { .flow-grid { grid-template-columns: 1fr 1fr; } }
 .map-layers { display: flex; flex-wrap: wrap; gap: 7px; width: 100%; margin: 0 0 8px; }
 .map-layer { display: inline-flex; align-items: center; gap: 7px; padding: 5px 9px; border: 1px solid #d8dadd; border-radius: 999px; background: #fff; color: #3f454c; font-size: 11px; }
 .map-layer input { width: 15px; height: 15px; accent-color: var(--brand); }
@@ -1075,3 +1079,17 @@ dialog p { color: #676d74; font-size: 13px; line-height: 1.6; }
 .map-opcoes-grade select, .map-opcoes-grade input[type="text"] { min-width: 120px; padding: 7px 9px; border: 1px solid #d8dadd; border-radius: 4px; color: var(--ink); background: #fff; }
 .map-opcoes-grade .check-label { display: flex; min-height: 0; }
 @media (max-width: 620px) { .map-zoom-actions { margin-left: 0; width: 100%; } }
+
+/* Telas de toque (celular e tablet): links de texto, cabeçalhos recolhíveis e
+   botões pequenos ganham altura para o dedo, sem mudar a aparência no mouse.
+   A largura entra junto porque nem todo navegador de celular declara o
+   ponteiro como "grosso". */
+@media (pointer: coarse), (max-width: 820px) {
+  .text-button { min-height: 36px; padding: 6px 0; }
+  details > summary { min-height: 40px; align-content: center; }
+  .select-all-button { min-height: 32px; padding-inline: 10px; }
+  .map-period-chips .map-period-bar { min-height: 34px; padding: 6px 12px; }
+  .tabulation-log-entry-actions .secondary-button, #catalog-cache-clear { min-height: 36px; }
+  .panel-actions .secondary-button, .map-toolbar .secondary-button { min-height: 40px; min-width: 40px; }
+  .bridge-controls input { min-width: 0; }
+}

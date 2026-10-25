@@ -122,12 +122,19 @@ Suprime_Linhas_Zeradas=true
 Suprime_Colunas_Zeradas=true
 Não_Classificados=0           ← 0 Ignorar, 1 Incluir, 2 Discriminar
 [Seleções_Ativas]
-Raça parcial: Branca|Parda    ← categorias separadas por "|"
+Raça parcial: Branca|Parda    ← categorias separadas por "|"…
+    Preta                     ← …e linha nova, com 4 espaços, se passar de 79
 [Arquivos]
 RDAC2401.dbc
 Registros_Processados= 4315
 Tempo_Decorrido= 0:00
 ```
+
+(Medido em 2026-10-24, na varredura de combinações: uma linha de Seleção com
+79 caracteres fica inteira; a categoria que a levaria a 80 ou mais vai para uma
+linha nova, recuada com 4 espaços e sem o "|". Vale até para a primeira: se
+"Nome: categoria" passar de 79, a linha fica só "Nome:" e a categoria abre a
+seguinte. Sondas `LARG000`–`LARG006`, `SONDA000` e `CCNES021`.)
 
 É o mesmo texto que abre um `.TAB` salvo (depois de `NEW`, `Titulo1=` e
 `Titulo2=`, ver RE-001). O código que escreve `Não_Classificados=` está em

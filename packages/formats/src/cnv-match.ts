@@ -166,20 +166,29 @@ function literalTable(definition: CnvDefinition): LiteralEntry[] {
   const length = definition.codeLength;
   const fixed = (code: string): string => code.padEnd(length, ' ').slice(0, length);
   const entries: LiteralEntry[] = [];
+  const faixa = (de: string, ate: string, category: number): void => {
+    const from = fixed(de); const to = fixed(ate);
+    literalInsert(entries, from, category);
+    literalInsert(entries, to, category);
+    entries[lowerBound(entries, from)]!.start = category;
+    entries[lowerBound(entries, to)]!.end = category;
+  };
   for (const rule of definition.rules) {
     const category = rule.categorySequence;
     const tokens = rule.literalTokens ?? [...rule.exactCodes, ...rule.ranges];
     for (const token of tokens) {
       if (typeof token === 'string') {
+        // " -9" (o código começa uma coluna depois): faixa do branco até "9",
+        // e pega os campos em branco — "não informado" do CNES (ORGEXPED.CNV,
+        // CLASAVAL.CNV). Sem o espaço, "-5" não pega nada. Sondas SONDE/SONDF
+        // no TabWin, 2026-10-24.
+        const doBranco = /^( +)-(\S.*)$/.exec(token);
+        if (doBranco) { faixa(doBranco[1]!, doBranco[2]!, category); continue; }
         if (token.trimStart().startsWith('-')) continue;
         literalInsert(entries, fixed(token), category);
       } else {
         if (!token.from.trim() || !token.to.trim()) continue;
-        const from = fixed(token.from); const to = fixed(token.to);
-        literalInsert(entries, from, category);
-        literalInsert(entries, to, category);
-        entries[lowerBound(entries, from)]!.start = category;
-        entries[lowerBound(entries, to)]!.end = category;
+        faixa(token.from, token.to, category);
       }
     }
   }

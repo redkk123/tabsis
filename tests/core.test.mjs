@@ -50,6 +50,23 @@ test('zero-column suppression removes only empty materialized column categories'
   assert.deepEqual(result.cells, [[1], [1]]);
 });
 
+test('zero-column suppression that empties every column leaves TabWin DUMMY column', () => {
+  // TabWin 4.15 (varredura de combinações, 2026-10-24): uma coluna "DUMMY"
+  // zerada e "NENHUM REGISTRO SELECIONADO" no .tab, nunca uma tabela sem colunas.
+  const plan = compileQueryPlan({
+    compatibilityProfile: 'tabwin-4.15', rows: { field: 'MES', conversionId: 'mes' },
+    columns: { field: 'MES', conversionId: 'mes' }, measure: { kind: 'count' },
+    filters: [{ field: 'MES', conversionId: 'mes', acceptedCategories: ['2'] }], suppressZeroColumns: true,
+  });
+  const result = executeInMemory([{ MES: '01' }], plan, { mes: monthCnv });
+  assert.deepEqual(result.columns.map((column) => column.label), ['DUMMY']);
+  assert.deepEqual(result.cells, [[0], [0], [0]]);
+  assert.equal(result.noRecordsSelected, true);
+  const kept = executeInMemory([{ MES: '01' }], compileQueryPlan({ ...plan.spec, suppressZeroColumns: false }), { mes: monthCnv });
+  assert.equal(kept.noRecordsSelected, undefined);
+  assert.deepEqual(kept.columns.map((column) => column.label), ['Janeiro', 'Fevereiro', 'Ignorado']);
+});
+
 test('zero-column suppression preserves the synthetic frequency column without a column dimension', () => {
   const plan = compileQueryPlan({
     compatibilityProfile: 'tabwin-4.15', rows: { field: 'MES', conversionId: 'mes' },

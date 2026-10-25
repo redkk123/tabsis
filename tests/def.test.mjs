@@ -124,3 +124,8 @@ test('nome da variável com no máximo 30 caracteres, como o TabWin mostra', () 
   assert.equal(def.options[0].label, 'Natureza 40 abcdefghijklmnopqr');
   assert.equal(def.options[1].label, 'Unid da Federação de Resid.');
 });
+
+test('nome do Incremento também com no máximo 30 caracteres (Estabelecimento.def do CNES)', () => {
+  const def = parseDef(';x\nAX\\ST*.DBC\nIQt.Leito Repouso/Obs.Indiferen.,QTLEITRP\n');
+  assert.equal(def.increments[0].label, 'Qt.Leito Repouso/Obs.Indiferen');
+});
