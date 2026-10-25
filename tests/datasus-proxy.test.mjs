@@ -629,3 +629,74 @@ test('sem o binding a versão sai como nula, e não some do corpo', async () => 
   assert.equal(corpo.version, null);
   assert.ok('version' in corpo && 'deployedAt' in corpo);
 });
+
+// Servidor FTP falso, em memória: o Worker usa `connect()` da Cloudflare, e o
+// teste injeta este no lugar (FTP_CONNECT).
+function fakeFtp(files) {
+  const conexoes = [];
+  let dadosPendentes = null;
+  const connect = ({ hostname, port }) => {
+    conexoes.push({ hostname, port });
+    const encoder = new TextEncoder();
+    if (port !== 21) {
+      // Como no FTP de verdade, os dados só correm depois do LIST/RETR.
+      return {
+        readable: new ReadableStream({ pull(c) { if (dadosPendentes) c.enqueue(dadosPendentes); dadosPendentes = null; c.close(); } }, { highWaterMark: 0 }),
+        writable: new WritableStream(),
+        close() {},
+      };
+    }
+    let saida;
+    const readable = new ReadableStream({ start(c) { saida = c; c.enqueue(encoder.encode('220-Bem-vindo\r\n220 Pronto\r\n')); } });
+    const responder = (texto) => saida.enqueue(encoder.encode(`${texto}\r\n`));
+    const writable = new WritableStream({
+      write(pedaco) {
+        const linha = new TextDecoder().decode(pedaco).trim();
+        const [comando, ...resto] = linha.split(' ');
+        const alvo = resto.join(' ');
+        if (comando === 'USER') responder('331 senha');
+        else if (comando === 'PASS') responder('230 ok');
+        else if (comando === 'TYPE') responder('200 ok');
+        else if (comando === 'PASV') responder('227 Entering Passive Mode (10,0,0,9,19,136)');
+        else if (comando === 'SIZE') responder(files[alvo] ? `213 ${files[alvo].byteLength}` : '550 nao existe');
+        else if (comando === 'RETR') { dadosPendentes = files[alvo]; responder('150 abrindo'); responder('226 fim'); }
+        else if (comando === 'LIST') {
+          dadosPendentes = encoder.encode('09-26-23  09:05AM               459467 LEIVBR21.dbc\r\n04-11-26  06:26PM       <DIR>          ANS\r\n');
+          responder('150 abrindo'); responder('226 fim');
+        } else if (comando === 'QUIT') responder('221 tchau');
+        else responder('502 nao');
+      },
+    });
+    return { readable, writable, close() {} };
+  };
+  return { connect, conexoes };
+}
+
+test('FTP fallback: lists a folder and streams a file from the official host only', async () => {
+  const arquivo = new Uint8Array([1, 2, 3, 4, 5]);
+  const ftp = fakeFtp({ '/dissemin/publicos/SINAN/DADOS/FINAIS/LEIVBR24.dbc': arquivo });
+  const environment = { ...ENVIRONMENT, FTP_CONNECT: ftp.connect };
+  const lista = await handleRequest(request('/ftp-list?path=/dissemin/publicos/SINAN/DADOS/FINAIS/'), environment);
+  assert.equal(lista.status, 200);
+  assert.deepEqual((await lista.json()).items, [
+    { name: 'LEIVBR21.dbc', directory: false, size: 459467, modified: '2023-09-26' },
+    { name: 'ANS', directory: true, size: 0, modified: '2026-04-11' },
+  ]);
+  const baixado = await handleRequest(request('/ftp-file?path=/dissemin/publicos/SINAN/DADOS/FINAIS/LEIVBR24.dbc'), environment);
+  assert.equal(baixado.status, 200);
+  assert.equal(baixado.headers.get('Content-Length'), '5');
+  assert.deepEqual(new Uint8Array(await baixado.arrayBuffer()), arquivo);
+  // O IP anunciado no PASV (10.0.0.9) é ignorado: tudo vai para o host oficial.
+  assert.ok(ftp.conexoes.every((conexao) => conexao.hostname === 'ftp.datasus.gov.br'));
+  assert.deepEqual([...new Set(ftp.conexoes.map((conexao) => conexao.port))].sort((a, b) => a - b), [21, 5000]);
+
+  const inexistente = await handleRequest(request('/ftp-file?path=/dissemin/publicos/SINAN/X.dbc'), environment);
+  assert.equal(inexistente.status, 404);
+  for (const caminho of ['/etc/passwd', '/dissemin/publicos/../x', '/dissemin/publicos/a/../../b.dbc', '/dissemin/publicos/a;b']) {
+    const recusado = await handleRequest(request(`/ftp-file?path=${encodeURIComponent(caminho)}`), environment);
+    assert.equal(recusado.status, 400, caminho);
+    assert.equal(await errorCode(recusado), 'invalid_ftp_path');
+  }
+  const semOrigem = await handleRequest(request('/ftp-list?path=/dissemin/publicos/', { origin: 'https://evil.example' }), environment);
+  assert.equal(semOrigem.status, 403);
+});

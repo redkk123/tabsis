@@ -13,6 +13,14 @@ not execute `AnalysisSpec` or `QueryPlan`.
 | `/catalog` | `POST` | fixed DATASUS `ftp.php` |
 | `/prepare` | `POST` | fixed DATASUS `download.php` |
 | `/archive?url=...` | `GET` | one prepared `zipupload/*/arquivo.zip` URL |
+| `/ftp-list?path=...` | `GET` | one folder under `/dissemin/publicos/` on `ftp.datasus.gov.br` (JSON) |
+| `/ftp-file?path=...` | `GET` | one file under `/dissemin/publicos/` on `ftp.datasus.gov.br` (stream, `Content-Length` from `SIZE`) |
+
+The FTP routes are the fallback for when the portal is down (2026-10-25: every
+`ftp.php` call answered HTTP 520 while the FTP server worked). They speak FTP
+over TCP (`cloudflare:sockets`), anonymous, read-only, and always connect the
+passive data channel to the official host name — never to the address the
+server announces — so they cannot be turned into a TCP relay.
 
 All acquisition routes require an exact `Origin` from `ALLOWED_ORIGINS`.
 Arbitrary hosts, paths, request headers, methods and POST redirects are refused.

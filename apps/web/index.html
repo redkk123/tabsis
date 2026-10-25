@@ -20,6 +20,8 @@
         datasus.saude.gov.br  o portal oficial, usado direto quando não há
                           proxy configurado
         cdn.jsdelivr.net  o motor de consulta (DuckDB), baixado sob demanda
+        servicodados.ibge.gov.br  a população por município (API do IBGE),
+                          para a taxa por 100 mil; só vão o ano e a tabela
         127.0.0.1         o downloader local opcional, que roda na máquina de
                           quem usa
 
@@ -37,6 +39,7 @@
         https://pub-41df939070d7465a8513416a16be8f88.r2.dev
         https://datasus.saude.gov.br
         https://cdn.jsdelivr.net
+        https://servicodados.ibge.gov.br
         http://127.0.0.1:*;
       form-action 'none';
       base-uri 'self';
@@ -907,10 +910,11 @@
               </div>
             </details>
             <div class="map-taxa" id="map-taxa">
-              <label class="check-label"><input id="map-taxa-check" type="checkbox" disabled /><span>Por 100 mil habitantes</span></label>
-              <button class="secondary-button" id="map-populacao-button" type="button">Abrir população (IBGE)…</button>
+              <label class="check-label"><input id="map-taxa-check" type="checkbox" /><span>Por 100 mil habitantes</span></label>
+              <button class="secondary-button" id="map-populacao-ibge" type="button" title="Busca a população de cada município na API do IBGE. Só o ano vai para o IBGE; seus dados não saem do aparelho.">Buscar no IBGE</button>
+              <button class="secondary-button" id="map-populacao-button" type="button">Abrir arquivo de população…</button>
               <input id="map-populacao-input" type="file" accept=".zip,.dbf,.dbc,.parquet,.csv,.tsv" hidden />
-              <small id="map-populacao-status">Para comparar lugares de tamanhos diferentes, abra a população por município (ex.: <i>IBGE · Bases populacionais</i> em Buscar no DATASUS, ou um CSV).</small>
+              <small id="map-populacao-status">Para comparar lugares de tamanhos diferentes: <b>Buscar no IBGE</b> traz a população de cada município pela internet (estimativas e Censo 2022), ou abra um arquivo (<i>IBGE · Bases populacionais</i> em Buscar no DATASUS, ou um CSV).</small>
             </div>
             <div class="map-focus" id="map-focus" hidden>
               <button class="secondary-button" id="map-focus-back" type="button" hidden>← Voltar ao Brasil</button>

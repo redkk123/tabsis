@@ -184,6 +184,16 @@ das Seleções em 79 caracteres, Seleção com CNV de faixas lendo o texto do
 registro, campo com outra caixa, Incremento cortado em 30, código `" -9"` como
 faixa do branco.
 
+**Portal do DATASUS fora do ar, IBGE e juntar guardados (2026-10-25):** o
+portal (datasus.saude.gov.br) passou a devolver HTTP 520 em toda consulta; o
+proxy ganhou rotas FTP (`/ftp-list`, `/ftp-file`, TCP pelo Worker) e o site cai
+para o FTP oficial na busca e no download — conferido de ponta a ponta com o
+portal realmente fora (LEIV 2023–2025 achados, baixados e juntados). Taxa por
+100 mil com a população da API do IBGE (estimativas e Censo 2022, CSP liberada
+só para servicodados.ibge.gov.br). Downloads guardados: marcar e abrir juntos,
+ou juntar ao que está aberto. Juntar anos com campos acrescentados pelo DATASUS
+(campo novo fica em branco nos anos sem ele; tamanho diferente segue recusado).
+
 **Celular e tablet (2026-10-24):** auditoria automática em 360, 412, 768 e
 1024 px (nada sai da tela, sem rolagem lateral, alvos de toque com altura de
 dedo) virou teste e2e; corrigidos botões do gráfico fora da tela, campo do

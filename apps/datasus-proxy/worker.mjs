@@ -1,3 +1,5 @@
+import { FtpFailure, ftpList, ftpRetrieve, validateFtpPath } from './ftp.mjs';
+
 const DATASUS_ORIGIN = 'https://datasus.saude.gov.br';
 const TABNET_ORIGIN = 'https://tabnet.datasus.gov.br';
 
@@ -24,6 +26,10 @@ const ROUTES = Object.freeze({
   // porque cada rota aqui declara um método só — e essa invariante é o que
   // mantém o preflight e o 405 simples de conferir.
   '/tabnet-form': Object.freeze({ name: 'tabnetForm', method: 'GET' }),
+  // Reserva para quando o portal cai: a lista de uma pasta e um arquivo do FTP
+  // oficial (ver ftp.mjs).
+  '/ftp-list': Object.freeze({ name: 'ftpList', method: 'GET' }),
+  '/ftp-file': Object.freeze({ name: 'ftpFile', method: 'GET' }),
 });
 
 const DEFAULTS = Object.freeze({
@@ -157,7 +163,7 @@ function routeForRequest(requestUrl) {
   const url = new URL(requestUrl);
   const route = ROUTES[url.pathname];
   if (!route) throw new ProxyFailure(404, 'route_not_found', 'Proxy route not found');
-  if (route.name !== 'archive' && route.name !== 'tabnet' && route.name !== 'tabnetForm' && url.search) {
+  if (!['archive', 'tabnet', 'tabnetForm', 'ftpList', 'ftpFile'].includes(route.name) && url.search) {
     throw new ProxyFailure(400, 'unexpected_query', 'This proxy route does not accept query parameters');
   }
   return { ...route, url };
@@ -567,6 +573,45 @@ function preflightResponse(route, request, origin) {
   return new Response(null, { status: 204, headers });
 }
 
+function ftpPathFrom(url) {
+  if ([...url.searchParams.keys()].some((key) => key !== 'path') || url.searchParams.getAll('path').length !== 1) {
+    throw new ProxyFailure(400, 'invalid_ftp_path', 'Expected exactly one path parameter');
+  }
+  return validateFtpPath(url.searchParams.get('path'));
+}
+
+async function handleFtp(route, environment, origin, proxySettings) {
+  try {
+    const path = ftpPathFrom(route.url);
+    const limites = { timeoutMs: proxySettings.formTimeoutMs };
+    if (route.name === 'ftpList') {
+      if (!path.endsWith('/')) throw new ProxyFailure(400, 'invalid_ftp_path', 'A folder path ends with /');
+      const itens = await ftpList(path, environment, { ...limites, maxBytes: proxySettings.maxFormResponseBytes });
+      const headers = baseHeaders(origin);
+      headers.set('Content-Type', 'application/json; charset=utf-8');
+      return new Response(JSON.stringify({ host: 'ftp.datasus.gov.br', path, items: itens }), { status: 200, headers });
+    }
+    if (path.endsWith('/')) throw new ProxyFailure(400, 'invalid_ftp_path', 'A file path does not end with /');
+    const { size, stream } = await ftpRetrieve(path, environment, { ...limites, maxBytes: proxySettings.maxArchiveBytes });
+    const headers = baseHeaders(origin);
+    headers.set('Content-Type', 'application/octet-stream');
+    headers.set('Content-Length', String(size));
+    headers.set('Content-Disposition', `attachment; filename="${path.split('/').pop().replace(/[^A-Za-z0-9_.-]/g, '_')}"`);
+    // FixedLengthStream (só no Worker) mantém o Content-Length: sem ele a
+    // resposta sai em pedaços e o navegador não tem como mostrar progresso.
+    let corpo = stream;
+    if (typeof FixedLengthStream === 'function') {
+      const fixo = new FixedLengthStream(size);
+      stream.pipeTo(fixo.writable).catch(() => {});
+      corpo = fixo.readable;
+    }
+    return new Response(corpo, { status: 200, headers });
+  } catch (error) {
+    if (error instanceof FtpFailure) throw new ProxyFailure(error.status, error.code, error.message);
+    throw error;
+  }
+}
+
 export async function handleRequest(request, environment = {}) {
   let origin = null;
   try {
@@ -601,6 +646,7 @@ export async function handleRequest(request, environment = {}) {
 
     const proxySettings = settings(environment);
     if (route.name === 'archive') return await handleArchive(request, environment, origin, proxySettings);
+    if (route.name === 'ftpList' || route.name === 'ftpFile') return await handleFtp(route, environment, origin, proxySettings);
     return await handleForm(route.name, request, environment, origin, proxySettings, route.method);
   } catch (error) {
     return errorResponse(normalizedUnexpectedFailure(error), origin);
