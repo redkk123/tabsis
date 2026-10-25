@@ -2235,6 +2235,27 @@ test('o painel de tabulação monta a tabela como o TabWin: Linhas, Colunas, Inc
   expect(await page.locator('#painel-colunas option:checked').textContent()).toBe('UF de residência');
 });
 
+test('painel: Seleções que não deixam nenhuma coluna com valor dão a coluna DUMMY do TabWin e um aviso', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#file-input').setInputFiles([
+    'e2e/fixtures/painel-e2e.def', 'e2e/fixtures/uf-e2e.cnv', 'e2e/fixtures/sexo-e2e.cnv',
+    'e2e/fixtures/raca-e2e.cnv', 'e2e/fixtures/painel-e2e.csv',
+  ]);
+  await expect(page.locator('#painel')).toBeVisible();
+  await page.locator('#painel-linhas').selectOption({ label: 'Raça' });
+  await page.locator('#painel-colunas').selectOption({ label: 'UF de residência' });
+  // Amazonas só tem Masculino: Feminino no Amazonas não pega nenhum registro.
+  for (const [eixo, categoria] of [['UF de residência', 'Amazonas'], ['Sexo', 'Feminino']]) {
+    await page.locator('#painel-selecoes-disponiveis').selectOption({ label: eixo });
+    await page.locator('#painel-incluir').click();
+    await page.locator('#painel-categorias label', { hasText: categoria }).locator('input').check();
+  }
+  await page.locator('#painel-executar').click();
+  await expect(page.locator('#painel-erro')).toBeHidden();
+  await expect(page.locator('#result-table thead')).toContainText('DUMMY');
+  await expect(page.locator('#table-headline')).toContainText('nenhum registro selecionado');
+});
+
 test('o mapa abre no Brasil, o clique desce ao estado e o botão volta', async ({ page }) => {
   await page.goto('/');
   await page.locator('#file-input').setInputFiles('e2e/fixtures/mapa-foco-e2e.csv');

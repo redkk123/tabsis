@@ -46,6 +46,17 @@ test('com Colunas, a coluna "Total" no fim, como na captura TO3', async () => {
   assert.equal(written, text);
 });
 
+test('.TAB sem nenhuma coluna com valor: aviso do TabWin entre o log e a coluna DUMMY', () => {
+  // Como o TabWin 4.15 gravou na varredura de combinações (2026-10-24).
+  const vazio = {
+    rows: [{ key: '1', label: 'Masculino', source: 'conversion' }, { key: '2', label: 'Feminino', source: 'conversion' }],
+    columns: [{ key: '__dummy__', label: 'DUMMY', source: 'raw' }],
+    cells: [[0], [0]], warnings: [], recordsSeen: 10, recordsAccepted: 0, noRecordsSelected: true,
+  };
+  const linhas = tabulationToTabwinTab(vazio, { rowLabel: 'Sexo', log: '[Opções]\r\nLinha=Sexo\r\nColuna=Raça\r\nTempo_Decorrido= 0:00', rowTotalColumn: false }).split('\r\n');
+  assert.deepEqual(linhas.slice(6), ['Tempo_Decorrido= 0:00', 'NENHUM REGISTRO SELECIONADO', '"Sexo";"DUMMY"', '"Masculino";0', '"Feminino";0', '"Total";0', '']);
+});
+
 test('casas decimais: as fixadas na coluna, ou as que os valores pedem', () => {
   assert.equal(columnDecimals(sexo, 0), 0);
   assert.equal(columnDecimals(sexo, 1), 2);

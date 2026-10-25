@@ -624,6 +624,16 @@ function materializeTabulation(state: TabulationState): TabulationResult {
     columns = columns.filter((_, index) => keep[index]);
     cells = cells.map((row) => row.filter((_, index) => keep[index]));
   }
+  // Sem nenhuma coluna com valor, o TabWin não deixa a tabela sem colunas: põe
+  // uma "DUMMY" zerada e avisa "NENHUM REGISTRO SELECIONADO" (varredura de
+  // combinações, 2026-10-24: Seleção que não pega nada, ou Coluna que só tem
+  // não classificados).
+  const noRecordsSelected = Boolean(plan.spec.columns) && columns.length === 0;
+  if (noRecordsSelected) {
+    columns = [{ key: '__dummy__', label: 'DUMMY', source: 'raw' }];
+    cells = rows.map(() => [0]);
+    warnings.add('NENHUM REGISTRO SELECIONADO: nenhuma coluna ficou com valor.');
+  }
 
   return {
     rows,
@@ -632,6 +642,7 @@ function materializeTabulation(state: TabulationState): TabulationResult {
     warnings: [...warnings],
     recordsSeen,
     recordsAccepted,
+    ...(noRecordsSelected ? { noRecordsSelected: true } : {}),
     ...(rules.length ? {
       dataQuality: rules.map((rule, index) => ({
         id: rule.id,

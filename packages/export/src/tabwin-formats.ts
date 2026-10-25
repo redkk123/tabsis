@@ -96,6 +96,8 @@ export function tabulationToTabwinTab(result: TabulationResult, context: TabwinF
     `Titulo1=${(context.title ?? '').replace(/[\r\n]+/g, ' ')}`,
     `Titulo2=${(context.subtitle ?? '').replace(/[\r\n]+/g, ' ')}`,
     log,
+    // O TabWin escreve o aviso entre o log e a matriz.
+    ...(result.noRecordsSelected ? ['NENHUM REGISTRO SELECIONADO'] : []),
     ...matrix(result, context, ';', ','),
   ];
   return `${lines.join('\r\n')}\r\n`;
