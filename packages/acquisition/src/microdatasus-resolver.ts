@@ -108,3 +108,21 @@ export function resolveMicrodatasusCompatibleCandidates(query: DatasusSearchQuer
 
   return [];
 }
+
+/**
+ * Candidatos para conferir NA LISTAGEM do FTP oficial (nunca para baixar às
+ * cegas): os do registro acima e, no SINAN, qualquer agravo pelo mesmo nome
+ * (`HANSBR23`, `ACBIBR24`…). Um nome que a pasta não lista não vira arquivo.
+ */
+export function resolveFtpListingCandidates(query: DatasusSearchQuery): DatasusRemoteFile[] {
+  const conhecidos = resolveMicrodatasusCompatibleCandidates(query);
+  if (conhecidos.length) return conhecidos;
+  const year = validYear(query.year);
+  const uf = query.uf?.toUpperCase() ?? '';
+  if (query.system !== 'SINAN' || year === null || year < 1996 || !/^[A-Z]{4}$/.test(query.fileType) || (uf && uf !== 'BR')) return [];
+  const name = `${query.fileType}BR${String(year).slice(-2)}.DBC`;
+  return [
+    remote(query, name, `${FTP_ROOT}/SINAN/DADOS/FINAIS/`, 'final'),
+    remote(query, name, `${FTP_ROOT}/SINAN/DADOS/PRELIM/`, 'preliminary'),
+  ];
+}

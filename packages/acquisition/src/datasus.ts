@@ -44,6 +44,10 @@ export interface DatasusRemoteFile {
   preparedUrl?: string;
   /** Epoch milliseconds used only to avoid reusing an expired prepared URL. */
   preparedAt?: number;
+  /** Achado direto no FTP oficial (portal fora do ar): baixa por lá, sem preparo. */
+  ftpPath?: string;
+  /** Tamanho que o FTP listou, em bytes. */
+  ftpSize?: number;
 }
 
 /** Explicit expansion of a multi-period catalog selection. */

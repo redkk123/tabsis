@@ -36,7 +36,7 @@ import {
   fetchWithHeaderTimeout,
   readStreamWithIdleTimeout,
 } from '../../../packages/acquisition/src/stream-reader.ts';
-import { resolveMicrodatasusCompatibleCandidates } from '../../../packages/acquisition/src/microdatasus-resolver.ts';
+import { resolveFtpListingCandidates, resolveMicrodatasusCompatibleCandidates } from '../../../packages/acquisition/src/microdatasus-resolver.ts';
 import {
   runDatasusBatch,
   type DatasusBatchResult,
@@ -174,6 +174,91 @@ export async function searchOfficialFiles(query: DatasusSearchQuery, signal?: Ab
   return (await searchOfficialFilesDetailed(query, signal)).value;
 }
 
+export interface OfficialFtpItem {
+  name: string;
+  directory: boolean;
+  size: number;
+  modified: string;
+}
+
+const pastasFtp = new Map<string, { quando: number; itens: Promise<OfficialFtpItem[]> }>();
+
+/** Caminho no FTP oficial de um endereço `ftp://ftp.datasus.gov.br/dissemin/…`; `null` para outro. */
+export function officialFtpPath(address: string): string | null {
+  try {
+    const url = new URL(address);
+    if (url.protocol !== 'ftp:' || url.hostname.toLowerCase() !== 'ftp.datasus.gov.br') return null;
+    const caminho = decodeURIComponent(url.pathname);
+    return caminho.startsWith('/dissemin/publicos/') ? caminho : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Uma pasta do FTP oficial, pelo proxy. É a reserva para quando o portal do
+ * DATASUS cai (2026-10-25: HTTP 520 em toda consulta, FTP respondendo). Cada
+ * pasta é lida uma vez a cada 10 minutos: uma busca de vários anos pergunta
+ * sempre pela mesma.
+ */
+export function listOfficialFtpFolder(path: string, signal?: AbortSignal): Promise<OfficialFtpItem[]> {
+  if (!DATASUS_PROXY_BASE) return Promise.reject(new Error('Sem proxy DATASUS, não há como ler o FTP oficial.'));
+  const guardada = pastasFtp.get(path);
+  if (guardada && Date.now() - guardada.quando < 10 * 60 * 1000) return guardada.itens;
+  const itens = (async () => {
+    const response = await fetch(`${DATASUS_PROXY_BASE}/ftp-list?path=${encodeURIComponent(path)}`, {
+      ...(signal ? { signal } : {}),
+      headers: { Accept: 'application/json' },
+    });
+    if (!response.ok) throw await datasusHttpError(response, 'Falha ao ler o FTP do DATASUS');
+    return ((await response.json()) as { items: OfficialFtpItem[] }).items;
+  })();
+  pastasFtp.set(path, { quando: Date.now(), itens });
+  itens.catch(() => pastasFtp.delete(path));
+  return itens;
+}
+
+/** Um arquivo do FTP oficial, pelo proxy, com progresso. */
+export async function fetchOfficialFtpFile(
+  path: string,
+  signal?: AbortSignal,
+  onProgress?: (progress: ArchiveDownloadProgress) => void,
+): Promise<Uint8Array> {
+  if (!DATASUS_PROXY_BASE) throw new Error('Sem proxy DATASUS, não há como ler o FTP oficial.');
+  const response = await fetch(`${DATASUS_PROXY_BASE}/ftp-file?path=${encodeURIComponent(path)}`, signal ? { signal } : {});
+  if (!response.ok || !response.body) throw await datasusHttpError(response, 'Falha ao baixar do FTP do DATASUS');
+  const total = Number(response.headers.get('content-length')) || undefined;
+  if (total && total > MAX_ARCHIVE_BYTES) throw new Error(`O arquivo tem ${total} bytes, acima do limite.`);
+  const leitor = response.body.getReader();
+  const partes: Uint8Array[] = [];
+  let recebidos = 0;
+  for (;;) {
+    const { value, done } = await leitor.read();
+    if (done) break;
+    partes.push(value);
+    recebidos += value.byteLength;
+    if (recebidos > MAX_ARCHIVE_BYTES) { await leitor.cancel(); throw new Error('O arquivo passou do limite de tamanho.'); }
+    onProgress?.({ receivedBytes: recebidos, ...(total ? { totalBytes: total } : {}) });
+  }
+  if (total && recebidos !== total) throw new Error(`O FTP do DATASUS entregou ${recebidos} de ${total} bytes.`);
+  const bytes = new Uint8Array(recebidos);
+  let em = 0;
+  for (const parte of partes) { bytes.set(parte, em); em += parte.byteLength; }
+  return bytes;
+}
+
+/** Confere no FTP oficial se um candidato existe, e devolve o nome como está lá. */
+async function candidatoNoFtp(candidate: DatasusRemoteFile, signal?: AbortSignal): Promise<DatasusRemoteFile | null> {
+  const caminho = officialFtpPath(candidate.address);
+  if (!caminho) return null;
+  const pasta = caminho.slice(0, caminho.lastIndexOf('/') + 1);
+  const nome = caminho.slice(pasta.length).toUpperCase();
+  const achado = (await listOfficialFtpFolder(pasta, signal)).find((item) => !item.directory && item.name.toUpperCase() === nome);
+  return achado
+    ? { ...candidate, name: achado.name, address: `ftp://ftp.datasus.gov.br${pasta}${achado.name}`, ftpPath: `${pasta}${achado.name}`, ftpSize: achado.size }
+    : null;
+}
+
 /** The official form accepts one period/UF tuple; batch it deterministically. */
 export async function searchOfficialFilesBatch(
   queries: readonly DatasusSearchQuery[],
@@ -237,7 +322,8 @@ export async function searchOfficialCatalogBatch(
     } catch (primaryError) {
       if (isAbortErrorLike(primaryError) || signal?.aborted) throw primaryError;
       const candidates = resolveMicrodatasusCompatibleCandidates(query);
-      if (!candidates.length) {
+      const candidatosFtp = DATASUS_PROXY_BASE ? resolveFtpListingCandidates(query) : [];
+      if (!candidates.length && !candidatosFtp.length) {
         return {
           status: 'LOOKUP_FAILED' as const,
           resolver: 'primary' as const,
@@ -247,6 +333,30 @@ export async function searchOfficialCatalogBatch(
       }
       let attempts = retryAttempts(primaryError);
       let lastError: unknown = primaryError;
+      // Primeiro o FTP oficial (pelo proxy): quando o portal cai, o preparo
+      // abaixo cai junto, e o FTP é onde os arquivos estão de verdade.
+      if (candidatosFtp.length) {
+        let ftpRespondeu = false;
+        for (const candidate of candidatosFtp) {
+          try {
+            const noFtp = await candidatoNoFtp(candidate, signal);
+            ftpRespondeu = true;
+            if (noFtp) {
+              return {
+                status: 'FOUND' as const,
+                resolver: 'microdatasus-compatible' as const,
+                attempts,
+                value: [{ ...noFtp, resolverAttempts: attempts }],
+              };
+            }
+          } catch (ftpError) {
+            if (isAbortErrorLike(ftpError) || signal?.aborted) throw ftpError;
+            lastError = ftpError;
+          }
+        }
+        // O FTP respondeu e o arquivo não está em nenhuma das pastas: não publicado.
+        if (ftpRespondeu) return { status: 'NOT_PUBLISHED' as const, value: [], resolver: 'microdatasus-compatible' as const, attempts };
+      }
       for (const candidate of candidates) {
         try {
           // Preparing through the independent official endpoint verifies the

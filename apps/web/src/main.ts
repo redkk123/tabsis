@@ -131,6 +131,7 @@ import { describeCacheUsage } from '../../../packages/acquisition/src/cache-poli
 import { fetchTabnetPreview, tabnetPreviewAvailable } from './tabnet-client.ts';
 import { nameGeographicLabels } from '../../../packages/analysis/src/geographic-labels.ts';
 import { populationFor, ratePer100k, readPopulationTable, type PopulationTable } from '../../../packages/analysis/src/population.ts';
+import { ibgePeriodosUrl, ibgePopulacaoUrl, ibgeSeriePara, ibgeSeriesDisponiveis, lerPeriodosIbge, lerPopulacaoIbge, tabelaDoIbge } from '../../../packages/analysis/src/ibge-population.ts';
 import { PERIODO_FIELD, type PainelEixo } from '../../../packages/core/src/painel.ts';
 import {
   DATE_PART_LABEL,
@@ -187,7 +188,7 @@ import {
   type BatchPromiseCache,
   type DatasusBatchResult,
 } from '../../../packages/acquisition/src/resilient-batch.ts';
-import { retryAttempts, retryCause } from '../../../packages/acquisition/src/retry-policy.ts';
+import { isAbortErrorLike, retryAttempts, retryCause } from '../../../packages/acquisition/src/retry-policy.ts';
 import {
   chooseVerifiedAuxiliaryBundle,
   extractArchiveEntryByBaseName,
@@ -198,6 +199,8 @@ import {
   readLastDownloadTransport,
   extractSupportedArchiveFiles,
   fetchOfficialArchiveDetailed,
+  fetchOfficialFtpFile,
+  officialFtpPath,
   prepareOfficialDownloadDetailed,
   preparedArchiveIsUnusable,
   searchOfficialAuxiliaries,
@@ -608,6 +611,7 @@ const mapVariationSelect = element<HTMLSelectElement>('#map-variation');
 const mapCard = element<HTMLElement>('#map-card');
 const mapTaxaCheck = element<HTMLInputElement>('#map-taxa-check');
 const mapPopulacaoButton = element<HTMLButtonElement>('#map-populacao-button');
+const mapPopulacaoIbge = element<HTMLButtonElement>('#map-populacao-ibge');
 const mapPopulacaoInput = element<HTMLInputElement>('#map-populacao-input');
 const mapPopulacaoStatus = element<HTMLElement>('#map-populacao-status');
 const mapClassCount = element<HTMLSelectElement>('#map-class-count');
@@ -3107,7 +3111,13 @@ async function appendCompatibleDbf(
     }
     // The Worker holds every source and checks the schema against the open
     // dataset, so nothing is concatenated on this thread.
+    const camposAntes = dbfHeader.fields.length;
     dbfHeader = await appendDataset(workerSourceFor(file.name, bytes), `Combinação de ${file.name}`);
+    // Ano com campos acrescentados: as listas passam a oferecer os novos.
+    if (dbfHeader.fields.length !== camposAntes) {
+      populateControls(rowField.value);
+      showToast(`${file.name} trouxe ${dbfHeader.fields.length - camposAntes} campo(s) que os outros arquivos não têm; neles esses campos ficam em branco.`);
+    }
   } finally {
     decodeCancelButton.hidden = true;
     activeDecode = null;
@@ -7676,6 +7686,64 @@ async function lerArquivoDePopulacao(arquivoAberto: File): Promise<void> {
   if (activeMap && currentResult && currentView === 'map') { renderMapPeriodBar(); renderMap(); }
 }
 
+/** Os anos dos dados abertos: dos nomes dos arquivos e dos períodos do mapa. */
+function anosDosDados(): string[] {
+  const textos = [
+    ...activeDatasetSources.map((source) => describeDatasusFile(source.name)?.periodShort ?? source.name),
+    ...mapPeriodList().map((periodo) => periodo.label),
+  ];
+  return [...new Set(textos.flatMap((texto) => /(?:19|20)\d{2}/.exec(texto)?.[0] ?? []))].sort();
+}
+
+/** Séries do IBGE já baixadas nesta sessão: trocar de arquivo não pergunta de novo. */
+const populacaoIbgeGuardada = new Map<string, Map<string, number>>();
+
+/**
+ * População de cada município pela API do IBGE, para os anos dos dados.
+ * Só o ano e a tabela vão para o IBGE; nenhum dado aberto sai do aparelho.
+ */
+async function buscarPopulacaoIbge(): Promise<void> {
+  mapPopulacaoIbge.disabled = true;
+  mapPopulacaoStatus.textContent = 'Buscando a população no IBGE…';
+  try {
+    const pedir = async (url: string): Promise<unknown> => {
+      const resposta = await fetch(url, { headers: { Accept: 'application/json' } });
+      if (!resposta.ok) throw new Error(`O IBGE respondeu HTTP ${resposta.status}.`);
+      return resposta.json();
+    };
+    const series = ibgeSeriesDisponiveis(lerPeriodosIbge(await pedir(ibgePeriodosUrl())));
+    const anos = anosDosDados();
+    if (!anos.length) anos.push(series.at(-1)!.ano);
+    const porAno = new Map<string, Map<string, number>>();
+    const usadas: string[] = [];
+    for (const ano of anos) {
+      const serie = ibgeSeriePara(ano, series)!;
+      const chave = `${serie.tabela}:${serie.ano}`;
+      let dados = populacaoIbgeGuardada.get(chave);
+      if (!dados) {
+        mapPopulacaoStatus.textContent = `Buscando no IBGE: ${serie.nome}…`;
+        dados = lerPopulacaoIbge(await pedir(ibgePopulacaoUrl(serie)), serie.ano);
+        populacaoIbgeGuardada.set(chave, dados);
+      }
+      porAno.set(ano, dados);
+      usadas.push(serie.ano === ano ? `${ano} (${serie.nome})` : `${ano} usa ${serie.nome}`);
+    }
+    populacao = tabelaDoIbge(porAno);
+    const municipios = Math.max(...[...porAno.values()].map((tabela) => tabela.size));
+    mapPopulacaoStatus.textContent = `População: API do IBGE · ${integerFormat.format(municipios)} municípios · ${usadas.join(' · ')}.`;
+    mapTaxaCheck.checked = true;
+    showToast('População do IBGE carregada: o mapa mostra casos por 100 mil habitantes.');
+    if (activeMap && currentResult && currentView === 'map') { renderMapPeriodBar(); renderMap(); }
+  } catch (error) {
+    if (!populacao) mapTaxaCheck.checked = false;
+    const motivo = error instanceof Error ? error.message : String(error);
+    mapPopulacaoStatus.textContent = `Não deu para buscar no IBGE (${motivo}). Sem internet, abra um arquivo de população.`;
+    showToast(`IBGE: ${motivo}`, true);
+  } finally {
+    mapPopulacaoIbge.disabled = false;
+  }
+}
+
 /** Segundo lugar do cartão, para comparar lado a lado; `mapCompareArmed` espera o próximo toque. */
 let mapCompareGeocode = '';
 let mapCompareArmed = false;
@@ -8633,46 +8701,76 @@ async function downloadCatalogEntries(
   }
 
   if (!archive) {
-    let prepared = files.length === 1 && files[0]?.preparedUrl && files[0].preparedAt
-      && Date.now() - files[0].preparedAt < 4 * 60 * 1000
-      ? { value: files[0].preparedUrl, attempts: 0 }
-      : await temposDoDownload.measure('preparo no DATASUS',
-        () => comBatimento('O DATASUS está preparando o pacote',
-          () => prepareOfficialDownloadDetailed(files, signal)));
+    // FTP oficial pelo proxy: o caminho quando o arquivo veio da reserva da
+    // busca, ou quando o preparo do portal falha (2026-10-25: portal com HTTP
+    // 520 e FTP no ar). Os .dbc são embalados sem recompressão, como no espelho.
+    const baixarPeloFtp = async (): Promise<Uint8Array> => {
+      const entradas: Record<string, [Uint8Array, { level: 0 }]> = {};
+      for (const file of files) {
+        const caminho = file.ftpPath ?? officialFtpPath(file.address);
+        if (!caminho) throw new Error(`${file.name}: sem endereço no FTP oficial.`);
+        const nome = caminho.split('/').pop() ?? file.name;
+        entradas[nome] = [await temposDoDownload.measure('download pelo FTP', () => fetchOfficialFtpFile(caminho, signal, ({ receivedBytes, totalBytes }) => {
+          onActivity?.();
+          setCatalogStatus(`Baixando ${nome} direto do FTP do DATASUS… ${totalBytes
+            ? `${Math.min(100, Math.round(receivedBytes / totalBytes * 100))}% · ${formatBytes(receivedBytes)} / ${formatBytes(totalBytes)}`
+            : formatBytes(receivedBytes)}`);
+        })), { level: 0 }];
+      }
+      return zipSync(entradas);
+    };
+    let bytes: Uint8Array;
+    if (files.length && files.every((file) => file.ftpPath)) {
+      bytes = await baixarPeloFtp();
+      attempts = 1;
+    } else {
+      try {
+        let prepared = files.length === 1 && files[0]?.preparedUrl && files[0].preparedAt
+          && Date.now() - files[0].preparedAt < 4 * 60 * 1000
+          ? { value: files[0].preparedUrl, attempts: 0 }
+          : await temposDoDownload.measure('preparo no DATASUS',
+            () => comBatimento('O DATASUS está preparando o pacote',
+              () => prepareOfficialDownloadDetailed(files, signal)));
 
-    const baixar = (url: string): Promise<{ value: Uint8Array; attempts: number }> =>
-      temposDoDownload.measure('download', () => fetchOfficialArchiveDetailed(url, signal, ({ receivedBytes, totalBytes }) => {
-      const progress = totalBytes
-        ? `${Math.min(100, Math.round(receivedBytes / totalBytes * 100))}% · ${formatBytes(receivedBytes)} / ${formatBytes(totalBytes)}`
-        : formatBytes(receivedBytes);
-      onActivity?.();
-      setCatalogStatus(`Baixando ${files.map((file) => file.name).join(', ')}… ${progress}`);
-    }, (esperando) => {
-      // O DATASUS entrega o endereço antes de terminar de montar o pacote. Sem
-      // esta linha a tela fica parada em 0% e parece travada.
-      onActivity?.();
-      setCatalogStatus(`O DATASUS está montando o pacote… ${Math.round(esperando / 1000)}s`);
-    }));
+        const baixar = (url: string): Promise<{ value: Uint8Array; attempts: number }> =>
+          temposDoDownload.measure('download', () => fetchOfficialArchiveDetailed(url, signal, ({ receivedBytes, totalBytes }) => {
+          const progress = totalBytes
+            ? `${Math.min(100, Math.round(receivedBytes / totalBytes * 100))}% · ${formatBytes(receivedBytes)} / ${formatBytes(totalBytes)}`
+            : formatBytes(receivedBytes);
+          onActivity?.();
+          setCatalogStatus(`Baixando ${files.map((file) => file.name).join(', ')}… ${progress}`);
+        }, (esperando) => {
+          // O DATASUS entrega o endereço antes de terminar de montar o pacote. Sem
+          // esta linha a tela fica parada em 0% e parece travada.
+          onActivity?.();
+          setCatalogStatus(`O DATASUS está montando o pacote… ${Math.round(esperando / 1000)}s`);
+        }));
 
-    let downloaded: { value: Uint8Array; attempts: number };
-    try {
-      downloaded = await baixar(prepared.value);
-    } catch (error) {
-      // Pacote inexistente ou cortado: nos dois casos, reler o mesmo endereço
-      // é a tentativa com menos chance de funcionar. Um preparo novo custa uma
-      // viagem e, medido, vem inteiro.
-      if (!preparedArchiveIsUnusable(error)) throw error;
-      const refeito = await comBatimento(
-        'O pacote do DATASUS não veio inteiro; pedindo outro',
-        () => prepareOfficialDownloadDetailed(files, signal),
-      );
-      prepared = { value: refeito.value, attempts: prepared.attempts + refeito.attempts };
-      downloaded = await baixar(prepared.value);
+        let downloaded: { value: Uint8Array; attempts: number };
+        try {
+          downloaded = await baixar(prepared.value);
+        } catch (error) {
+          // Pacote inexistente ou cortado: nos dois casos, reler o mesmo endereço
+          // é a tentativa com menos chance de funcionar. Um preparo novo custa uma
+          // viagem e, medido, vem inteiro.
+          if (!preparedArchiveIsUnusable(error)) throw error;
+          const refeito = await comBatimento(
+            'O pacote do DATASUS não veio inteiro; pedindo outro',
+            () => prepareOfficialDownloadDetailed(files, signal),
+          );
+          prepared = { value: refeito.value, attempts: prepared.attempts + refeito.attempts };
+          downloaded = await baixar(prepared.value);
+        }
+        bytes = downloaded.value;
+        attempts = prepared.attempts + downloaded.attempts;
+      } catch (error) {
+        if (isAbortErrorLike(error) || signal?.aborted || !files.every((file) => officialFtpPath(file.address))) throw error;
+        setCatalogStatus(`O portal do DATASUS falhou (${error instanceof Error ? error.message : String(error)}); baixando direto do FTP oficial…`);
+        bytes = await baixarPeloFtp();
+        attempts = 1;
+      }
     }
-
-    const bytes = downloaded.value;
     archive = bytes;
-    attempts = prepared.attempts + downloaded.attempts;
     const archiveSha256 = await temposDoDownload.measure('impressão SHA-256', () => sha256(bytes));
     try {
       summary = await writeCachedArchive(cacheKey, bytes, {
@@ -9313,22 +9411,20 @@ function renderDownloadBatchActions(
   catalogResults.append(panel);
 }
 
-async function openRecentArchive(summary: CachedArchiveSummary): Promise<void> {
-  setCatalogBusy(true);
-  setCatalogStatus('Abrindo o arquivo salvo neste aparelho…');
-  try {
-    const cached = await readCachedArchive(summary.key, Number.POSITIVE_INFINITY);
-    if (!cached) throw new Error('O arquivo não está mais disponível no cache local');
-    const extracted = extractSupportedArchiveFiles(cached.bytes);
-    const expectedNames = new Set(summary.sources.map((source) => source.name.toLowerCase()));
-    const wanted = extracted.find((entry) => expectedNames.has(displayBaseName(entry.name).toLowerCase()))
-      ?? extracted.find((entry) => ['DBC', 'DBF', 'PARQUET'].includes(extensionOf(entry.name)));
-    if (!wanted) throw new Error('O pacote salvo não contém um DBC ou DBF reconhecido');
-    // Propagate decode/schema failures. The UI-oriented multi-file wrapper
-    // intentionally catches errors and would otherwise report a false success.
-    await loadFile(archiveFile(wanted));
-    const source = loadedSources.find((item) => item.name.toLowerCase() === displayBaseName(wanted.name).toLowerCase());
-    if (source) {
+/** O arquivo de dados de um pacote guardado, pronto para abrir, e como anotar de onde ele veio. */
+async function arquivoGuardado(summary: CachedArchiveSummary): Promise<{ file: File; anotarOrigem: () => Promise<void> }> {
+  const cached = await readCachedArchive(summary.key, Number.POSITIVE_INFINITY);
+  if (!cached) throw new Error('O arquivo não está mais disponível no cache local');
+  const extracted = extractSupportedArchiveFiles(cached.bytes);
+  const expectedNames = new Set(summary.sources.map((source) => source.name.toLowerCase()));
+  const wanted = extracted.find((entry) => expectedNames.has(displayBaseName(entry.name).toLowerCase()))
+    ?? extracted.find((entry) => ['DBC', 'DBF', 'PARQUET'].includes(extensionOf(entry.name)));
+  if (!wanted) throw new Error('O pacote salvo não contém um DBC ou DBF reconhecido');
+  return {
+    file: archiveFile(wanted),
+    anotarOrigem: async () => {
+      const source = loadedSources.find((item) => item.name.toLowerCase() === displayBaseName(wanted.name).toLowerCase());
+      if (!source) return;
       const cachedSource = summary.sources.find((item) => item.name.toLowerCase() === source.name.toLowerCase())
         ?? summary.sources[0];
       if (cachedSource?.address) source.origin = cachedSource.address;
@@ -9337,11 +9433,46 @@ async function openRecentArchive(summary: CachedArchiveSummary): Promise<void> {
       source.retrievedAt = new Date(summary.savedAt).toISOString();
       source.archiveSha256 = summary.sha256 || await sha256(cached.bytes);
       source.cacheKey = summary.key;
-    }
+    },
+  };
+}
+
+/**
+ * Vários arquivos já guardados abertos como um conjunto só: anos, meses ou
+ * estados do mesmo sistema (pedido do Red, 2026-10-25). `juntar` acrescenta
+ * ao que já está aberto em vez de recomeçar.
+ */
+async function openRecentArchivesTogether(summaries: CachedArchiveSummary[], juntar: boolean): Promise<void> {
+  setCatalogBusy(true);
+  setCatalogStatus(`Abrindo ${summaries.length} arquivos salvos neste aparelho…`);
+  try {
+    const abertos = [];
+    for (const summary of summaries) abertos.push(await arquivoGuardado(summary));
+    await loadFiles(abertos.map((aberto) => aberto.file), juntar ? { juntar: true } : {});
+    for (const aberto of abertos) await aberto.anotarOrigem();
     renderAudit();
-    setCatalogStatus(`${displayBaseName(wanted.name)} aberto sem usar a internet.`);
+    setCatalogStatus(`${activeDatasetSources.length} arquivos juntos, sem usar a internet.`);
+    if (activeDatasetSources.length > 1) catalogDialog.close();
+  } catch (error) {
+    setCatalogStatus(error instanceof Error ? error.message : String(error), true);
+  } finally {
+    setCatalogBusy(false);
+  }
+}
+
+async function openRecentArchive(summary: CachedArchiveSummary): Promise<void> {
+  setCatalogBusy(true);
+  setCatalogStatus('Abrindo o arquivo salvo neste aparelho…');
+  try {
+    const { file, anotarOrigem } = await arquivoGuardado(summary);
+    // Propagate decode/schema failures. The UI-oriented multi-file wrapper
+    // intentionally catches errors and would otherwise report a false success.
+    await loadFile(file);
+    await anotarOrigem();
+    renderAudit();
+    setCatalogStatus(`${displayBaseName(file.name)} aberto sem usar a internet.`);
     catalogDialog.close();
-    showToast(`${displayBaseName(wanted.name)} reaberto do cache local`);
+    showToast(`${displayBaseName(file.name)} reaberto do cache local`);
   } catch (error) {
     setCatalogStatus(error instanceof Error ? error.message : String(error), true);
   } finally {
@@ -9736,9 +9867,57 @@ async function renderRecentArchives(): Promise<void> {
       catalogRecentList.append(bulk);
     }
 
+    // Juntar o que já está aqui: marque dois ou mais (anos, meses, estados do
+    // mesmo sistema) e abra como um conjunto, sem baixar de novo.
+    const marcados = new Map<CachedArchiveSummary, HTMLInputElement>();
+    let sincronizarJuntar = (): void => {};
+    if (dataArchives.length > 1) {
+      const barra = document.createElement('div');
+      barra.className = 'catalog-result catalog-batch-bar catalog-recent-join';
+      const texto = document.createElement('div');
+      const titulo = document.createElement('b');
+      titulo.textContent = 'Juntar arquivos guardados';
+      const nota = document.createElement('small');
+      nota.textContent = 'Marque dois ou mais — outros anos, meses ou estados do mesmo sistema — e abra como uma tabela só, sem baixar de novo.';
+      texto.append(titulo, nota);
+      const abrirJuntos = document.createElement('button');
+      abrirJuntos.className = 'secondary-button';
+      abrirJuntos.type = 'button';
+      abrirJuntos.id = 'catalog-recent-open-together';
+      const juntarAoAberto = document.createElement('button');
+      juntarAoAberto.className = 'secondary-button';
+      juntarAoAberto.type = 'button';
+      juntarAoAberto.id = 'catalog-recent-join-open';
+      const escolhidos = (): CachedArchiveSummary[] => [...marcados].filter(([, caixa]) => caixa.checked).map(([resumo]) => resumo);
+      sincronizarJuntar = () => {
+        const n = escolhidos().length;
+        abrirJuntos.textContent = n > 1 ? `Abrir os ${n} juntos` : 'Abrir marcados juntos';
+        abrirJuntos.disabled = n < 2;
+        juntarAoAberto.textContent = n ? `Juntar ${n === 1 ? 'o marcado' : `os ${n}`} ao que está aberto` : 'Juntar ao que está aberto';
+        juntarAoAberto.disabled = n < 1 || !dbfHeader;
+        juntarAoAberto.hidden = !dbfHeader;
+      };
+      abrirJuntos.addEventListener('click', () => void openRecentArchivesTogether(escolhidos(), false));
+      juntarAoAberto.addEventListener('click', () => void openRecentArchivesTogether(escolhidos(), true));
+      const botoes = document.createElement('div');
+      botoes.className = 'catalog-batch-bar-actions';
+      botoes.append(abrirJuntos, juntarAoAberto);
+      barra.append(texto, botoes);
+      catalogRecentList.append(barra);
+    }
+
     for (const archive of archives) {
       const item = document.createElement('div');
       item.className = 'catalog-result catalog-recent-item';
+      if (archive.role === 'data' && dataArchives.length > 1) {
+        const caixa = document.createElement('input');
+        caixa.type = 'checkbox';
+        caixa.className = 'catalog-result-check';
+        caixa.setAttribute('aria-label', `Marcar ${archive.sources.map((source) => source.name).join(', ') || 'arquivo'} para juntar`);
+        caixa.addEventListener('change', () => sincronizarJuntar());
+        marcados.set(archive, caixa);
+        item.append(caixa);
+      }
       const details = document.createElement('div');
       const name = document.createElement('b');
       const meta = document.createElement('small');
@@ -9790,6 +9969,7 @@ async function renderRecentArchives(): Promise<void> {
       item.append(details, actions);
       catalogRecentList.append(item);
     }
+    sincronizarJuntar();
   } catch (error) {
     if (generation !== recentArchivesGeneration) return;
     catalogRecentList.replaceChildren();
@@ -9951,7 +10131,9 @@ function renderCatalogSearchBatch(
     const name = document.createElement('b');
     const meta = document.createElement('small');
     name.textContent = remote.name;
-    meta.textContent = `${remote.source} · ${remote.modality} · ${remote.resolver === 'microdatasus-compatible' ? 'fallback rastreável' : 'catálogo principal'}`;
+    meta.textContent = `${remote.source} · ${remote.modality} · ${remote.ftpPath
+      ? `achado no FTP oficial (portal do DATASUS fora do ar)${remote.ftpSize ? ` · ${formatBytes(remote.ftpSize)}` : ''}`
+      : remote.resolver === 'microdatasus-compatible' ? 'fallback rastreável' : 'catálogo principal'}`;
     details.append(name, meta);
     const button = document.createElement('button');
     button.className = 'secondary-button';
@@ -11482,7 +11664,10 @@ mapPopulacaoInput.addEventListener('change', () => {
   if (!arquivo) return;
   void lerArquivoDePopulacao(arquivo).catch((error) => showToast(error instanceof Error ? error.message : String(error), true));
 });
+mapPopulacaoIbge.addEventListener('click', () => void buscarPopulacaoIbge());
 mapTaxaCheck.addEventListener('change', () => {
+  // Sem população aberta, marcar a taxa já busca no IBGE.
+  if (mapTaxaCheck.checked && !populacao) { void buscarPopulacaoIbge(); return; }
   if (activeMap && currentResult && currentView === 'map') { renderMapPeriodBar(); renderMap(); }
 });
 mapModeSelect.addEventListener('change', () => {

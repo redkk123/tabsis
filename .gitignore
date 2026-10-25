@@ -29,3 +29,4 @@ playwright/.cache/
 # Arquivos do DATASUS usados para gerar as capturas do manual.
 # São públicos e re-baixáveis; não precisam pesar no repositório.
 e2e/fixtures/manual/
+.wrangler/

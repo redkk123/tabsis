@@ -446,15 +446,18 @@ function streamAll(
       continue;
     }
 
+    // Num conjunto de anos com campos acrescentados, cada arquivo só lê os
+    // campos que tem; os outros ficam ausentes (em branco) nos registros dele.
+    const proprios = fieldsPresentIn(source, fields);
     if (source.kind === 'parquet') {
-      readSoFar += streamParquetSource(source, fields, forward);
+      readSoFar += streamParquetSource(source, proprios, forward);
       continue;
     }
 
     const bytes = new Uint8Array(source.bytes);
     const summary = source.isDbc
-      ? streamDbcRecords(bytes, forward, { batchSize: BATCH_RECORDS, ...(fields ? { fields } : {}) })
-      : streamDbfRecords(bytes, forward, { batchSize: BATCH_RECORDS, ...(fields ? { fields } : {}) });
+      ? streamDbcRecords(bytes, forward, { batchSize: BATCH_RECORDS, ...(proprios ? { fields: proprios } : {}) })
+      : streamDbfRecords(bytes, forward, { batchSize: BATCH_RECORDS, ...(proprios ? { fields: proprios } : {}) });
     readSoFar += summary.recordsRead;
   }
 
@@ -509,11 +512,8 @@ function headerForSources(request: OpenRequest): DbfHeader {
   let first_header: DbfHeader | null = null;
   for (const source of request.sources) {
     if (source.kind === 'records') throw new Error('Fontes de tipos diferentes não podem ser combinadas');
-    const current = source.kind === 'parquet' ? parquetHeader(source) : binaryHeader(source);
-    if (!first_header) first_header = current;
-    else if (schemaSignature(first_header) !== schemaSignature(current)) {
-      throw new Error(`${source.name}: esquema incompatível com o primeiro arquivo`);
-    }
+    const current = headerOf(source);
+    first_header = first_header ? mergedSchema(first_header, current, source.name) : current;
     recordCount += current.recordCount;
   }
   return { ...first_header!, recordCount };
@@ -528,6 +528,54 @@ function binaryHeader(source: BinarySource): DbfHeader {
 
 function schemaSignature(value: DbfHeader): string {
   return value.fields.map((field) => `${field.name}:${field.type}:${field.length}:${field.decimalCount}`).join('|');
+}
+
+/**
+ * Junta o esquema de mais um arquivo ao do conjunto. O DATASUS acrescenta
+ * campos com os anos (LEIVBR25 tem 11 a mais que LEIVBR24): o campo novo entra
+ * no conjunto e fica em branco nos arquivos que não o têm. Um campo que existe
+ * nos dois com tipo, tamanho ou decimais diferentes continua recusado — aí a
+ * leitura do código mudaria de um ano para o outro.
+ */
+function mergedSchema(base: DbfHeader, incoming: DbfHeader, name: string): DbfHeader {
+  if (schemaSignature(base) === schemaSignature(incoming)) return base;
+  const porNome = new Map(base.fields.map((field) => [field.name, field]));
+  const divergentes = incoming.fields.filter((field) => {
+    const existente = porNome.get(field.name);
+    return existente && (existente.type !== field.type || existente.length !== field.length || existente.decimalCount !== field.decimalCount);
+  });
+  if (divergentes.length) {
+    const exemplo = divergentes.slice(0, 3).map((field) => {
+      const existente = porNome.get(field.name)!;
+      return `${field.name} (${existente.type}${existente.length} × ${field.type}${field.length})`;
+    }).join(', ');
+    throw new Error(`${name}: esquema incompatível; campos com tipo ou tamanho diferente: ${exemplo}${divergentes.length > 3 ? '…' : ''}`);
+  }
+  const novos = incoming.fields.filter((field) => !porNome.has(field.name));
+  const fields = [...base.fields, ...novos];
+  return {
+    ...base,
+    fields,
+    headerLength: 32 + fields.length * 32 + 1,
+    recordLength: 1 + fields.reduce((sum, field) => sum + field.length, 0),
+  };
+}
+
+/** Cabeçalho de cada arquivo aberto, para pedir a ele só os campos que ele tem. */
+const sourceHeaders = new WeakMap<DatasetSource, DbfHeader>();
+function headerOf(source: BinarySource | ParquetSource): DbfHeader {
+  let cabecalho = sourceHeaders.get(source);
+  if (!cabecalho) {
+    cabecalho = source.kind === 'parquet' ? parquetHeader(source) : binaryHeader(source);
+    sourceHeaders.set(source, cabecalho);
+  }
+  return cabecalho;
+}
+
+function fieldsPresentIn(source: BinarySource | ParquetSource, fields: readonly string[] | undefined): readonly string[] | undefined {
+  if (!fields) return fields;
+  const nomes = new Set(headerOf(source).fields.map((field) => field.name));
+  return fields.every((name) => nomes.has(name)) ? fields : fields.filter((name) => nomes.has(name));
 }
 
 /**
@@ -574,14 +622,10 @@ function handle(request: DatasetRequest): void {
       if (!header) throw new Error('Nenhum conjunto de dados aberto para combinar');
       const source = request.source;
       if (source.kind === 'records') throw new Error('Só arquivos DBC/DBF/Parquet podem ser combinados');
-      const incoming = source.kind === 'parquet' ? parquetHeader(source) : binaryHeader(source);
-      if (schemaSignature(header) !== schemaSignature(incoming)) {
-        throw new Error(
-          `${source.name}: esquema incompatível; arquivos combinados precisam ter os mesmos campos, tipos, tamanhos e decimais`,
-        );
-      }
+      const incoming = headerOf(source);
+      const juntado = mergedSchema(header, incoming, source.name);
       sources = [...sources, source];
-      header = { ...header, recordCount: header.recordCount + incoming.recordCount };
+      header = { ...juntado, recordCount: header.recordCount + incoming.recordCount };
       invalidateDataset();
       post({ type: 'opened', requestId: request.requestId, header, recordCount: header.recordCount });
       return;

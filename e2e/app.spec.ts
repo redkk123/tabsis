@@ -1665,6 +1665,67 @@ test('o arquivo guardado pode ser baixado sem precisar abrir a análise', async 
   expect(file.suggestedFilename()).toBe('GUARDADO01.dbc');
 });
 
+test('downloads guardados: marcar dois anos e abrir juntos, depois juntar mais um ao que está aberto', async ({ page }) => {
+  const { zipSync } = await import('fflate');
+  const { readFileSync } = await import('node:fs');
+  await page.goto('/');
+  const pacotes = ['DENGBR23', 'DENGBR24', 'DENGBR25'].map((nome) => ({
+    nome, bytes: [...zipSync({ [`${nome}.dbf`]: new Uint8Array(readFileSync(`e2e/fixtures/${nome}.dbf`)) })],
+  }));
+  await page.evaluate(async (lista) => {
+    const mod = await import('/src/archive-cache.ts');
+    for (const { nome, bytes } of lista) {
+      await mod.writeCachedArchive(`official-v1:${nome}`, new Uint8Array(bytes), {
+        sha256: nome.slice(-2).repeat(32), role: 'data',
+        sources: [{ name: `${nome}.dbf`, address: `ftp://ftp.datasus.gov.br/dissemin/publicos/SINAN/DADOS/FINAIS/${nome}.dbc`, source: 'SINAN', modality: 'Dados' }],
+      });
+      await new Promise((r) => setTimeout(r, 4));
+    }
+  }, pacotes);
+
+  await page.locator('#catalog-button').click();
+  const abrirJuntos = page.locator('#catalog-recent-open-together');
+  await expect(abrirJuntos).toBeDisabled();
+  for (const nome of ['DENGBR23', 'DENGBR24']) {
+    await page.locator('.catalog-recent-item').filter({ hasText: `${nome}.dbf` }).locator('.catalog-result-check').check();
+  }
+  await expect(abrirJuntos).toHaveText('Abrir os 2 juntos');
+  await abrirJuntos.click();
+  await expect(page.locator('#dataset-files-list li')).toHaveCount(2);
+  await expect(page.locator('#dataset-files-summary')).toContainText('2 juntos · 2023 a 2024');
+
+  await page.locator('#catalog-button').click();
+  await page.locator('.catalog-recent-item').filter({ hasText: 'DENGBR25.dbf' }).locator('.catalog-result-check').check();
+  await page.locator('#catalog-recent-join-open').click();
+  await expect(page.locator('#dataset-files-list li')).toHaveCount(3);
+  await expect(page.locator('#dataset-files-summary')).toHaveText('3 juntos · 2023 a 2025 · 24 registros');
+});
+
+test('juntar anos com campos acrescentados: o campo novo entra e fica em branco no ano que não o tem', async ({ page }) => {
+  // O DATASUS acrescenta campos com os anos (LEIVBR25 tem 11 a mais que LEIVBR24).
+  const { writeDbf } = await import('../dist/packages/export/src/dbf-writer.js');
+  const sexo = { name: 'CS_SEXO', type: 'C', length: 1, decimalCount: 0 };
+  const novo = { name: 'NU_LOTE_V', type: 'C', length: 7, decimalCount: 0 };
+  const antigo = writeDbf([{ CS_SEXO: 'M' }, { CS_SEXO: 'F' }], [sexo]);
+  const recente = writeDbf([{ CS_SEXO: 'M', NU_LOTE_V: 'L1' }, { CS_SEXO: 'M', NU_LOTE_V: 'L1' }, { CS_SEXO: 'F', NU_LOTE_V: 'L2' }], [sexo, novo]);
+  const divergente = writeDbf([{ CS_SEXO: 'MM' }], [{ ...sexo, length: 2 }]);
+  await page.goto('/');
+  await page.locator('#file-input').setInputFiles([
+    { name: 'LEIVBR24.dbf', mimeType: 'application/octet-stream', buffer: Buffer.from(antigo) },
+    { name: 'LEIVBR25.dbf', mimeType: 'application/octet-stream', buffer: Buffer.from(recente) },
+  ]);
+  await expect(page.locator('#dataset-files-summary')).toContainText('2 juntos · 2024 a 2025 · 5 registros');
+  await page.locator('#row-field').selectOption('NU_LOTE_V');
+  await page.locator('#analysis-form').evaluate((form: HTMLFormElement) => form.requestSubmit());
+  const corpo = page.locator('#result-table tbody');
+  await expect(corpo.locator('tr', { hasText: 'L1' })).toContainText('2');
+  await expect(corpo.locator('tr', { hasText: 'L2' })).toContainText('1');
+  // Campo em comum com tamanho diferente continua recusado, com o nome dele.
+  await page.locator('#dataset-add-input').setInputFiles({ name: 'LEIVBR26.dbf', mimeType: 'application/octet-stream', buffer: Buffer.from(divergente) });
+  await expect(page.locator('.toast').last()).toContainText('CS_SEXO (C1 × C2)');
+  await expect(page.locator('#dataset-files-list li')).toHaveCount(2);
+});
+
 test('um .TAB salvo pelo TabWin 4.15 abre aqui, somente para leitura', async ({ page }) => {
   // O leitor era provado contra o golden G023 e não estava ligado: a
   // biblioteca lia o formato, o aplicativo não abria o arquivo. Esta fixture é
@@ -2690,7 +2751,7 @@ test('taxa por 100 mil: a população aberta no mapa troca contagem por taxa, e 
   ]);
   await page.locator('[data-view="map"]').click();
   await expect(page.locator('#map-period-status')).toContainText('Mostrando todos', { timeout: 20000 });
-  await expect(page.locator('#map-taxa-check')).toBeDisabled();
+  await expect(page.locator('#map-taxa-check')).not.toBeChecked();
 
   await page.locator('#map-populacao-input').setInputFiles('e2e/fixtures/populacao-e2e.csv');
   await expect(page.locator('#map-populacao-status')).toContainText('3 municípios · 2023 a 2024');
@@ -2705,6 +2766,46 @@ test('taxa por 100 mil: a população aberta no mapa troca contagem por taxa, e 
   await page.locator('#map-taxa-check').uncheck();
   await expect(page.locator('#map-legend')).not.toContainText('Por 100 mil');
   await expect(page.locator('#map-period-chart .evo-valor')).toHaveText('9');
+});
+
+test('taxa por 100 mil com a população da API do IBGE: cada ano usa a sua série, ou a mais próxima', async ({ page }) => {
+  // A API do IBGE fica simulada: o teste não depende da internet. Mesmo
+  // formato da resposta real (tabela 6579, variável 9324; Censo 2022 na 4709).
+  const pedidos: string[] = [];
+  const municipios = (ano: string, sp: number, belem: number, rio: number) => [{
+    id: '9324', resultados: [{ classificacoes: [], series: [
+      { localidade: { id: '3550308' }, serie: { [ano]: String(sp) } },
+      { localidade: { id: '1501402' }, serie: { [ano]: String(belem) } },
+      { localidade: { id: '3304557' }, serie: { [ano]: String(rio) } },
+      ...Array.from({ length: 5600 }, (_, i) => ({ localidade: { id: String(1100000 + i * 10 + 5) }, serie: { [ano]: '1000' } })),
+    ] }],
+  }];
+  await page.route('https://servicodados.ibge.gov.br/**', async (route) => {
+    const url = route.request().url();
+    pedidos.push(url);
+    const corpo = url.endsWith('/6579/periodos') ? [{ id: '2021' }, { id: '2024' }, { id: '2025' }]
+      : url.includes('/4709/periodos/2022/') ? municipios('2022', 11451999, 1303403, 6211223)
+        : url.includes('/6579/periodos/2024/') ? municipios('2024', 11500000, 1310000, 6220000)
+          : url.includes('/6579/periodos/2025/') ? municipios('2025', 11600000, 1320000, 6230000) : null;
+    await route.fulfill(corpo ? { json: corpo, headers: { 'Access-Control-Allow-Origin': '*' } } : { status: 404 });
+  });
+  await page.goto('/');
+  await page.locator('#file-input').setInputFiles([
+    'e2e/fixtures/DENGBR23.dbf', 'e2e/fixtures/DENGBR24.dbf', 'e2e/fixtures/DENGBR25.dbf',
+  ]);
+  await page.locator('[data-view="map"]').click();
+  await expect(page.locator('#map-period-status')).toContainText('Mostrando todos', { timeout: 20000 });
+  // Marcar a taxa sem população já busca no IBGE.
+  await page.locator('#map-taxa-check').click();
+  const status = page.locator('#map-populacao-status');
+  await expect(status).toContainText('API do IBGE');
+  await expect(status).toContainText('2023 usa Censo 2022');
+  await expect(status).toContainText('2024 (Estimativa 2024)');
+  await expect(page.locator('#map-legend')).toContainText('Por 100 mil hab.');
+  await page.locator('#map-period-select').selectOption({ label: '2024' });
+  await expect(page.locator('#map-period-chart .evo-valor')).toHaveText('0,05');
+  // Só o ano e a tabela foram para o IBGE: nenhum dado do arquivo na URL.
+  expect(pedidos.every((url) => /\/agregados\/(6579|4709)\/periodos(\/\d{4}\/variaveis\/\d+\?localidades=N6%5Ball%5D)?$/.test(url))).toBe(true);
 });
 
 test('a primeira tabela começa pela residência, não pelo município do hospital, e o mapa diz o que pinta', async ({ page }) => {
