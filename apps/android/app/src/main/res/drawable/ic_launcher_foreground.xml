@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- As três barras do logotipo do TabSis, dentro da área segura do ícone adaptável (66 dp no centro de 108). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:fillColor="#FFFFFFFF" android:fillAlpha="0.55" android:pathData="M34,58h10v20h-10z" />
+    <path android:fillColor="#FFFFFFFF" android:fillAlpha="0.8" android:pathData="M49,46h10v32h-10z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M64,32h10v46h-10z" />
+</vector>

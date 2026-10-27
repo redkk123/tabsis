@@ -1726,6 +1726,33 @@ test('juntar anos com campos acrescentados: o campo novo entra e fica em branco 
   await expect(page.locator('#dataset-files-list li')).toHaveCount(2);
 });
 
+test('dentro do app Android, salvar vai pela ponte nativa (o WebView não baixa blob:) e imprimir também', async ({ page }) => {
+  // Ponte falsa com a mesma forma da PonteAndroid.java.
+  await page.addInitScript(() => {
+    const registro = { partes: [] as string[], concluido: null as null | { nome: string; tipo: string; abrir: boolean }, impressoes: 0 };
+    (window as unknown as { __ponte: typeof registro }).__ponte = registro;
+    (window as unknown as { TabSisAndroid: unknown }).TabSisAndroid = {
+      iniciarArquivo: () => '00000000-0000-0000-0000-000000000000',
+      escreverParte: (_id: string, base64: string) => { registro.partes.push(base64); },
+      concluirArquivo: (_id: string, nome: string, tipo: string, abrir: boolean) => { registro.concluido = { nome, tipo, abrir }; return `${nome} salvo em Downloads/TabSis`; },
+      descartarArquivo: () => {},
+      imprimir: () => { registro.impressoes += 1; },
+    };
+  });
+  await page.goto('/');
+  await page.locator('#file-input').setInputFiles('e2e/fixtures/DENGBR23.dbf');
+  await expect(page.locator('#result-table tbody tr').first()).toBeVisible();
+  await page.locator('#export-csv-button').click();
+  await expect(page.locator('#toast')).toContainText('salvo em Downloads/TabSis');
+  const ponte = await page.evaluate(() => (window as unknown as { __ponte: { partes: string[]; concluido: { nome: string; tipo: string; abrir: boolean } } }).__ponte);
+  expect(ponte.concluido.nome).toMatch(/\.csv$/);
+  expect(ponte.concluido.abrir).toBe(false);
+  const csv = Buffer.from(ponte.partes.join(''), 'base64').toString('utf8');
+  expect(csv.split('\n').length).toBeGreaterThan(2);
+  await page.evaluate(() => window.print());
+  expect(await page.evaluate(() => (window as unknown as { __ponte: { impressoes: number } }).__ponte.impressoes)).toBe(1);
+});
+
 test('um .TAB salvo pelo TabWin 4.15 abre aqui, somente para leitura', async ({ page }) => {
   // O leitor era provado contra o golden G023 e não estava ligado: a
   // biblioteca lia o formato, o aplicativo não abria o arquivo. Esta fixture é

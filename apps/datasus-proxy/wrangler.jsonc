@@ -17,7 +17,9 @@
     // Liberar a nova DEPOIS de o site mudar quebraria todo download no
     // instante da virada; liberar antes não custa nada, porque origem só é
     // aceita se o navegador realmente vier dela.
-    "ALLOWED_ORIGINS": "https://redkk123.github.io,https://tabweb.me,https://www.tabweb.me",
+    // app.tabweb.me é o app Android: o WebView serve o site empacotado nesse
+    // endereço, interceptado no aparelho (não existe na rede).
+    "ALLOWED_ORIGINS": "https://redkk123.github.io,https://tabweb.me,https://www.tabweb.me,https://app.tabweb.me",
     "MAX_FORM_BYTES": "65536",
     "MAX_FORM_RESPONSE_BYTES": "4194304",
     "MAX_ARCHIVE_BYTES": "536870912",
