@@ -15,6 +15,8 @@ O que o WebView não faz sozinho, o app faz:
   em `Downloads/TabSis`, sem pedir permissão de armazenamento.
 - **PDF da documentação oficial:** vai para Downloads e abre no leitor de PDF.
 - **Imprimir:** serviço de impressão do Android (inclui "Salvar como PDF").
+- **Falta de memória:** se o processo que desenha a página cair (arquivo grande
+  demais), o app recomeça a tela e avisa, em vez de fechar.
 - **Voltar:** fecha a janela aberta no site (busca no DATASUS, manual); senão,
   volta a página; senão, sai do app.
 - **Links para fora** (DATASUS, GitHub) abrem no navegador.
@@ -25,10 +27,10 @@ O que o WebView não faz sozinho, o app faz:
    `npm run android:site`. Isso gera `app/src/main/assets/site`, que fica fora
    do git.
 2. Abra `apps/android` no Android Studio e use **Run**, ou rode
-   `gradle assembleDebug` nesta pasta. O APK sai em
+   `./gradlew assembleDebug` nesta pasta (com `JAVA_HOME` num JDK 17+). O APK sai em
    `app/build/outputs/apk/debug/`.
 
-O wrapper do Gradle está fixado em 9.8.2 (`gradle/wrapper/gradle-wrapper.properties`,
+O wrapper do Gradle (`gradlew`) está fixado em 9.8.2 (`gradle/wrapper/gradle-wrapper.properties`,
 com SHA-256). Versões usadas: AGP 9.4.1, compileSdk/targetSdk 36, minSdk 29
 (Android 10), AndroidX core 1.18.0, activity 1.13.0 e webkit 1.18.0.
 

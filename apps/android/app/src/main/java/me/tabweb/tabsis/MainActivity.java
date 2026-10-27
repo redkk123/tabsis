@@ -9,6 +9,7 @@ import android.os.Bundle;
 import android.print.PrintAttributes;
 import android.print.PrintManager;
 import android.view.ViewGroup;
+import android.webkit.RenderProcessGoneDetail;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
@@ -79,6 +80,23 @@ public class MainActivity extends ComponentActivity {
             @Override
             public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
                 return carregador.shouldInterceptRequest(request.getUrl());
+            }
+
+            // Um arquivo grande demais pode esgotar a memória do processo que
+            // desenha a página. Sem isto o app inteiro fecharia: aqui ele
+            // recomeça a tela e avisa. Os downloads guardados continuam no aparelho.
+            @Override
+            public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
+                Toast.makeText(MainActivity.this, detail.didCrash()
+                        ? "O TabSis encontrou um erro e recomeçou a página."
+                        : "Faltou memória para esta tabela; o TabSis recomeçou a página. Tente um arquivo menor ou feche outros apps.",
+                        Toast.LENGTH_LONG).show();
+                ViewGroup pai = (ViewGroup) view.getParent();
+                if (pai != null) pai.removeView(view);
+                view.destroy();
+                if (view == webView) webView = null;
+                recreate();
+                return true;
             }
 
             @Override
@@ -152,7 +170,7 @@ public class MainActivity extends ComponentActivity {
     @Override
     protected void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
-        webView.saveState(outState);
+        if (webView != null) webView.saveState(outState);
     }
 
     private String versao() {
