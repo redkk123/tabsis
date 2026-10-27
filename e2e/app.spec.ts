@@ -1598,6 +1598,34 @@ test('o pacote para o Lab sai com os dados e a procedência junto', async ({ pag
   expect(csv.split('\r\n').length - 1).toBe(provenance.rowCount + 1);
 });
 
+test('Abrir no Python leva os microdados da tabela e um caderno pronto ao Lab', async ({ page, context }) => {
+  await tabulateFixture(page);
+  await openSidebarGroup(page, 'export');
+  await expect(page.locator('#open-python-button')).toBeEnabled();
+
+  const popup = context.waitForEvent('page');
+  await page.locator('#open-python-button').click();
+  const lab = await popup;
+  await lab.waitForLoadState();
+
+  // Os dados entram como se o usuário os tivesse escolhido: em /data, na lista.
+  await expect(lab.locator('#data-file-list')).toContainText('-microdados.csv');
+  const codigos = await lab.locator('.cell-code').evaluateAll((areas) => areas.map((area) => (area as HTMLTextAreaElement).value));
+  expect(codigos.length).toBeGreaterThanOrEqual(3);
+  expect(codigos[0]).toMatch(/pd\.read_csv\("\/data\/[^"]+-microdados\.csv", sep=";"/);
+  expect(codigos[1]).toMatch(/groupby\(/);
+  // Recarregar não espera dados de novo: o ?origem=tabsis sai da barra.
+  expect(new URL(lab.url()).search).toBe('');
+
+  // O CSV montado tem os mesmos registros que a tabela aceitou.
+  const linhas = await lab.evaluate(async () => {
+    const arquivo = (document.querySelector('#data-files') as HTMLInputElement).files![0];
+    return (await arquivo.text()).trim().split(/\r?\n/).length - 1;
+  });
+  // A fixture tem três registros e nenhum filtro: os três chegam ao Lab.
+  expect(linhas).toBe(3);
+});
+
 test('o arquivo guardado pode ser baixado sem precisar abrir a análise', async ({ page }) => {
   // Querer o arquivo é diferente de querer analisá-lo aqui. Antes, a única
   // forma de tirá-lo do aparelho era abrir a análise primeiro.

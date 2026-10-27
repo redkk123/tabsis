@@ -1,6 +1,6 @@
 # Plano — Laboratório e microdados sem código
 
-Data: 2026-10-27. Status: proposta para discussão; nada daqui está implementado.
+Data: 2026-10-27. Status: proposta para discussão. Implementado até agora: item 1 dos pedidos abaixo.
 
 ## Onde estamos
 
@@ -49,6 +49,36 @@ R/Python no Lab. As duas pessoas chegam ao mesmo número, conferível.
    versão do TabSis.
 5. **Os dados não saem do aparelho.** O Lab continua no navegador; o TabSis
    Local entra quando o volume não cabe.
+
+## Pedidos do Red (2026-10-27), nesta ordem
+
+1. **Liberdade para usar o Python do Lab com os dados do TabSis.** FEITO:
+   o botão "Abrir no Python" (grupo Exportar) abre o Lab numa aba nova com os
+   microdados da tabela atual (Seleções e transformações já aplicadas) em
+   `/data` e um caderno pronto: carrega com pandas, refaz a tabela e lista as
+   transformações em Python como comentário. O caderno anterior vai para a
+   recuperação. Limite: 32 MB (o do Lab); acima disso, a mensagem sugere
+   Seleções ou o item 2. Conferido no Pyodide de verdade: o `groupby` dá os
+   mesmos números da tabela.
+2. **Liberdade para baixar o Python e rodar no computador**, em Windows, Linux
+   e macOS, **sem atrito de código e sem npm**. Proposta: "Baixar para rodar
+   no computador" gera um `.zip` com `dados.csv`, `analise.py` (o mesmo
+   caderno), `analise.ipynb` (para Jupyter/VS Code/Colab) e um iniciador de
+   dois cliques por sistema (`Rodar no Windows.bat`, `Rodar no Mac.command`,
+   `rodar-linux.sh`). O iniciador usa o Python que já existe; se não houver,
+   diz onde baixar (python.org) em vez de falhar calado. Alternativa sem
+   instalar nada: o TabSis Local, que já é um executável único, ganha
+   "Rodar análise" com Python e pandas embutidos (cerca de +40 MB por
+   sistema). Decidir antes de implementar.
+3. **Separar o laboratório de microdados do laboratório de código.**
+   - Microdados: low code, sem escrever nada (as receitas da Fase 1).
+   - Código: o Lab atual.
+   - Caso real que motivou: a pesquisa de doença de Chagas precisou baixar só
+     o CID B57. O SINAN não tem agravo próprio para Chagas crônica, só
+     "tripanossomíase", que inclui a doença do sono (B56). O laboratório de
+     microdados precisa permitir escolher CIDs à mão (lista ou faixa, por
+     exemplo B57.0–B57.5 sem B56) sobre SIM, SIH e SINAN, e salvar essa
+     definição de caso como receita reaproveitável.
 
 ## Fases
 

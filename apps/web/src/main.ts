@@ -378,6 +378,7 @@ const sourceDbfButton = element<HTMLButtonElement>('#source-dbf-button');
 const selectedDbfButton = element<HTMLButtonElement>('#selected-dbf-button');
 const microdatasusCsvButton = element<HTMLButtonElement>('#microdatasus-csv-button');
 const labPackageButton = element<HTMLButtonElement>('#lab-package-button');
+const openPythonButton = element<HTMLButtonElement>('#open-python-button');
 const decodeCancelButton = element<HTMLButtonElement>('#decode-cancel-button');
 const combineCompatibleFiles = element<HTMLInputElement>('#combine-compatible-files');
 const datasetFilesSection = element<HTMLElement>('#dataset-files');
@@ -3828,11 +3829,132 @@ function microdatasusSourceContexts(): MicrodatasusSourceContext[] {
   }));
 }
 
+/** Os registros da tabela atual (Seleções e transformações aplicadas) em CSV, com rótulos das CNV. */
+async function microdadosDaTabelaEmCsv(maxBytes: number): Promise<{ blob: Blob; filename: string; registros: number; bytes: number }> {
+  if (!dbfHeader || !currentPlan || !currentResult) throw new Error('Abra um arquivo e monte uma tabela antes.');
+  const chunks: BlobPart[] = [];
+  const fields = microdatasusFieldSpecs();
+  const conversions = conversionsForMicrodatasus(fields);
+  const reply = await askDataset<{ stats: { recordsSeen: number; recordsAccepted: number; rowsEmitted: number; bytesEmitted: number } }>(
+    {
+      type: 'microdatasus-csv',
+      plan: planWithoutPeriod(currentPlan),
+      conversions,
+      fields,
+      provenanceColumns: ['sourceName', 'system', 'fileType', 'year', 'month', 'uf'],
+      sourceContexts: microdatasusSourceContexts(),
+      maxBytes,
+    },
+    {
+      label: 'Microdados em CSV',
+      progress: datasetProgress('Separando os microdados'),
+      chunk: (bytes) => chunks.push(new Uint8Array(bytes)),
+    },
+  );
+  if (reply.stats.recordsAccepted !== currentResult.recordsAccepted || reply.stats.rowsEmitted !== currentResult.recordsAccepted) {
+    throw new Error('Os microdados divergiram da contagem da tabela; exportação interrompida');
+  }
+  return {
+    blob: new Blob(chunks, { type: 'text/csv;charset=utf-8' }),
+    filename: `${datasetName.replace(/\.[^.]+$/, '').replace(/[^A-Za-z0-9._ +-]/g, '_').slice(0, 80)}-microdados.csv`,
+    registros: reply.stats.rowsEmitted,
+    bytes: reply.stats.bytesEmitted,
+  };
+}
+
+/** O Laboratório aceita até 32 MB por arquivo (lab/src/runtimes/pyodide-runtime-guards.js). */
+const LIMITE_LAB_BYTES = 32 * 1024 * 1024;
+
+/** Caderno inicial: carrega os microdados no pandas, refaz a tabela e deixa o resto livre. */
+function cadernoParaPython(arquivo: string, registros: number): { title: string; cells: Array<{ runtime: 'python'; code: string }> } {
+  const campo = currentPlan?.spec.rows.field ?? '';
+  const comRotulo = microdatasusFieldSpecs().some((spec) => spec.field === campo && spec.valueMode === 'raw-and-label');
+  const coluna = comRotulo ? `${campo}__ROTULO` : campo;
+  const titulo = (resultTitle.textContent ?? '').trim() || datasetName;
+  const celulas = [
+    [
+      `# Microdados enviados pelo TabSis: ${datasetName}`,
+      `# ${integerFormat.format(registros)} registros — os da tabela atual, com Seleções e transformações já aplicadas.`,
+      '# Colunas terminadas em __ROTULO trazem o nome da categoria (CNV); as outras, o código como está no DATASUS.',
+      'import pandas as pd',
+      '',
+      `dados = pd.read_csv(${JSON.stringify(`/data/${arquivo}`)}, sep=";", encoding="utf-8-sig", dtype=str, keep_default_na=False)`,
+      'print(dados.shape)',
+      'dados.head()',
+    ].join('\n'),
+  ];
+  if (campo && /^[A-Za-z_][A-Za-z0-9_]*$/.test(campo)) {
+    celulas.push([
+      `# A mesma pergunta da tabela do TabSis: ${titulo}`,
+      `# Contagem de registros por ${coluna} (confira com a coluna de Frequência do TabSis).`,
+      `tabela = dados.groupby(${JSON.stringify(coluna)}).size().sort_values(ascending=False)`,
+      'tabela',
+    ].join('\n'));
+  }
+  const etapas = appliedTransformSteps.length ? appliedTransformSteps : [];
+  if (etapas.length) {
+    celulas.push([
+      '# As transformações do TabSis, em Python. Elas JÁ FORAM APLICADAS aos dados acima;',
+      '# o código fica aqui para você ver o que foi feito e reaproveitar com outros arquivos.',
+      ...transformPipelineToCode(etapas, 'python', 'dados').split('\n').map((linha) => `# ${linha}`),
+    ].join('\n'));
+  }
+  celulas.push('# Daqui em diante é com você: pandas, numpy, matplotlib, scipy, statsmodels…\n');
+  return { title: `TabSis · ${titulo}`.slice(0, 120), cells: celulas.map((code) => ({ runtime: 'python' as const, code })) };
+}
+
+/**
+ * "Abrir no Python": os microdados da tabela atual vão para o Laboratório
+ * (tabweb.me/lab, mesma origem), num caderno pronto e livre para editar. A
+ * página do Lab avisa quando está pronta e recebe os bytes por postMessage;
+ * nada passa por servidor.
+ */
+async function abrirNoPython(): Promise<void> {
+  // Abre a aba já no clique: depois de preparar o CSV, o navegador bloquearia a janela.
+  const lab = window.open('./lab/?origem=tabsis', '_blank');
+  if (!lab) throw new Error('O navegador bloqueou a nova aba do Laboratório; permita janelas para este site.');
+  let pronto = false;
+  let envio: (() => void) | null = null;
+  const ouvir = (event: MessageEvent) => {
+    if (event.origin !== window.location.origin || event.source !== lab || (event.data as { tipo?: string })?.tipo !== 'tabsis:pronto') return;
+    pronto = true;
+    envio?.();
+  };
+  window.addEventListener('message', ouvir);
+  openPythonButton.disabled = true;
+  try {
+    const { blob, filename, registros, bytes } = await microdadosDaTabelaEmCsv(LIMITE_LAB_BYTES);
+    const conteudo = await blob.arrayBuffer();
+    const caderno = cadernoParaPython(filename, registros);
+    await new Promise<void>((resolve, reject) => {
+      const prazo = window.setTimeout(() => reject(new Error('O Laboratório não respondeu em 60 segundos.')), 60_000);
+      envio = () => {
+        window.clearTimeout(prazo);
+        lab.postMessage({ tipo: 'tabsis:dados', arquivos: [{ name: filename, bytes: conteudo }], caderno }, window.location.origin, [conteudo]);
+        resolve();
+      };
+      if (pronto) envio();
+    });
+    showToast(`Laboratório aberto com ${integerFormat.format(registros)} registros (${formatBytes(bytes)}) e um caderno pronto.`);
+  } catch (error) {
+    const mensagem = error instanceof Error ? error.message : String(error);
+    const grande = /maxBytes|limite|exceed|larger|grande/i.test(mensagem);
+    lab.close();
+    throw new Error(grande
+      ? `Os microdados desta tabela passam de ${formatBytes(LIMITE_LAB_BYTES)}, o limite do Laboratório no navegador. Use Seleções para recortar (um ano, um estado), ou baixe o código Python e rode no computador.`
+      : mensagem);
+  } finally {
+    window.removeEventListener('message', ouvir);
+    openPythonButton.disabled = !dbfHeader || !currentPlan || !currentResult;
+  }
+}
+
 async function downloadMicrodatasusCsv(): Promise<void> {
   if (!dbfHeader || !currentPlan || !currentResult) return;
   const label = microdatasusCsvButton.textContent;
   microdatasusCsvButton.disabled = true;
   labPackageButton.disabled = true;
+  openPythonButton.disabled = true;
   microdatasusCsvButton.textContent = 'Preparando Microdatasus…';
   const chunks: BlobPart[] = [];
   try {
@@ -4196,6 +4318,7 @@ async function runAnalysis(measureOverride?: MeasureSpec, planOverride?: QueryPl
   selectedDbfButton.disabled = true;
   microdatasusCsvButton.disabled = true;
   labPackageButton.disabled = true;
+  openPythonButton.disabled = true;
   await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
   decodeCancelButton.hidden = false;
   try {
@@ -4244,6 +4367,7 @@ async function runAnalysis(measureOverride?: MeasureSpec, planOverride?: QueryPl
     saveRecipeButton.disabled = false;
     saveTableButton.disabled = false;
     labPackageButton.disabled = false;
+    openPythonButton.disabled = false;
     selectedDbfButton.disabled = false;
     setControlsEnabled(true);
     if (currentView === 'map' || rowField.value.toUpperCase().includes('MUNIC')) await ensureMap();
@@ -10871,6 +10995,7 @@ async function openPortableTable(file: File): Promise<void> {
   selectedDbfButton.disabled = true;
   microdatasusCsvButton.disabled = true;
   labPackageButton.disabled = true;
+  openPythonButton.disabled = true;
   resetAnalysisState();
   renderCrossFieldRules();
   renderExtraMeasures();
@@ -10928,6 +11053,7 @@ async function openPortableTable(file: File): Promise<void> {
   saveRecipeButton.disabled = true;
   saveTableButton.disabled = false;
   labPackageButton.disabled = false;
+  openPythonButton.disabled = false;
   exportCsvButton.disabled = false;
   exportJsonButton.disabled = false;
   exportXlsxButton.disabled = false;
@@ -11014,6 +11140,7 @@ function openLegacyTabText(text: string, name: string, kind: string): void {
   saveRecipeButton.disabled = true;
   saveTableButton.disabled = false;
   labPackageButton.disabled = false;
+  openPythonButton.disabled = false;
   for (const button of [exportCsvButton, exportJsonButton, exportXlsxButton, exportXmlButton, exportTabButton, exportPrnButton, exportSqlButton]) {
     button.disabled = false;
   }
@@ -11466,6 +11593,9 @@ sourceDbfButton.addEventListener('click', () => void downloadSourceDbf().catch((
   showToast(error instanceof Error ? error.message : String(error), true)));
 microdatasusCsvButton.addEventListener('click', () => void downloadMicrodatasusCsv().catch((error) =>
   showToast(error instanceof Error ? error.message : String(error), true)));
+openPythonButton.addEventListener('click', () => {
+  void abrirNoPython().catch((error) => showToast(error instanceof Error ? error.message : String(error), true));
+});
 labPackageButton.addEventListener('click', () => {
   try {
     downloadLabPackage();
