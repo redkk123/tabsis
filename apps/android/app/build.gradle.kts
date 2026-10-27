@@ -12,13 +12,29 @@ android {
         // Android 10: salvar em Downloads (MediaStore) sem pedir permissão de armazenamento.
         minSdk = 29
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.0.0"
+    }
+
+    // Chave de release fora do repositório: caminho e senhas vêm do ambiente
+    // (TABSIS_KEYSTORE, TABSIS_KEYSTORE_PASSWORD, TABSIS_KEY_ALIAS, TABSIS_KEY_PASSWORD).
+    // A mesma chave sempre: sem ela, uma versão nova não instala por cima da antiga.
+    val chave = providers.environmentVariable("TABSIS_KEYSTORE").orNull
+    signingConfigs {
+        if (chave != null) {
+            create("release") {
+                storeFile = file(chave)
+                storePassword = providers.environmentVariable("TABSIS_KEYSTORE_PASSWORD").get()
+                keyAlias = providers.environmentVariable("TABSIS_KEY_ALIAS").getOrElse("tabsis")
+                keyPassword = providers.environmentVariable("TABSIS_KEY_PASSWORD").orElse(providers.environmentVariable("TABSIS_KEYSTORE_PASSWORD")).get()
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
+            if (chave != null) signingConfig = signingConfigs.getByName("release")
         }
     }
 

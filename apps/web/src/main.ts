@@ -163,13 +163,19 @@ import {
   rememberCatalogAnswers,
 } from './catalog-memory-store.ts';
 import {
+  bridgeBaseUrl,
+  bridgeHasFeature,
   bridgeWouldHelp,
   cancelBridgeDownload,
   describeBridgeProbe,
+  fetchBridgeFile,
+  listBridgeFiles,
   probeBridge,
   readBridgeJob,
+  sendFileToBridge,
   startBridgeDownload,
   type BridgeJob,
+  type BridgeLocalFile,
 } from '../../../packages/acquisition/src/bridge-client.ts';
 import {
   describeSkippedEntries,
@@ -8156,7 +8162,15 @@ const bridgeVerdict = element<HTMLElement>('#bridge-verdict');
  * própria nem o inicia. Sem isso, um site qualquer poderia sondar portas da
  * máquina de quem abrisse a página.
  */
-let bridgeReady: { token: string; directory: string } | null = null;
+let bridgeReady: { token: string; directory: string; baseUrl: string; features: string[] } | null = null;
+/** Porta do auxiliar: 8787, ou a que o TabSis Local mandou no link (#local=token:porta). */
+let bridgePort = 8787;
+const bridgeAutoCopy = element<HTMLInputElement>('#bridge-auto-copy');
+const bridgeAutoCopyLabel = element<HTMLElement>('#bridge-auto-copy-label');
+const catalogLocal = element<HTMLElement>('#catalog-local');
+const catalogLocalSummary = element<HTMLElement>('#catalog-local-summary');
+const catalogLocalList = element<HTMLElement>('#catalog-local-list');
+const bridgeOptions = () => (bridgeReady ? { token: bridgeReady.token, baseUrl: bridgeReady.baseUrl } : null);
 
 function setBridgeVerdict(message: string, kind: 'ok' | 'off' | 'warn'): void {
   bridgeVerdict.hidden = false;
@@ -8169,7 +8183,7 @@ async function checkBridge(): Promise<void> {
   bridgeCheckButton.disabled = true;
   setBridgeVerdict('Perguntando ao auxiliar…', 'off');
   try {
-    const probe = await probeBridge();
+    const probe = await probeBridge(bridgeBaseUrl(bridgePort));
     if (!probe.available) {
       bridgeReady = null;
       setBridgeVerdict(describeBridgeProbe(probe), probe.reason === 'offline' ? 'off' : 'warn');
@@ -8183,15 +8197,155 @@ async function checkBridge(): Promise<void> {
       );
       return;
     }
-    bridgeReady = { token, directory: probe.health.directory };
-    setBridgeVerdict(
-      `${describeBridgeProbe(probe)}. Endereços que ele pode acessar: ${probe.health.allowlist.join(' | ')}`,
-      'ok',
-    );
+    bridgeReady = { token, directory: probe.health.directory, baseUrl: probe.baseUrl, features: probe.health.features ?? [] };
+    const local = bridgeHasFeature(probe.health, 'guardados');
+    setBridgeVerdict(local
+      ? `TabSis Local ${probe.health.version ?? ''} conectado. Pasta: ${probe.health.directory}`
+      : `${describeBridgeProbe(probe)}. Endereços que ele pode acessar: ${probe.health.allowlist.join(' | ')}`,
+    'ok');
+    bridgeAutoCopyLabel.hidden = !local;
+    void renderLocalFiles();
+    void renderRecentArchives();
   } finally {
     bridgeCheckButton.disabled = false;
   }
 }
+
+/** Arquivos já copiados nesta sessão: reabrir do cache não manda de novo. */
+const copiadosParaComputador = new Set<string>();
+
+/**
+ * Cópia no computador do que acabou de ser baixado (TabSis Local aberto e a
+ * opção marcada). Não atrasa a análise: vai em segundo plano e avisa onde ficou.
+ */
+async function copiarParaComputador(arquivos: ReadonlyArray<{ name: string; bytes: Uint8Array }>): Promise<void> {
+  const opcoes = bridgeOptions();
+  if (!opcoes || !bridgeReady?.features.includes('guardados') || !bridgeAutoCopy.checked) return;
+  for (const arquivo of arquivos) {
+    const nome = displayBaseName(arquivo.name);
+    if (!['DBC', 'DBF', 'PARQUET'].includes(extensionOf(nome))) continue;
+    const chave = `${nome}:${arquivo.bytes.byteLength}`;
+    if (copiadosParaComputador.has(chave)) continue;
+    try {
+      const salvo = await sendFileToBridge(opcoes, nome, new Blob([arquivo.bytes as BlobPart]));
+      copiadosParaComputador.add(chave);
+      showToast(`Cópia no computador: ${salvo.path}`);
+    } catch (error) {
+      showToast(`Não deu para copiar ${nome} para o computador: ${error instanceof Error ? error.message : String(error)}`, true);
+    }
+  }
+  void renderLocalFiles();
+}
+
+/** "No computador": o que está na pasta do TabSis Local, para abrir de novo aqui sem baixar. */
+async function renderLocalFiles(): Promise<void> {
+  const opcoes = bridgeOptions();
+  catalogLocal.hidden = !opcoes || !bridgeReady?.features.includes('arquivos');
+  if (catalogLocal.hidden || !opcoes) return;
+  let lista: { directory: string; files: BridgeLocalFile[] };
+  try {
+    lista = await listBridgeFiles(opcoes);
+  } catch (error) {
+    catalogLocalSummary.textContent = `Não deu para ler a pasta do TabSis Local: ${error instanceof Error ? error.message : String(error)}`;
+    catalogLocalList.replaceChildren();
+    return;
+  }
+  const dados = lista.files.filter((arquivo) => ['DBC', 'DBF', 'PARQUET'].includes(extensionOf(arquivo.nome)));
+  catalogLocalSummary.textContent = dados.length
+    ? `${dados.length} arquivo(s) de dados em ${lista.directory}. Abra daqui, ou em qualquer outro programa por essa pasta.`
+    : `Nenhum arquivo de dados em ${lista.directory} ainda. O que você baixar aqui vai para lá.`;
+  catalogLocalList.replaceChildren();
+  const marcados = new Map<BridgeLocalFile, HTMLInputElement>();
+  const abrir = async (escolhidos: BridgeLocalFile[], juntar: boolean): Promise<void> => {
+    setCatalogBusy(true);
+    try {
+      setCatalogStatus(`Abrindo ${escolhidos.length} arquivo(s) da pasta do computador…`);
+      const arquivos = [];
+      for (const arquivo of escolhidos) arquivos.push(new File([(await fetchBridgeFile(opcoes, arquivo)) as BlobPart], arquivo.nome));
+      await loadFiles(arquivos, juntar ? { juntar: true } : {});
+      setCatalogStatus(`${escolhidos.map((arquivo) => arquivo.nome).join(', ')} aberto(s) da pasta do computador, sem baixar de novo.`);
+      catalogDialog.close();
+    } catch (error) {
+      setCatalogStatus(error instanceof Error ? error.message : String(error), true);
+    } finally {
+      setCatalogBusy(false);
+    }
+  };
+  if (dados.length > 1) {
+    const barra = document.createElement('div');
+    barra.className = 'catalog-result catalog-batch-bar';
+    const texto = document.createElement('div');
+    texto.innerHTML = '<b>Abrir vários juntos</b><small>Marque outros anos, meses ou estados do mesmo sistema.</small>';
+    const juntos = document.createElement('button');
+    juntos.className = 'secondary-button';
+    juntos.type = 'button';
+    juntos.id = 'catalog-local-open-together';
+    juntos.textContent = 'Abrir marcados juntos';
+    juntos.disabled = true;
+    juntos.addEventListener('click', () => void abrir([...marcados].filter(([, caixa]) => caixa.checked).map(([arquivo]) => arquivo), false));
+    barra.append(texto, juntos);
+    catalogLocalList.append(barra);
+    const sincronizar = () => {
+      const n = [...marcados.values()].filter((caixa) => caixa.checked).length;
+      juntos.disabled = n < 2;
+      juntos.textContent = n > 1 ? `Abrir os ${n} juntos` : 'Abrir marcados juntos';
+    };
+    for (const arquivo of dados) {
+      const caixa = document.createElement('input');
+      caixa.type = 'checkbox';
+      caixa.className = 'catalog-result-check';
+      caixa.addEventListener('change', sincronizar);
+      marcados.set(arquivo, caixa);
+    }
+  }
+  for (const arquivo of dados) {
+    const item = document.createElement('div');
+    item.className = 'catalog-result catalog-recent-item';
+    const caixa = marcados.get(arquivo);
+    if (caixa) item.append(caixa);
+    const detalhes = document.createElement('div');
+    const nome = document.createElement('b');
+    nome.textContent = arquivo.nome;
+    const meta = document.createElement('small');
+    meta.textContent = `${formatBytes(arquivo.bytes)} · ${new Date(arquivo.modificado * 1000).toLocaleString('pt-BR')} · ${arquivo.caminho}`;
+    detalhes.append(nome, meta);
+    const acoes = document.createElement('div');
+    acoes.className = 'catalog-recent-actions';
+    const botao = document.createElement('button');
+    botao.className = 'secondary-button';
+    botao.type = 'button';
+    botao.textContent = 'Abrir';
+    botao.addEventListener('click', () => void abrir([arquivo], false));
+    acoes.append(botao);
+    if (dbfHeader) {
+      const juntar = document.createElement('button');
+      juntar.className = 'text-button';
+      juntar.type = 'button';
+      juntar.textContent = 'Juntar ao aberto';
+      juntar.addEventListener('click', () => void abrir([arquivo], true));
+      acoes.append(juntar);
+    }
+    item.append(detalhes, acoes);
+    catalogLocalList.append(item);
+  }
+}
+
+// O TabSis Local abre esta página com #local=token:porta: liga os dois sem
+// colar nada. O fragmento não vai para servidor nenhum, e sai da barra de
+// endereço em seguida.
+function conectarPeloLink(): void {
+  const ligacao = /(?:^#|&)local=([A-Za-z0-9_-]{16,}):(\d{2,5})/.exec(window.location.hash);
+  if (!ligacao) return;
+  bridgeTokenInput.value = ligacao[1]!;
+  bridgePort = Number(ligacao[2]);
+  history.replaceState(null, '', window.location.pathname + window.location.search);
+  void checkBridge().then(() => {
+    if (bridgeReady) showToast(`Conectado ao TabSis Local: o que você baixar fica também em ${bridgeReady.directory}`);
+  });
+}
+conectarPeloLink();
+// Com o TabSis já aberto nesta aba, o link só troca o #: a página não recarrega.
+window.addEventListener('hashchange', conectarPeloLink);
 
 bridgeCheckButton.addEventListener('click', () => void checkBridge());
 
@@ -8801,6 +8955,7 @@ async function downloadCatalogEntries(
   }
   const archiveSha256 = summary?.sha256 || await sha256(archive);
   const extracted = await extractSupportedArchiveAsync(archive);
+  if (role === 'data') void copiarParaComputador(extracted.files);
   if (role === 'auxiliary') {
     for (const name of listArchiveDocuments(archive)) documentosOficiais.set(displayBaseName(name), { cacheKey, entry: name });
     renderFileList();
@@ -9872,6 +10027,45 @@ async function renderRecentArchives(): Promise<void> {
       catalogRecentList.append(bulk);
     }
 
+    // Com o TabSis Local aberto, o que está neste navegador pode ir para a pasta do computador.
+    if (dataArchives.length && bridgeReady?.features.includes('guardados')) {
+      const enviar = document.createElement('div');
+      enviar.className = 'catalog-result catalog-batch-bar';
+      const texto = document.createElement('div');
+      texto.innerHTML = `<b>Enviar ${dataArchives.length === 1 ? 'o guardado' : `os ${integerFormat.format(dataArchives.length)} guardados`} para o computador</b><small>Copia para ${bridgeReady.directory}</small>`;
+      const botao = document.createElement('button');
+      botao.className = 'secondary-button';
+      botao.type = 'button';
+      botao.id = 'catalog-recent-send-local';
+      botao.textContent = 'Enviar para o computador';
+      botao.addEventListener('click', () => void (async () => {
+        const opcoes = bridgeOptions();
+        if (!opcoes) return;
+        botao.disabled = true;
+        let feitos = 0;
+        try {
+          for (const resumo of dataArchives) {
+            const { file } = await arquivoGuardado(resumo);
+            botao.textContent = `Enviando ${feitos + 1} de ${dataArchives.length}…`;
+            await sendFileToBridge(opcoes, file.name, file);
+            feitos += 1;
+          }
+          setCatalogStatus(`${feitos} arquivo(s) copiados para ${bridgeReady?.directory ?? 'o computador'}.`);
+        } catch (error) {
+          setCatalogStatus(`Parou em ${feitos} de ${dataArchives.length}: ${error instanceof Error ? error.message : String(error)}`, true);
+        } finally {
+          botao.disabled = false;
+          botao.textContent = 'Enviar para o computador';
+          void renderLocalFiles();
+        }
+      })());
+      const acoes = document.createElement('div');
+      acoes.className = 'catalog-batch-bar-actions';
+      acoes.append(botao);
+      enviar.append(texto, acoes);
+      catalogRecentList.append(enviar);
+    }
+
     // Juntar o que já está aqui: marque dois ou mais (anos, meses, estados do
     // mesmo sistema) e abra como um conjunto, sem baixar de novo.
     const marcados = new Map<CachedArchiveSummary, HTMLInputElement>();
@@ -10364,7 +10558,14 @@ interface PonteAndroid {
   imprimir(): void;
 }
 const ponteAndroid = (window as unknown as { TabSisAndroid?: PonteAndroid }).TabSisAndroid;
-if (ponteAndroid) window.print = () => ponteAndroid.imprimir();
+if (ponteAndroid) {
+  window.print = () => ponteAndroid.imprimir();
+  // No seletor do Android, marcar vários arquivos é tocar e segurar o primeiro
+  // — e nada na tela diz isso. Sem esta dica, "abrir vários anos" parecia não existir.
+  const dica = document.querySelector<HTMLElement>('.drop-zone-dica');
+  if (dica) dica.textContent = 'Vários anos? No seletor do Android, toque e segure o primeiro arquivo e depois toque nos outros: eles são juntados.';
+  document.querySelector('#dataset-add-button')?.setAttribute('title', 'Toque e segure no seletor para marcar vários arquivos');
+}
 
 function paraBase64(bytes: Uint8Array): string {
   let texto = '';
@@ -12085,6 +12286,7 @@ defInspectorDialog.addEventListener('click', (event) => {
 element<HTMLButtonElement>('#catalog-button').addEventListener('click', () => {
   catalogDialog.showModal();
   void renderRecentArchives();
+  void renderLocalFiles();
 });
 
 /**
