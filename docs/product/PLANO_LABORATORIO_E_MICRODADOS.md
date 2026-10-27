@@ -1,6 +1,6 @@
 # Plano — Laboratório e microdados sem código
 
-Data: 2026-10-27. Status: proposta para discussão. Implementado até agora: item 1 dos pedidos abaixo.
+Data: 2026-10-27. Status: proposta para discussão. Implementado até agora: itens 1 e 2 dos pedidos abaixo.
 
 ## Onde estamos
 
@@ -61,15 +61,16 @@ R/Python no Lab. As duas pessoas chegam ao mesmo número, conferível.
    Seleções ou o item 2. Conferido no Pyodide de verdade: o `groupby` dá os
    mesmos números da tabela.
 2. **Liberdade para baixar o Python e rodar no computador**, em Windows, Linux
-   e macOS, **sem atrito de código e sem npm**. Proposta: "Baixar para rodar
-   no computador" gera um `.zip` com `dados.csv`, `analise.py` (o mesmo
-   caderno), `analise.ipynb` (para Jupyter/VS Code/Colab) e um iniciador de
-   dois cliques por sistema (`Rodar no Windows.bat`, `Rodar no Mac.command`,
-   `rodar-linux.sh`). O iniciador usa o Python que já existe; se não houver,
-   diz onde baixar (python.org) em vez de falhar calado. Alternativa sem
-   instalar nada: o TabSis Local, que já é um executável único, ganha
-   "Rodar análise" com Python e pandas embutidos (cerca de +40 MB por
-   sistema). Decidir antes de implementar.
+   e macOS, **sem atrito de código e sem npm**. FEITO: "Rodar no computador"
+   baixa um `.zip` com `dados/`, `analise.py`, `analise.ipynb`,
+   `requirements.txt` e um arquivo de dois cliques por sistema
+   (`Rodar no Windows.bat`, `Rodar no Mac.command`, `rodar-linux.sh`). O
+   arquivo acha um Python 3.9+ e chama `preparar_e_rodar.py`, que cria um
+   `.venv` só da pasta, instala os pacotes uma vez e roda a análise. Sem
+   Python, abre o python.org. Limite de 512 MB. Conferido no Linux (a análise
+   dá os mesmos números da tabela). Windows e macOS: só revisão do script,
+   falta testar numa máquina real. Possível próximo passo, se o Python
+   instalado à parte atrapalhar: o TabSis Local com Python embutido.
 3. **Separar o laboratório de microdados do laboratório de código.**
    - Microdados: low code, sem escrever nada (as receitas da Fase 1).
    - Código: o Lab atual.

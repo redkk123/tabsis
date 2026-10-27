@@ -649,6 +649,8 @@ histórico do TabWin 4.15.
 | **Microdatasus filtrado CSV** | os registros aceitos, no formato que o pacote `microdatasus` do R espera |
 | **Extrair DBF original** | o DBF de dentro do DBC, sem alteração |
 | **Pacote para o Lab** | a tabela mais um `PROVENIENCIA.json` (origem, hash das fontes, filtros e transformações), para analisar no Tabwin Lab |
+| **Abrir no Python** | abre o Laboratório numa aba nova com os microdados da tabela em `/data` e um caderno pandas pronto (até 32 MB) |
+| **Rodar no computador** | um `.zip` com os microdados, o caderno em `.py` e `.ipynb` e um arquivo de dois cliques para Windows, macOS e Linux |
 
 A receita carrega o pipeline junto. Sem isso ela reconstruiria uma tabela
 diferente enquanto afirma fidelidade à fonte — e uma receita que mente sobre
@@ -665,6 +667,28 @@ citada.
 
 Célula vazia significa **ausente**. Nenhum zero é fabricado para preencher
 lacuna — nem na exportação, nem na leitura do outro lado.
+
+### Python com os microdados: no navegador ou no computador
+
+**Abrir no Python** leva os registros da tabela atual (com Seleções e
+transformações aplicadas) para o Laboratório, num caderno que já carrega os
+dados no pandas e refaz a tabela. Daí em diante o código é seu: edite e rode.
+O caderno que estava aberto no Lab fica em "Recuperar versão anterior". O
+limite é o do Lab no navegador, 32 MB.
+
+**Rodar no computador** baixa o mesmo caderno para rodar fora do navegador,
+sem esse limite e sem instalar nada além do Python:
+
+1. Descompacte o `.zip`.
+2. Dê dois cliques em `Rodar no Windows.bat`, `Rodar no Mac.command` ou
+   `rodar-linux.sh`.
+3. Na primeira vez ele prepara um Python só daquela pasta e instala o pandas
+   (precisa de internet nessa hora). Se não houver Python no computador, ele
+   avisa e mostra onde baixar.
+
+O resultado aparece na janela e fica salvo em `resultado-tabela.csv`. Para
+mexer, edite `analise.py` (ou abra `analise.ipynb` no Jupyter, VS Code ou
+Colab) e rode de novo. Pacotes extras entram em `requirements.txt`.
 
 ### Abrir um `.TAB` do TabWin 4.15
 

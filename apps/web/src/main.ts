@@ -1,4 +1,4 @@
-import { unzipSync, zip, zipSync } from 'fflate';
+import { unzipSync, zip, zipSync, type Zippable } from 'fflate';
 import {
   readDbfHeader,
   readDbfRecords,
@@ -86,6 +86,14 @@ import {
   labPackageEntries,
   labPackageFilename,
 } from '../../../packages/export/src/lab-package.ts';
+import {
+  arquivosRodarNoComputador,
+  PASTA_DADOS,
+  PYTHON_PASTA,
+  ZIP_ATTRS_COMUM,
+  ZIP_ATTRS_EXECUTAVEL,
+  type CelulaPython,
+} from '../../../packages/export/src/python-local.ts';
 import { extractSourceDbf } from '../../../packages/export/src/dbf-source.ts';
 import { describeDownloadStrategy } from '../../../packages/acquisition/src/ranged-download.ts';
 import { officialDocumentsFor, type OfficialDocument } from '../../../packages/acquisition/src/official-docs.ts';
@@ -379,6 +387,7 @@ const selectedDbfButton = element<HTMLButtonElement>('#selected-dbf-button');
 const microdatasusCsvButton = element<HTMLButtonElement>('#microdatasus-csv-button');
 const labPackageButton = element<HTMLButtonElement>('#lab-package-button');
 const openPythonButton = element<HTMLButtonElement>('#open-python-button');
+const pythonLocalButton = element<HTMLButtonElement>('#python-local-button');
 const decodeCancelButton = element<HTMLButtonElement>('#decode-cancel-button');
 const combineCompatibleFiles = element<HTMLInputElement>('#combine-compatible-files');
 const datasetFilesSection = element<HTMLElement>('#dataset-files');
@@ -3865,42 +3874,95 @@ async function microdadosDaTabelaEmCsv(maxBytes: number): Promise<{ blob: Blob; 
 /** O Laboratório aceita até 32 MB por arquivo (lab/src/runtimes/pyodide-runtime-guards.js). */
 const LIMITE_LAB_BYTES = 32 * 1024 * 1024;
 
-/** Caderno inicial: carrega os microdados no pandas, refaz a tabela e deixa o resto livre. */
-function cadernoParaPython(arquivo: string, registros: number): { title: string; cells: Array<{ runtime: 'python'; code: string }> } {
+/**
+ * Caderno inicial: carrega os microdados no pandas, refaz a tabela e deixa o
+ * resto livre. O mesmo caderno vai para o Laboratório (dados em /data) e para
+ * o pacote "Rodar no computador" (dados em ./dados, ao lado do script).
+ */
+function celulasPython(arquivo: string, registros: number, destino: 'lab' | 'computador'): { titulo: string; celulas: CelulaPython[] } {
   const campo = currentPlan?.spec.rows.field ?? '';
   const comRotulo = microdatasusFieldSpecs().some((spec) => spec.field === campo && spec.valueMode === 'raw-and-label');
   const coluna = comRotulo ? `${campo}__ROTULO` : campo;
   const titulo = (resultTitle.textContent ?? '').trim() || datasetName;
-  const celulas = [
-    [
+  const caminho = destino === 'lab' ? JSON.stringify(`/data/${arquivo}`) : `PASTA / ${JSON.stringify(PASTA_DADOS)} / ${JSON.stringify(arquivo)}`;
+  const celulas: CelulaPython[] = [{
+    code: [
       `# Microdados enviados pelo TabSis: ${datasetName}`,
       `# ${integerFormat.format(registros)} registros — os da tabela atual, com Seleções e transformações já aplicadas.`,
       '# Colunas terminadas em __ROTULO trazem o nome da categoria (CNV); as outras, o código como está no DATASUS.',
       'import pandas as pd',
+      ...(destino === 'computador' ? [PYTHON_PASTA] : []),
       '',
-      `dados = pd.read_csv(${JSON.stringify(`/data/${arquivo}`)}, sep=";", encoding="utf-8-sig", dtype=str, keep_default_na=False)`,
+      `dados = pd.read_csv(${caminho}, sep=";", encoding="utf-8-sig", dtype=str, keep_default_na=False)`,
       'print(dados.shape)',
-      'dados.head()',
     ].join('\n'),
-  ];
+    mostrar: 'dados.head()',
+  }];
   if (campo && /^[A-Za-z_][A-Za-z0-9_]*$/.test(campo)) {
-    celulas.push([
-      `# A mesma pergunta da tabela do TabSis: ${titulo}`,
-      `# Contagem de registros por ${coluna} (confira com a coluna de Frequência do TabSis).`,
-      `tabela = dados.groupby(${JSON.stringify(coluna)}).size().sort_values(ascending=False)`,
-      'tabela',
-    ].join('\n'));
+    celulas.push({
+      code: [
+        `# A mesma pergunta da tabela do TabSis: ${titulo}`,
+        `# Contagem de registros por ${coluna} (confira com a coluna de Frequência do TabSis).`,
+        `tabela = dados.groupby(${JSON.stringify(coluna)}).size().sort_values(ascending=False)`,
+        ...(destino === 'computador' ? ['tabela.to_csv(PASTA / "resultado-tabela.csv", sep=";", header=["Frequencia"])'] : []),
+      ].join('\n'),
+      mostrar: destino === 'computador' ? 'tabela.to_string()' : 'tabela',
+    });
   }
-  const etapas = appliedTransformSteps.length ? appliedTransformSteps : [];
-  if (etapas.length) {
-    celulas.push([
-      '# As transformações do TabSis, em Python. Elas JÁ FORAM APLICADAS aos dados acima;',
-      '# o código fica aqui para você ver o que foi feito e reaproveitar com outros arquivos.',
-      ...transformPipelineToCode(etapas, 'python', 'dados').split('\n').map((linha) => `# ${linha}`),
-    ].join('\n'));
+  if (appliedTransformSteps.length) {
+    celulas.push({
+      code: [
+        '# As transformações do TabSis, em Python. Elas JÁ FORAM APLICADAS aos dados acima;',
+        '# o código fica aqui para você ver o que foi feito e reaproveitar com outros arquivos.',
+        ...transformPipelineToCode(appliedTransformSteps, 'python', 'dados').split('\n').map((linha) => `# ${linha}`),
+      ].join('\n'),
+    });
   }
-  celulas.push('# Daqui em diante é com você: pandas, numpy, matplotlib, scipy, statsmodels…\n');
-  return { title: `TabSis · ${titulo}`.slice(0, 120), cells: celulas.map((code) => ({ runtime: 'python' as const, code })) };
+  celulas.push({ code: '# Daqui em diante é com você: pandas, numpy, matplotlib, scipy, statsmodels…\n' });
+  return { titulo: `TabSis · ${titulo}`.slice(0, 120), celulas };
+}
+
+function cadernoParaPython(arquivo: string, registros: number): { title: string; cells: Array<{ runtime: 'python'; code: string }> } {
+  const { titulo, celulas } = celulasPython(arquivo, registros, 'lab');
+  return {
+    title: titulo,
+    cells: celulas.map((celula) => ({ runtime: 'python' as const, code: celula.mostrar ? `${celula.code}\n${celula.mostrar}` : celula.code })),
+  };
+}
+
+/** No computador não há o limite do navegador do Lab, só a memória para montar o zip. */
+const LIMITE_COMPUTADOR_BYTES = 512 * 1024 * 1024;
+
+/**
+ * "Rodar no computador": um zip com os microdados, o caderno em .py e .ipynb
+ * e um arquivo de dois cliques por sistema (packages/export/src/python-local.ts).
+ */
+async function baixarPythonParaComputador(): Promise<void> {
+  pythonLocalButton.disabled = true;
+  try {
+    const { blob, filename, registros, bytes } = await microdadosDaTabelaEmCsv(LIMITE_COMPUTADOR_BYTES);
+    const { titulo, celulas } = celulasPython(filename, registros, 'computador');
+    const textos = arquivosRodarNoComputador({ celulas, titulo, csvNome: filename, registros: integerFormat.format(registros) });
+    const pasta = filename.replace(/-microdados\.csv$/, '-python');
+    const codificar = new TextEncoder();
+    const entradas: Zippable = {};
+    for (const [nome, arquivo] of Object.entries(textos)) {
+      entradas[`${pasta}/${nome}`] = [codificar.encode(arquivo.texto), { os: 3, attrs: arquivo.executavel ? ZIP_ATTRS_EXECUTAVEL : ZIP_ATTRS_COMUM }];
+    }
+    entradas[`${pasta}/${PASTA_DADOS}/${filename}`] = [new Uint8Array(await blob.arrayBuffer()), { os: 3, attrs: ZIP_ATTRS_COMUM, level: bytes > 64 * 1024 * 1024 ? 1 : 6 }];
+    const pacote = await new Promise<Uint8Array>((resolve, reject) => {
+      zip(entradas, { level: 6 }, (error, data) => (error ? reject(error) : resolve(data)));
+    });
+    downloadBlob(new Blob([pacote], { type: 'application/zip' }), `${pasta}.zip`);
+    showToast(`Pacote para rodar no computador: ${integerFormat.format(registros)} registros. Descompacte e dê dois cliques em "Rodar no …".`);
+  } catch (error) {
+    const mensagem = error instanceof Error ? error.message : String(error);
+    throw new Error(/maxBytes|limite|exceed|larger|grande/i.test(mensagem)
+      ? `Os microdados desta tabela passam de ${formatBytes(LIMITE_COMPUTADOR_BYTES)}. Use Seleções para recortar (um ano, um estado).`
+      : mensagem);
+  } finally {
+    pythonLocalButton.disabled = !dbfHeader || !currentPlan || !currentResult;
+  }
 }
 
 /**
@@ -3922,6 +3984,7 @@ async function abrirNoPython(): Promise<void> {
   };
   window.addEventListener('message', ouvir);
   openPythonButton.disabled = true;
+  pythonLocalButton.disabled = true;
   try {
     const { blob, filename, registros, bytes } = await microdadosDaTabelaEmCsv(LIMITE_LAB_BYTES);
     const conteudo = await blob.arrayBuffer();
@@ -3941,11 +4004,12 @@ async function abrirNoPython(): Promise<void> {
     const grande = /maxBytes|limite|exceed|larger|grande/i.test(mensagem);
     lab.close();
     throw new Error(grande
-      ? `Os microdados desta tabela passam de ${formatBytes(LIMITE_LAB_BYTES)}, o limite do Laboratório no navegador. Use Seleções para recortar (um ano, um estado), ou baixe o código Python e rode no computador.`
+      ? `Os microdados desta tabela passam de ${formatBytes(LIMITE_LAB_BYTES)}, o limite do Laboratório no navegador. Use Seleções para recortar (um ano, um estado), ou use “Rodar no computador”, que não tem esse limite.`
       : mensagem);
   } finally {
     window.removeEventListener('message', ouvir);
     openPythonButton.disabled = !dbfHeader || !currentPlan || !currentResult;
+    pythonLocalButton.disabled = openPythonButton.disabled;
   }
 }
 
@@ -3955,6 +4019,7 @@ async function downloadMicrodatasusCsv(): Promise<void> {
   microdatasusCsvButton.disabled = true;
   labPackageButton.disabled = true;
   openPythonButton.disabled = true;
+  pythonLocalButton.disabled = true;
   microdatasusCsvButton.textContent = 'Preparando Microdatasus…';
   const chunks: BlobPart[] = [];
   try {
@@ -4319,6 +4384,7 @@ async function runAnalysis(measureOverride?: MeasureSpec, planOverride?: QueryPl
   microdatasusCsvButton.disabled = true;
   labPackageButton.disabled = true;
   openPythonButton.disabled = true;
+  pythonLocalButton.disabled = true;
   await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
   decodeCancelButton.hidden = false;
   try {
@@ -4368,6 +4434,7 @@ async function runAnalysis(measureOverride?: MeasureSpec, planOverride?: QueryPl
     saveTableButton.disabled = false;
     labPackageButton.disabled = false;
     openPythonButton.disabled = false;
+    pythonLocalButton.disabled = false;
     selectedDbfButton.disabled = false;
     setControlsEnabled(true);
     if (currentView === 'map' || rowField.value.toUpperCase().includes('MUNIC')) await ensureMap();
@@ -10996,6 +11063,7 @@ async function openPortableTable(file: File): Promise<void> {
   microdatasusCsvButton.disabled = true;
   labPackageButton.disabled = true;
   openPythonButton.disabled = true;
+  pythonLocalButton.disabled = true;
   resetAnalysisState();
   renderCrossFieldRules();
   renderExtraMeasures();
@@ -11054,6 +11122,7 @@ async function openPortableTable(file: File): Promise<void> {
   saveTableButton.disabled = false;
   labPackageButton.disabled = false;
   openPythonButton.disabled = false;
+  pythonLocalButton.disabled = false;
   exportCsvButton.disabled = false;
   exportJsonButton.disabled = false;
   exportXlsxButton.disabled = false;
@@ -11141,6 +11210,7 @@ function openLegacyTabText(text: string, name: string, kind: string): void {
   saveTableButton.disabled = false;
   labPackageButton.disabled = false;
   openPythonButton.disabled = false;
+  pythonLocalButton.disabled = false;
   for (const button of [exportCsvButton, exportJsonButton, exportXlsxButton, exportXmlButton, exportTabButton, exportPrnButton, exportSqlButton]) {
     button.disabled = false;
   }
@@ -11595,6 +11665,9 @@ microdatasusCsvButton.addEventListener('click', () => void downloadMicrodatasusC
   showToast(error instanceof Error ? error.message : String(error), true)));
 openPythonButton.addEventListener('click', () => {
   void abrirNoPython().catch((error) => showToast(error instanceof Error ? error.message : String(error), true));
+});
+pythonLocalButton.addEventListener('click', () => {
+  void baixarPythonParaComputador().catch((error) => showToast(error instanceof Error ? error.message : String(error), true));
 });
 labPackageButton.addEventListener('click', () => {
   try {

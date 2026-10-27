@@ -1626,6 +1626,44 @@ test('Abrir no Python leva os microdados da tabela e um caderno pronto ao Lab', 
   expect(linhas).toBe(3);
 });
 
+test('Rodar no computador baixa um zip com os microdados, o caderno e um iniciador por sistema', async ({ page }) => {
+  await tabulateFixture(page);
+  await openSidebarGroup(page, 'export');
+  const download = page.waitForEvent('download');
+  await page.locator('#python-local-button').click();
+  const file = await download;
+  expect(file.suggestedFilename()).toBe('microdados-e2e-python.zip');
+
+  const { readFileSync } = await import('node:fs');
+  const bytes = new Uint8Array(readFileSync(await file.path()));
+  const { unzipSync, strFromU8 } = await import('fflate');
+  const entradas = unzipSync(bytes);
+  const nomes = Object.keys(entradas).map((nome) => nome.replace(/^microdados-e2e-python\//, '')).sort();
+  expect(nomes).toEqual([
+    'LEIA-ME.txt', 'Rodar no Mac.command', 'Rodar no Windows.bat', 'analise.ipynb', 'analise.py',
+    'dados/microdados-e2e-microdados.csv', 'preparar_e_rodar.py', 'requirements.txt', 'rodar-linux.sh',
+  ]);
+  const script = strFromU8(entradas['microdados-e2e-python/analise.py']!);
+  expect(script).toContain('PASTA / "dados" / "microdados-e2e-microdados.csv"');
+  expect(script).toContain('print(tabela.to_string())');
+  // Os três registros da tabela, mais o cabeçalho.
+  expect(strFromU8(entradas['microdados-e2e-python/dados/microdados-e2e-microdados.csv']!).trim().split(/\r?\n/)).toHaveLength(4);
+
+  // Dois cliques no macOS e no Linux dependem do modo rwx gravado no zip
+  // (16 bits altos dos atributos externos, no diretório central).
+  const modos = new Map<string, number>();
+  const visao = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  for (let i = 0; i + 46 <= bytes.length; i++) {
+    if (visao.getUint32(i, true) !== 0x02014b50) continue;
+    const tamanhoNome = visao.getUint16(i + 28, true);
+    const nome = new TextDecoder().decode(bytes.subarray(i + 46, i + 46 + tamanhoNome));
+    modos.set(nome.replace(/^microdados-e2e-python\//, ''), visao.getUint32(i + 38, true) >>> 16);
+  }
+  expect(modos.get('rodar-linux.sh')).toBe(0o100755);
+  expect(modos.get('Rodar no Mac.command')).toBe(0o100755);
+  expect(modos.get('analise.py')).toBe(0o100644);
+});
+
 test('o arquivo guardado pode ser baixado sem precisar abrir a análise', async ({ page }) => {
   // Querer o arquivo é diferente de querer analisá-lo aqui. Antes, a única
   // forma de tirá-lo do aparelho era abrir a análise primeiro.
