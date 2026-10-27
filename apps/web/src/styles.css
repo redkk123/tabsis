@@ -1103,3 +1103,13 @@ dialog p { color: #676d74; font-size: 13px; line-height: 1.6; }
   .catalog-batch-bar, .catalog-batch-actions { flex-direction: column; align-items: stretch; }
   .catalog-batch-bar button, .catalog-batch-actions button { width: 100%; white-space: normal; }
 }
+/* O contador "N de N selecionado(s)" ficava numa linha só e passava da borda do diálogo. */
+.catalog-batch-bar > div:first-child { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; min-width: 0; }
+.catalog-batch-bar small { white-space: normal; overflow-wrap: anywhere; min-width: 0; }
+/* Resultados da busca no celular: os botões vão para baixo do nome, em vez de
+   espremer nome e descrição numa coluna de uma palavra por linha. */
+@media (max-width: 620px) {
+  .catalog-result:not(.catalog-batch-bar):not(.catalog-batch-actions) { flex-wrap: wrap; }
+  .catalog-result:not(.catalog-batch-bar):not(.catalog-batch-actions) > div:not(.catalog-result-actions):not(.catalog-recent-actions) { flex: 1 1 calc(100% - 40px); }
+  .catalog-result:not(.catalog-batch-bar) > .catalog-result-actions, .catalog-result:not(.catalog-batch-bar) > .catalog-recent-actions { flex: 1 1 100%; flex-wrap: wrap; justify-content: flex-start; }
+}
