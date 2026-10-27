@@ -116,6 +116,7 @@ import {
 } from '../../../packages/analysis/src/geographic-fields.ts';
 import { criarAbaConsulta, type AbaConsulta } from './aba-consulta.ts';
 import { criarAbaMicrodados, type AbaMicrodados } from './aba-microdados.ts';
+import { descreverDefinicao, lerDefinicao } from '../../../packages/core/src/definicao-caso.ts';
 import {
   tabulationToTabwinPrn,
   tabulationToTabwinSql,
@@ -883,12 +884,7 @@ let painel: Painel | null = null;
 let abaConsulta: AbaConsulta | null = null;
 /** A aba Microdados (aba-microdados.ts); nasce no fim do carregamento. */
 let abaMicrodados: AbaMicrodados | null = null;
-/**
- * As Seleções que a aba Microdados aplicou, com a frase da definição ("B57,
- * sem B56"). Por objeto: a lista de Seleções guarda o próprio filtro, e a aba
- * troca o seu sem mexer nos outros.
- */
-const filtrosDeCaso = new WeakMap<FilterSpec, string>();
+
 /** Filtros que vieram das Seleções do painel, para trocá-los sem apagar os outros. */
 let filtrosDoPainel = new Set<FilterSpec>();
 /** Arquivos marcados no painel ("Arquivos" do TabWin); `null` = todos os abertos. */
@@ -1910,6 +1906,7 @@ function transformStepSummary(step: TransformStep): string {
       const filter = step.filters[0];
       if (!filter) return 'Filtrar linhas';
       const verb = filter.mode === 'exclude' ? 'Excluir' : 'Manter';
+      if (filter.kind === 'code-rules') return `${verb} ${selectionLabel(filter.field)} = ${describeCodeRules(filter)}`;
       return filter.kind === 'numeric-range'
         ? `${verb} ${selectionLabel(filter.field)} entre ${filter.minimum ?? '−∞'} e ${filter.maximum ?? '+∞'}`
         : `${verb} ${selectionLabel(filter.field)} em [${filter.acceptedCategories.join(', ')}]`;
@@ -2389,9 +2386,17 @@ function describeActiveFiltersForExport(): string[] {
 
 function describeFilter(filter: FilterSpec, prefix: string): string {
   if (filter.kind === 'numeric-range') return `${prefix} ${selectionLabel(filter.field)} · ${filter.minimum ?? '−∞'} a ${filter.maximum ?? '+∞'}`;
-  const valores = `${filter.acceptedCategories.length + (filter.includeUnclassified ? 1 : 0)} valor(es)`;
-  const caso = filtrosDeCaso.get(filter);
-  return caso ? `Caso ${selectionLabel(filter.field)} · ${caso} (${valores})` : `${prefix} ${selectionLabel(filter.field)} · ${valores}`;
+  if (filter.kind === 'code-rules') return `Caso ${selectionLabel(filter.field)} · ${describeCodeRules(filter)}`;
+  return `${prefix} ${selectionLabel(filter.field)} · ${filter.acceptedCategories.length + (filter.includeUnclassified ? 1 : 0)} valor(es)`;
+}
+
+/** "B57, sem B56": a mesma frase da aba Microdados. */
+function describeCodeRules(filter: Extract<FilterSpec, { kind: 'code-rules' }>): string {
+  try {
+    return descreverDefinicao(lerDefinicao(filter.include, filter.exclude));
+  } catch {
+    return [filter.include, filter.exclude && `sem ${filter.exclude}`].filter(Boolean).join(', ');
+  }
 }
 
 function renderConfiguredFilters(): void {
@@ -2421,7 +2426,7 @@ function renderConfiguredFilters(): void {
 }
 
 function cloneFilter(filter: FilterSpec): FilterSpec {
-  return filter.kind === 'numeric-range'
+  return filter.kind === 'numeric-range' || filter.kind === 'code-rules'
     ? { ...filter }
     : { ...filter, acceptedCategories: [...filter.acceptedCategories] };
 }
@@ -2495,6 +2500,7 @@ function crossFieldCondition(index: number): FilterSpec {
 
 function describeCrossFieldCondition(condition: FilterSpec): string {
   const field = selectionLabel(condition.field);
+  if (condition.kind === 'code-rules') return `${field} = ${describeCodeRules(condition)}`;
   if (condition.kind !== 'numeric-range') {
     return `${field} = ${condition.acceptedCategories.join(', ')}`;
   }
@@ -11355,7 +11361,7 @@ async function openRecipe(file: File): Promise<void> {
     columnStartPosition.value = String(recipe.spec.columns.startPosition ?? 1);
   }
   configuredFilters = recipe.spec.filters.map((filter) => {
-    if (filter.kind === 'numeric-range') return { ...filter };
+    if (filter.kind === 'numeric-range' || filter.kind === 'code-rules') return { ...filter };
     if (!filter.conversionId) return cloneFilter(filter);
     const loaded = conversionNameInRegistry(filter.conversionId);
     if (!loaded) throw new Error(`Carregue a conversão ${displayBaseName(filter.conversionId)} antes de abrir esta análise`);
@@ -11364,7 +11370,7 @@ async function openRecipe(file: File): Promise<void> {
   configuredCrossFieldRules = (recipe.spec.crossFieldRules ?? []).map((rule) => ({
     ...rule,
     conditions: rule.conditions.map((condition) => {
-      if (condition.kind === 'numeric-range' || !condition.conversionId) return cloneFilter(condition);
+      if (condition.kind === 'numeric-range' || condition.kind === 'code-rules' || !condition.conversionId) return cloneFilter(condition);
       const loaded = conversionNameInRegistry(condition.conversionId);
       if (!loaded) throw new Error(`Carregue a conversão ${displayBaseName(condition.conversionId)} antes de abrir esta análise`);
       return { ...condition, conversionId: loaded, acceptedCategories: [...condition.acceptedCategories] };
@@ -12782,7 +12788,7 @@ abaMicrodados = criarAbaMicrodados({
       compatibilityProfile: currentCompatibilityProfile,
       rows: { field: campo },
       measure: { kind: 'count' as const },
-      filters: configuredFilters.filter((filter) => !filtrosDeCaso.has(filter)).map(cloneFilter),
+      filters: configuredFilters.filter((filter) => !(filter.kind === 'code-rules' && filter.field === campo)).map(cloneFilter),
       ...(configuredCrossFieldRules.length ? { crossFieldRules: configuredCrossFieldRules.map(cloneCrossFieldRule) } : {}),
       suppressZeroRows: true,
       suppressZeroColumns: false,
@@ -12793,13 +12799,11 @@ abaMicrodados = criarAbaMicrodados({
     );
     return result.rows.map((row, indice) => ({ valor: row.key, registros: result.cells[indice]?.[0] ?? 0 }));
   },
-  aplicar: (campo, valores, descricao) => {
-    for (let i = configuredFilters.length - 1; i >= 0; i--) {
-      if (filtrosDeCaso.has(configuredFilters[i]!)) configuredFilters.splice(i, 1);
-    }
-    const filtro: FilterSpec = { field: campo, mode: 'include', acceptedCategories: valores };
-    filtrosDeCaso.set(filtro, descricao);
-    configuredFilters.push(filtro);
+  aplicar: (campo, incluir, excluir) => {
+    // Uma definição por campo: aplicar de novo no mesmo campo troca a anterior;
+    // em outro campo, soma (região num campo, CID em outro).
+    configuredFilters = configuredFilters.filter((filter) => !(filter.kind === 'code-rules' && filter.field === campo));
+    configuredFilters.push({ field: campo, mode: 'include', kind: 'code-rules', include: incluir, exclude: excluir });
     renderConfiguredFilters();
     void runAnalysis();
   },

@@ -13,6 +13,7 @@
  * else.
  */
 
+import { lerDefinicao, type RegraDeCodigo } from '../../core/src/definicao-caso.js';
 import type { FilterSpec } from '../../core/src/model.js';
 import type {
   SummaryAggregation,
@@ -56,6 +57,10 @@ function filterPredicateR(filter: FilterSpec): string {
     const predicate = parts.join(' & ') || 'TRUE';
     return filter.mode === 'exclude' ? `!(${predicate})` : predicate;
   }
+  if (filter.kind === 'code-rules') {
+    const test = codeRulesPredicate(filter, 'r', `toupper(gsub("[[:space:].]", "", ${field}))`);
+    return filter.mode === 'exclude' ? `!(${test})` : test;
+  }
   const test = `${field} %in% ${rVector(filter.acceptedCategories.map(String))}`;
   return filter.mode === 'exclude' ? `!(${test})` : test;
 }
@@ -69,8 +74,34 @@ function filterPredicatePython(filter: FilterSpec): string {
     const predicate = parts.join(' & ') || 'True';
     return filter.mode === 'exclude' ? `~(${predicate})` : predicate;
   }
+  if (filter.kind === 'code-rules') {
+    const test = codeRulesPredicate(filter, 'python', `${field}.astype(str).str.upper().str.replace(r"[\\s.]", "", regex=True)`);
+    return filter.mode === 'exclude' ? `~(${test})` : test;
+  }
   const test = `${field}.isin(${pyList(filter.acceptedCategories.map(String))})`;
   return filter.mode === 'exclude' ? `~${test}` : test;
+}
+
+/**
+ * A definição de caso por códigos (definicao-caso.ts) em R ou pandas: prefixo
+ * vira "começa com", faixa compara o começo do código com cada ponta, e
+ * excluir vale por cima de incluir — a mesma regra do motor.
+ */
+function codeRulesPredicate(filter: Extract<FilterSpec, { kind: 'code-rules' }>, language: 'r' | 'python', code: string): string {
+  const { incluir, excluir } = lerDefinicao(filter.include, filter.exclude);
+  const str = language === 'r' ? rString : pyString;
+  const rule = (regra: RegraDeCodigo): string => {
+    if (regra.inicio === regra.fim) {
+      return language === 'r' ? `startsWith(${code}, ${str(regra.inicio)})` : `${code}.str.startswith(${str(regra.inicio)})`;
+    }
+    const head = (n: number) => (language === 'r' ? `substr(${code}, 1, ${n})` : `${code}.str[:${n}]`);
+    return `(${head(regra.inicio.length)} >= ${str(regra.inicio)}) & (${head(regra.fim.length)} <= ${str(regra.fim)})`;
+  };
+  const any = (regras: RegraDeCodigo[]) => regras.map((regra) => `(${rule(regra)})`).join(' | ');
+  const parts: string[] = [];
+  if (incluir.length) parts.push(`(${any(incluir)})`);
+  if (excluir.length) parts.push(language === 'r' ? `!(${any(excluir)})` : `~(${any(excluir)})`);
+  return parts.join(' & ');
 }
 
 /** A TabWin formula with column names left bare (`[Óbitos]` -> `Óbitos`), for R. */

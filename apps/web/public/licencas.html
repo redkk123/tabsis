@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; script-src 'none'; form-action 'none'; base-uri 'self'">
+<meta name="theme-color" content="#0e3f6c">
+<title>Licenças do TabSis</title>
+<style>
+:root { color-scheme: light; --brand: #14548c; --brand-strong: #0e3f6c; --ink: #17202a; --muted: #55606b; --line: #dfe3e8; --soft: #f4f6f9; --ok: #1d6b45; --warn: #8a5a00; --bg: #ffffff; --card: #ffffff; }
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) { color-scheme: dark; --brand: #6fa8e0; --brand-strong: #0b2f52; --ink: #edf1f5; --muted: #a9b4bf; --line: #2e3742; --soft: #1b222b; --ok: #6cc59a; --warn: #e2b55a; --bg: #12171d; --card: #171e26; }
+}
+:root[data-theme="dark"] { color-scheme: dark; --brand: #6fa8e0; --brand-strong: #0b2f52; --ink: #edf1f5; --muted: #a9b4bf; --line: #2e3742; --soft: #1b222b; --ok: #6cc59a; --warn: #e2b55a; --bg: #12171d; --card: #171e26; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.55 "Inter", "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+header { background: var(--brand-strong); color: #fff; padding: 22px 16px; }
+header .in, main { max-width: 1000px; margin: 0 auto; }
+header a { color: #cfe2f5; }
+h1 { margin: 6px 0 4px; font-size: 28px; line-height: 1.2; }
+header p { margin: 0; color: #d7e6f5; }
+main { padding: 24px 16px 56px; }
+h2 { font-size: 20px; margin: 32px 0 10px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 8px; }
+.card h3 { margin: 0; font-size: 18px; }
+.card .tag { align-self: flex-start; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--brand); }
+.card p { margin: 0; color: var(--muted); font-size: 15px; }
+.card ul { margin: 4px 0 0; padding-left: 18px; color: var(--muted); font-size: 14.5px; }
+.botoes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; padding-top: 8px; }
+.botao { display: inline-block; padding: 10px 14px; border-radius: 8px; background: var(--brand); color: #fff; text-decoration: none; font-weight: 600; font-size: 14.5px; }
+.botao.sec { background: transparent; color: var(--brand); border: 1px solid var(--line); }
+@media (prefers-color-scheme: dark) { :root:where(:not([data-theme="light"])) .botao { color: #0b1624; } :root:where(:not([data-theme="light"])) .botao.sec { color: var(--brand); } }
+.tabela { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; }
+table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 14.5px; }
+th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+thead th { background: var(--soft); font-weight: 700; }
+tbody th { font-weight: 600; width: 22%; }
+tr:last-child td, tr:last-child th { border-bottom: 0; }
+.sim { color: var(--ok); font-weight: 600; }
+.aviso { color: var(--warn); font-weight: 600; }
+.passos { counter-reset: p; list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.passos li { counter-increment: p; background: var(--soft); border-radius: 10px; padding: 12px 14px 12px 48px; position: relative; }
+.passos li::before { content: counter(p); position: absolute; left: 14px; top: 11px; width: 24px; height: 24px; border-radius: 50%; background: var(--brand); color: #fff; font-weight: 700; font-size: 13px; display: grid; place-items: center; }
+.nota { color: var(--muted); font-size: 14px; }
+code { background: var(--soft); padding: 1px 5px; border-radius: 4px; font-size: 13.5px; }
+
+.lic { width: 100%; border-collapse: collapse; font-size: 14.5px; min-width: 560px; }
+.lic td small { color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <div class="in">
+    <a href="./">← Voltar ao TabSis</a>
+    <h1>Licenças</h1>
+    <p>O TabSis e as peças de terceiros que ele usa. Vale para o site, o app Android e o TabSis Local.</p>
+  </div>
+</header>
+<main>
+  <h2>O TabSis</h2>
+  <p>Código aberto sob a <a href="https://www.gnu.org/licenses/agpl-3.0.html">GNU Affero General Public License, versão 3 ou posterior</a> (AGPL-3.0-or-later). Código-fonte: <a href="https://github.com/redkk123/tabsis">github.com/redkk123/tabsis</a>. O Laboratório (<code>/lab</code>) é um projeto à parte, sob a licença MIT.</p>
+
+  <h2>Peças de terceiros</h2>
+  <div class="tabela">
+    <table class="lic">
+      <thead><tr><th>Componente</th><th>Para quê</th><th>Licença</th></tr></thead>
+      <tbody>
+        <tr><th>@precisa-saude/datasus-dbc 2.0.2</th><td>Abrir arquivos <code>.DBC</code> do DATASUS</td><td><a href="https://www.apache.org/licenses/LICENSE-2.0">Apache-2.0</a></td></tr>
+        <tr><th>fflate 0.8.2</th><td>Arquivos <code>.zip</code></td><td><a href="https://github.com/101arrowz/fflate/blob/master/LICENSE">MIT</a></td></tr>
+        <tr><th>fzstd 0.1.1</th><td>Descompressão Zstandard (formato leve)</td><td><a href="https://github.com/101arrowz/fzstd/blob/master/LICENSE">MIT</a></td></tr>
+        <tr><th>hyparquet 1.31.1</th><td>Leitura de Parquet</td><td><a href="https://github.com/hyparam/hyparquet/blob/master/LICENSE">MIT</a></td></tr>
+        <tr><th>DuckDB-WASM 1.33</th><td>Aba Consulta (SQL); baixado só quando a aba é usada</td><td><a href="https://github.com/duckdb/duckdb-wasm/blob/main/LICENSE">MIT</a></td></tr>
+        <tr><th>Pyodide 314.0.6</th><td>Python no Laboratório; baixado só ao carregar o Python <small>(inclui CPython, sob a PSF-2.0, e pacotes como pandas e numpy, sob a BSD-3-Clause)</small></td><td><a href="https://github.com/pyodide/pyodide/blob/main/LICENSE">MPL-2.0</a></td></tr>
+        <tr><th>webR 0.6.0</th><td>R no Laboratório; baixado só ao carregar o R <small>(o próprio R é GPL-2.0-or-later)</small></td><td><a href="https://github.com/r-wasm/webr/blob/main/LICENSE.md">MIT</a></td></tr>
+        <tr><th>AndroidX WebKit 1.18, Activity 1.13, Core 1.18</th><td>App Android</td><td><a href="https://www.apache.org/licenses/LICENSE-2.0">Apache-2.0</a></td></tr>
+        <tr><th>Python e Tcl/Tk</th><td>TabSis Local (computador)</td><td><a href="https://docs.python.org/3/license.html">PSF-2.0</a> e <a href="https://www.tcl-lang.org/software/tcltk/license.html">licença Tcl/Tk</a></td></tr>
+        <tr><th>PyInstaller</th><td>Empacota o TabSis Local num executável</td><td><a href="https://github.com/pyinstaller/pyinstaller/blob/develop/COPYING.txt">GPL-2.0 com exceção para o executável gerado</a></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="nota">Os componentes sob a Apache-2.0 são distribuídos sem modificação. O texto integral de cada licença está no link da tabela.</p>
+
+  <h2>Dados</h2>
+  <ul class="nota">
+    <li><b>Microdados e tabelas de conversão:</b> DATASUS/Ministério da Saúde, dados públicos. O TabSis baixa do portal e do FTP oficiais, sem alterar os arquivos. Cite o DATASUS como fonte.</li>
+    <li><b>População, códigos de município e malhas dos mapas:</b> IBGE, dados públicos (APIs de localidades, agregados e malhas). Cite o IBGE como fonte.</li>
+    <li>O TabSis é um projeto independente, sem afiliação ao DATASUS, ao Ministério da Saúde ou ao IBGE.</li>
+  </ul>
+</main>
+</body>
+</html>

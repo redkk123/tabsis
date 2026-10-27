@@ -1,5 +1,6 @@
 import type { CnvDefinition } from '../../formats/src/cnv-model.js';
 import { classifyCnv } from '../../formats/src/cnv-match.js';
+import { casaDefinicao, lerDefinicao, type DefinicaoDeCaso } from './definicao-caso.js';
 import type {
   CrossFieldRuleSpec,
   DataRecord,
@@ -239,6 +240,17 @@ export function resolveDimensionValue(
   return { key: String(match.sequence), label: match.label };
 }
 
+/** A regra é lida uma vez por filtro, não uma vez por registro. */
+const definicoesLidas = new WeakMap<FilterSpec, DefinicaoDeCaso>();
+function definicaoDoFiltro(filter: Extract<FilterSpec, { kind: 'code-rules' }>): DefinicaoDeCaso {
+  let definicao = definicoesLidas.get(filter);
+  if (!definicao) {
+    definicao = lerDefinicao(filter.include, filter.exclude);
+    definicoesLidas.set(filter, definicao);
+  }
+  return definicao;
+}
+
 function acceptsFilter(
   record: DataRecord,
   filter: FilterSpec,
@@ -261,6 +273,8 @@ function acceptsFilter(
         || (filter.includeMaximum === false ? value < filter.maximum : value <= filter.maximum);
       matches = aboveMinimum && belowMaximum;
     }
+  } else if (filter.kind === 'code-rules') {
+    matches = casaDefinicao(definicaoDoFiltro(filter), String(raw ?? ''));
   } else if (!definition) {
     matches = filter.acceptedCategories.includes(String(raw ?? ''));
   } else {
