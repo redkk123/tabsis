@@ -8365,11 +8365,15 @@ function offerBridgeAfterFailure(remote: DatasusRemoteFile, error: unknown): voi
   const name = document.createElement('b');
   name.textContent = `${remote.name} falhou no navegador`;
   const meta = document.createElement('small');
-  details.append(name, meta);
+  const motivo = document.createElement('small');
+  // O motivo real, para quem vê o aviso (e para o print que chega até nós).
+  motivo.textContent = `Motivo: ${error instanceof Error ? error.message : String(error)}`;
+  details.append(name, motivo, meta);
 
   if (!bridgeReady) {
-    meta.textContent = 'Um downloader local pode terminar esse download. Abra "Downloader local", '
-      + 'inicie o auxiliar na sua máquina e clique em Verificar.';
+    meta.textContent = ponteAndroid
+      ? 'Tente de novo em alguns minutos: o servidor do DATASUS oscila.'
+      : 'O TabSis Local, no computador, pode terminar esse download: abra "TabSis Local no computador" e conecte.';
     panel.append(details);
     catalogResults.append(panel);
     return;
@@ -9270,10 +9274,19 @@ async function openOfficialFile(
           showToast(`Auxiliares verificados não carregados: ${error instanceof Error ? error.message : String(error)}`, true);
         }
       } else {
-        const bundles = await searchOfficialAuxiliaries(query.system, controller.signal);
-        showManualAuxiliaryBundles(bundles, query);
-        manualAuxiliariesOffered = true;
-        showToast('Não há associação auxiliar comprovada; escolha um pacote oficial manualmente.');
+        // A lista de pacotes auxiliares vem do PORTAL do DATASUS. Com ele fora
+        // do ar (2026-10-27: HTTP 520), esta busca derrubava o download inteiro
+        // — que vem do FTP e funcionava. Auxiliar é opcional: o arquivo abre
+        // sem ele, e o aviso diz por quê.
+        try {
+          const bundles = await searchOfficialAuxiliaries(query.system, controller.signal);
+          showManualAuxiliaryBundles(bundles, query);
+          manualAuxiliariesOffered = true;
+          showToast('Não há associação auxiliar comprovada; escolha um pacote oficial manualmente.');
+        } catch (error) {
+          if (isAbortError(error)) throw error;
+          showToast(`Auxiliares indisponíveis agora (${error instanceof Error ? error.message : String(error)}); o arquivo abre sem eles.`, true);
+        }
       }
     }
     // Cada etapa concluída é sinal de vida: os auxiliares podem demorar

@@ -2021,6 +2021,44 @@ test('preparo demorado dá sinal de vida, em vez de parecer travado', async ({ p
   await expect(status).not.toContainText('parou de progredir');
 });
 
+test('auxiliares fora do ar não derrubam o download: o arquivo abre e o aviso diz por quê', async ({ page }) => {
+  // 2026-10-27, no app Android: com "Carregar auxiliares" marcada, a lista de
+  // pacotes auxiliares vem do portal, que respondia 520 — e isso derrubava
+  // "Baixar e combinar" inteiro, mesmo com os dados disponíveis.
+  const { zipSync } = await import('fflate');
+  const { readFileSync } = await import('node:fs');
+  const pacote = Buffer.from(zipSync({ 'BOTUBR24.dbf': new Uint8Array(readFileSync('e2e/fixtures/DENGBR24.dbf')) }, { level: 0 }));
+  await page.route('**/wp-content/ftp.php', async (route) => {
+    const corpo = route.request().postData() ?? '';
+    if (corpo.includes('AUX')) {
+      await route.fulfill({ status: 520, headers: { 'access-control-allow-origin': '*' }, body: '' });
+      return;
+    }
+    await route.fulfill({
+      status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' },
+      body: JSON.stringify([{ arquivo: 'BOTUBR24.dbc', endereco: 'ftp://ftp.datasus.gov.br/dissemin/publicos/SINAN/DADOS/FINAIS/BOTUBR24.dbc', fonte: 'SINAN', modalidade: 'Dados' }]),
+    });
+  });
+  await page.route('**/wp-content/download.php', (route) => route.fulfill({
+    status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' },
+    body: JSON.stringify(['https://datasus.saude.gov.br/wp-content/zipupload/Arq_1/arquivo.zip']),
+  }));
+  await page.route('**/zipupload/**', (route) => route.fulfill({
+    status: 200, contentType: 'application/zip', headers: { 'access-control-allow-origin': '*', 'accept-ranges': 'none' }, body: pacote,
+  }));
+  await page.goto('/');
+  await page.locator('#catalog-button').click();
+  await page.locator('#catalog-system').selectOption('SINAN');
+  await page.locator('#catalog-file-type').selectOption('BOTU');
+  await page.locator('#catalog-year').selectOption(['2024']);
+  await expect(page.locator('#catalog-auxiliary')).toBeChecked();
+  await page.locator('#catalog-form').evaluate((form: HTMLFormElement) => form.requestSubmit());
+  await page.locator('.catalog-result button', { hasText: 'Baixar e abrir' }).click();
+  await expect(page.locator('#result-table tbody tr').first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('#result-kicker')).toContainText('BOTUBR24');
+  await expect(page.locator('.catalog-result', { hasText: 'falhou no navegador' })).toHaveCount(0);
+});
+
 test('o .dbc pode ser salvo direto do resultado da busca, sem abrir', async ({ page }) => {
   // "Baixar e abrir" serve para tabular aqui. Quem vai levar o arquivo para o
   // R, para o Python ou para outra máquina não precisa que o navegador monte
