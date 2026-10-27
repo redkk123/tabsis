@@ -115,6 +115,7 @@ import {
   type GeographicCandidate,
 } from '../../../packages/analysis/src/geographic-fields.ts';
 import { criarAbaConsulta, type AbaConsulta } from './aba-consulta.ts';
+import { criarAbaMicrodados, type AbaMicrodados } from './aba-microdados.ts';
 import {
   tabulationToTabwinPrn,
   tabulationToTabwinSql,
@@ -318,7 +319,7 @@ import type { JoinType, PipelineSource } from '../../../packages/analysis/src/tr
 import { tableRowIndexes, tableRowsToTsv } from '../../../packages/analysis/src/table-presentation.ts';
 import './styles.css';
 
-type ViewName = 'table' | 'chart' | 'map' | 'statistics' | 'compare' | 'investigate' | 'query' | 'audit';
+type ViewName = 'table' | 'chart' | 'map' | 'statistics' | 'compare' | 'investigate' | 'microdata' | 'query' | 'audit';
 
 interface LoadedSource {
   name: string;
@@ -880,6 +881,14 @@ let extraMeasures: MeasureSpec[] = [];
 let painel: Painel | null = null;
 /** A aba de consulta SQL (aba-consulta.ts); nasce no fim do carregamento. */
 let abaConsulta: AbaConsulta | null = null;
+/** A aba Microdados (aba-microdados.ts); nasce no fim do carregamento. */
+let abaMicrodados: AbaMicrodados | null = null;
+/**
+ * As Seleções que a aba Microdados aplicou, com a frase da definição ("B57,
+ * sem B56"). Por objeto: a lista de Seleções guarda o próprio filtro, e a aba
+ * troca o seu sem mexer nos outros.
+ */
+const filtrosDeCaso = new WeakMap<FilterSpec, string>();
 /** Filtros que vieram das Seleções do painel, para trocá-los sem apagar os outros. */
 let filtrosDoPainel = new Set<FilterSpec>();
 /** Arquivos marcados no painel ("Arquivos" do TabWin); `null` = todos os abertos. */
@@ -1229,6 +1238,7 @@ function chooseDefaultField(fields: DbfHeader['fields']): string {
 function populateControls(preferredField?: string): void {
   populateFlowFields();
   abaConsulta?.atualizarCampos();
+  abaMicrodados?.atualizarCampos();
   if (!dbfHeader) return;
   fieldSearch.value = '';
   const previousRow = preferredField ?? rowField.value;
@@ -2373,10 +2383,15 @@ function describeActiveFiltersForExport(): string[] {
   return configuredFilters.map((filter) => {
     const prefix = filter.origin === 'data-quality' ? 'Limpeza'
       : filter.mode === 'exclude' ? 'Excluir' : 'Incluir';
-    return filter.kind === 'numeric-range'
-      ? `${prefix} ${selectionLabel(filter.field)} · ${filter.minimum ?? '−∞'} a ${filter.maximum ?? '+∞'}`
-      : `${prefix} ${selectionLabel(filter.field)} · ${filter.acceptedCategories.length + (filter.includeUnclassified ? 1 : 0)} valor(es)`;
+    return describeFilter(filter, prefix);
   });
+}
+
+function describeFilter(filter: FilterSpec, prefix: string): string {
+  if (filter.kind === 'numeric-range') return `${prefix} ${selectionLabel(filter.field)} · ${filter.minimum ?? '−∞'} a ${filter.maximum ?? '+∞'}`;
+  const valores = `${filter.acceptedCategories.length + (filter.includeUnclassified ? 1 : 0)} valor(es)`;
+  const caso = filtrosDeCaso.get(filter);
+  return caso ? `Caso ${selectionLabel(filter.field)} · ${caso} (${valores})` : `${prefix} ${selectionLabel(filter.field)} · ${valores}`;
 }
 
 function renderConfiguredFilters(): void {
@@ -2387,9 +2402,7 @@ function renderConfiguredFilters(): void {
     const label = document.createElement('span');
     const prefix = filter.origin === 'data-quality' ? 'Limpeza'
       : filter.mode === 'exclude' ? 'Excluir' : 'Incluir';
-    label.textContent = filter.kind === 'numeric-range'
-      ? `${prefix} ${selectionLabel(filter.field)} · ${filter.minimum ?? '−∞'} a ${filter.maximum ?? '+∞'}`
-      : `${prefix} ${selectionLabel(filter.field)} · ${filter.acceptedCategories.length + (filter.includeUnclassified ? 1 : 0)} valor(es)`;
+    label.textContent = describeFilter(filter, prefix);
     const remove = document.createElement('button');
     remove.type = 'button';
     remove.setAttribute('aria-label', `Remover filtro ${selectionLabel(filter.field)}`);
@@ -12758,3 +12771,37 @@ abaConsulta = criarAbaConsulta({
   ligarSelecionarTodos: wireSelectAll,
 });
 abaConsulta.atualizarCampos();
+
+abaMicrodados = criarAbaMicrodados({
+  campos: () => (dbfHeader?.fields ?? []).map((field) => field.name),
+  rotuloDoCampo: (campo) => fieldLabel(campo),
+  contarPorValor: async (campo) => {
+    // As outras Seleções continuam valendo; a definição anterior desta aba,
+    // não: a prévia de uma definição nova não pode ser recortada pela velha.
+    const plan = compilarPlano({
+      compatibilityProfile: currentCompatibilityProfile,
+      rows: { field: campo },
+      measure: { kind: 'count' as const },
+      filters: configuredFilters.filter((filter) => !filtrosDeCaso.has(filter)).map(cloneFilter),
+      ...(configuredCrossFieldRules.length ? { crossFieldRules: configuredCrossFieldRules.map(cloneCrossFieldRule) } : {}),
+      suppressZeroRows: true,
+      suppressZeroColumns: false,
+    });
+    const { result } = await askDataset<{ result: TabulationResult; cached: boolean }>(
+      { type: 'tabulate', plan, conversions: conversionsForPlan(plan) },
+      { label: 'Prévia da definição de caso' },
+    );
+    return result.rows.map((row, indice) => ({ valor: row.key, registros: result.cells[indice]?.[0] ?? 0 }));
+  },
+  aplicar: (campo, valores, descricao) => {
+    for (let i = configuredFilters.length - 1; i >= 0; i--) {
+      if (filtrosDeCaso.has(configuredFilters[i]!)) configuredFilters.splice(i, 1);
+    }
+    const filtro: FilterSpec = { field: campo, mode: 'include', acceptedCategories: valores };
+    filtrosDeCaso.set(filtro, descricao);
+    configuredFilters.push(filtro);
+    renderConfiguredFilters();
+    void runAnalysis();
+  },
+  aviso: showToast,
+});

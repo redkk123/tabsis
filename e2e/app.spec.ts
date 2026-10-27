@@ -1664,6 +1664,53 @@ test('Rodar no computador baixa um zip com os microdados, o caderno e um iniciad
   expect(modos.get('analise.py')).toBe(0o100644);
 });
 
+test('Microdados: definição de caso por códigos, com prévia, vira uma Seleção', async ({ page }) => {
+  await tabulateFixture(page);
+  await page.locator('[data-view="microdata"]').click();
+  await expect(page.locator('#microdata-view')).toBeVisible();
+  await page.locator('#case-field').selectOption('UF');
+
+  // "A" é prefixo (AC e AM); "AM" sai por cima, como B56 sai de B56-B57.
+  await page.locator('#case-include').fill('A');
+  await page.locator('#case-exclude').fill('AM');
+  await expect(page.locator('#case-apply')).toBeDisabled();
+  await page.locator('#case-preview').click();
+  await expect(page.locator('#case-status')).toContainText('2 de 3 registros entram');
+  await expect(page.locator('#case-result')).toContainText('Entram');
+  await expect(page.locator('#case-result')).toContainText('Tirados por "Excluir"');
+
+  // Mudou a definição: a prévia velha não serve para aplicar.
+  await page.locator('#case-exclude').fill('AM, ZZ');
+  await expect(page.locator('#case-apply')).toBeDisabled();
+  await page.locator('#case-exclude').fill('AM');
+  await page.locator('#case-preview').click();
+  await expect(page.locator('#case-apply')).toBeEnabled();
+  await page.locator('#case-apply').click();
+
+  await expect(page.locator('#case-status')).toContainText('Aplicado como Seleção: UF = A, sem AM');
+  await page.locator('[data-view="table"]').click();
+  await expect(page.locator('#result-table tbody')).toContainText('AC');
+  await expect(page.locator('#result-table tbody')).not.toContainText('AM');
+
+  // Aplicar de novo troca a Seleção desta aba, não empilha outra.
+  await page.locator('[data-view="microdata"]').click();
+  await page.locator('#case-exclude').fill('');
+  await page.locator('#case-preview').click();
+  await expect(page.locator('#case-status')).toContainText('3 de 3 registros entram');
+  await page.locator('#case-apply').click();
+  await page.locator('[data-view="table"]').click();
+  await expect(page.locator('#result-table tbody')).toContainText('AM');
+  await expect(page.locator('.active-filter')).toHaveCount(1);
+  await expect(page.locator('.active-filter')).toContainText('Caso');
+
+  // Código que não existe no campo é apontado, em vez de dar zero calado.
+  await page.locator('[data-view="microdata"]').click();
+  await page.locator('#case-include').fill('B57');
+  await page.locator('#case-preview').click();
+  await expect(page.locator('#case-status')).toContainText('Nenhum registro com: B57');
+  await expect(page.locator('#case-apply')).toBeDisabled();
+});
+
 test('o arquivo guardado pode ser baixado sem precisar abrir a análise', async ({ page }) => {
   // Querer o arquivo é diferente de querer analisá-lo aqui. Antes, a única
   // forma de tirá-lo do aparelho era abrir a análise primeiro.

@@ -668,6 +668,29 @@ citada.
 Célula vazia significa **ausente**. Nenhum zero é fabricado para preencher
 lacuna — nem na exportação, nem na leitura do outro lado.
 
+### Microdados: definição de caso por códigos
+
+A aba **Microdados** é o laboratório de microdados sem código. Serve para
+quando a lista pronta junta coisas diferentes. Por exemplo, a
+"Tripanossomíase" junta a doença de Chagas (B57) com a doença do sono (B56).
+
+1. Escolha o **Campo** (CAUSABAS no SIM, DIAG_PRINC no SIH, ID_AGRAVO no
+   SINAN; a aba já sugere o campo de código do arquivo).
+2. Em **Incluir códigos**, escreva os que entram: `B57`. Um código sem fim
+   pega todos os que começam com ele (`B57` pega B570 a B575); `B570-B572` é
+   uma faixa; separe vários por vírgula. Pontos e minúsculas não importam.
+3. Em **Excluir códigos**, os que ficam de fora, mesmo que caiam no incluir
+   (opcional).
+4. **Ver prévia** mostra quantos registros cada código traz, o que a exclusão
+   tirou e avisa quando um código não aparece no arquivo (provável erro de
+   digitação ou campo errado).
+5. **Aplicar como Seleção** filtra a tabela, o mapa e as exportações. A
+   Seleção aparece como "Caso" na lista de Seleções; aplicar de novo troca a
+   anterior, sem empilhar.
+
+**Guardar definição** guarda campo e códigos neste navegador, para usar de
+novo com outros anos ou estados.
+
 ### Python com os microdados: no navegador ou no computador
 
 **Abrir no Python** leva os registros da tabela atual (com Seleções e

@@ -1,3 +1,8 @@
+[![Android: baixar o APK](https://img.shields.io/badge/Android-baixar%20o%20APK-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/redkk123/tabsis/releases/download/{{TAG}}/TabSis-android.apk)
+[![Windows: TabSis Local](https://img.shields.io/badge/Windows-TabSis%20Local-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/redkk123/tabsis/releases/download/{{TAG}}/TabSis-Local-windows.exe)
+[![macOS: TabSis Local](https://img.shields.io/badge/macOS-TabSis%20Local-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/redkk123/tabsis/releases/download/{{TAG}}/TabSis-Local-macos.zip)
+[![Linux: TabSis Local](https://img.shields.io/badge/Linux-TabSis%20Local-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/redkk123/tabsis/releases/download/{{TAG}}/TabSis-Local-linux)
+
 ## Downloads
 
 | Arquivo | Para quê |

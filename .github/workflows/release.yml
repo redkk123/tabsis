@@ -120,5 +120,7 @@ jobs:
           if gh release view "$TAG" > /dev/null 2>&1; then
             gh release upload "$TAG" saida/* --clobber
           else
-            gh release create "$TAG" saida/* --title "TabSis $TAG" --notes-file .github/release-notes.md
+            # Os botões das notas apontam para os arquivos desta versão.
+            sed "s/{{TAG}}/$TAG/g" .github/release-notes.md > notas.md
+            gh release create "$TAG" saida/* --title "TabSis $TAG" --notes-file notas.md
           fi
