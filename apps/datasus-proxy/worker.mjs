@@ -592,18 +592,23 @@ async function handleFtp(route, environment, origin, proxySettings) {
       return new Response(JSON.stringify({ host: 'ftp.datasus.gov.br', path, items: itens }), { status: 200, headers });
     }
     if (path.endsWith('/')) throw new ProxyFailure(400, 'invalid_ftp_path', 'A file path does not end with /');
-    const { size, stream } = await ftpRetrieve(path, environment, { ...limites, maxBytes: proxySettings.maxArchiveBytes });
+    const { size, stream, fechar } = await ftpRetrieve(path, environment, { ...limites, maxBytes: proxySettings.maxArchiveBytes });
     const headers = baseHeaders(origin);
     headers.set('Content-Type', 'application/octet-stream');
     headers.set('Content-Length', String(size));
     headers.set('Content-Disposition', `attachment; filename="${path.split('/').pop().replace(/[^A-Za-z0-9_.-]/g, '_')}"`);
     // FixedLengthStream (só no Worker) mantém o Content-Length: sem ele a
     // resposta sai em pedaços e o navegador não tem como mostrar progresso.
-    let corpo = stream;
+    let corpo;
     if (typeof FixedLengthStream === 'function') {
       const fixo = new FixedLengthStream(size);
-      stream.pipeTo(fixo.writable).catch(() => {});
+      stream.pipeTo(fixo.writable).catch(() => {}).finally(fechar);
       corpo = fixo.readable;
+    } else {
+      // Fora do Worker (teste em Node): mesmo fluxo, sem o conferente nativo.
+      const passagem = new TransformStream();
+      stream.pipeTo(passagem.writable).catch(() => {}).finally(fechar);
+      corpo = passagem.readable;
     }
     return new Response(corpo, { status: 200, headers });
   } catch (error) {

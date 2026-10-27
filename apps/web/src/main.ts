@@ -8166,6 +8166,8 @@ let bridgeReady: { token: string; directory: string; baseUrl: string; features: 
 /** Porta do auxiliar: 8787, ou a que o TabSis Local mandou no link (#local=token:porta). */
 let bridgePort = 8787;
 const bridgeAutoCopy = element<HTMLInputElement>('#bridge-auto-copy');
+const bridgeViaLocal = element<HTMLInputElement>('#bridge-via-local');
+const bridgeViaLocalLabel = element<HTMLElement>('#bridge-via-local-label');
 const bridgeAutoCopyLabel = element<HTMLElement>('#bridge-auto-copy-label');
 const catalogLocal = element<HTMLElement>('#catalog-local');
 const catalogLocalSummary = element<HTMLElement>('#catalog-local-summary');
@@ -8204,6 +8206,7 @@ async function checkBridge(): Promise<void> {
       : `${describeBridgeProbe(probe)}. Endereços que ele pode acessar: ${probe.health.allowlist.join(' | ')}`,
     'ok');
     bridgeAutoCopyLabel.hidden = !local;
+    bridgeViaLocalLabel.hidden = !bridgeHasFeature(probe.health, 'ftp');
     void renderLocalFiles();
     void renderRecentArchives();
   } finally {
@@ -8235,6 +8238,56 @@ async function copiarParaComputador(arquivos: ReadonlyArray<{ name: string; byte
     }
   }
   void renderLocalFiles();
+}
+
+/** Pode baixar pela fila do TabSis Local: conectado, opção marcada e todo arquivo com endereço no FTP oficial. */
+function podeBaixarPeloComputador(files: readonly DatasusRemoteFile[]): boolean {
+  return Boolean(bridgeReady?.features.includes('ftp') && bridgeViaLocal.checked && files.length
+    && files.every((file) => file.ftpPath ?? officialFtpPath(file.address)));
+}
+
+/**
+ * Baixa pela fila do TabSis Local (Python): um arquivo de cada vez, em segundo
+ * plano, retomando de onde parou se a conexão cair — o que o navegador não
+ * garante (prazos, aba suspensa). O arquivo já fica na pasta do computador; o
+ * site só o lê de lá para abrir. Devolve um .zip, como os outros caminhos.
+ */
+async function baixarPeloComputador(
+  files: readonly DatasusRemoteFile[],
+  signal: AbortSignal | undefined,
+  onActivity?: () => void,
+): Promise<Uint8Array> {
+  const opcoes = bridgeOptions();
+  if (!opcoes) throw new Error('O TabSis Local não está conectado.');
+  const entradas: Record<string, [Uint8Array, { level: 0 }]> = {};
+  for (const file of files) {
+    const caminho = file.ftpPath ?? officialFtpPath(file.address)!;
+    let job = await startBridgeDownload(opcoes, `ftp://ftp.datasus.gov.br${caminho}`);
+    const aoCancelar = () => { void cancelBridgeDownload(opcoes, job.id).catch(() => {}); };
+    signal?.addEventListener('abort', aoCancelar, { once: true });
+    try {
+      while (job.status === 'pending' || job.status === 'downloading') {
+        await new Promise((resolve) => setTimeout(resolve, 700));
+        if (signal?.aborted) throw new DOMException('Operação cancelada', 'AbortError');
+        job = await readBridgeJob(opcoes, job.id);
+        onActivity?.();
+        setCatalogStatus(job.status === 'pending'
+          ? `${job.filename} na fila do TabSis Local (um arquivo de cada vez)…`
+          : `Baixando ${job.filename} pelo TabSis Local… ${job.totalBytes
+            ? `${Math.min(100, Math.round(job.receivedBytes / job.totalBytes * 100))}% · ${formatBytes(job.receivedBytes)} / ${formatBytes(job.totalBytes)}`
+            : formatBytes(job.receivedBytes)}`);
+      }
+    } finally {
+      signal?.removeEventListener('abort', aoCancelar);
+    }
+    if (job.status !== 'done') throw new Error(`O TabSis Local não conseguiu baixar ${job.filename}: ${job.error ?? job.status}`);
+    const bytes = await fetchBridgeFile(opcoes, { nome: job.filename, pasta: 'principal' });
+    copiadosParaComputador.add(`${job.filename}:${bytes.byteLength}`);
+    entradas[job.filename] = [bytes, { level: 0 }];
+    showToast(`${job.filename} baixado pelo TabSis Local e guardado em ${job.path ?? bridgeReady?.directory}`);
+  }
+  void renderLocalFiles();
+  return zipSync(entradas);
 }
 
 /** "No computador": o que está na pasta do TabSis Local, para abrir de novo aqui sem baixar. */
@@ -8883,7 +8936,10 @@ async function downloadCatalogEntries(
       return zipSync(entradas);
     };
     let bytes: Uint8Array;
-    if (files.length && files.every((file) => file.ftpPath)) {
+    if (podeBaixarPeloComputador(files)) {
+      bytes = await baixarPeloComputador(files, signal, onActivity);
+      attempts = 1;
+    } else if (files.length && files.every((file) => file.ftpPath)) {
       bytes = await baixarPeloFtp();
       attempts = 1;
     } else {
@@ -10276,8 +10332,35 @@ function renderCatalogSearchBatch(
     packageSelected.type = 'button';
     packageSelected.title = 'Baixa os escolhidos e entrega um .zip com os DBC e um manifesto de procedência, sem abrir nem combinar';
 
+    // Com o TabSis Local: manda tudo para a fila do computador e não abre nada.
+    // Ele baixa um de cada vez, em segundo plano, mesmo com esta página fechada.
+    const localSelected = document.createElement('button');
+    localSelected.className = 'secondary-button';
+    localSelected.type = 'button';
+    localSelected.id = 'catalog-send-local-queue';
+    localSelected.title = 'O TabSis Local baixa um de cada vez para a pasta do computador, mesmo que você feche esta página';
+    localSelected.hidden = !bridgeReady?.features.includes('ftp');
+    localSelected.addEventListener('click', () => void (async () => {
+      const opcoes = bridgeOptions();
+      if (!opcoes) return;
+      const escolhidos = selectedFiles().filter((remote) => remote.ftpPath ?? officialFtpPath(remote.address));
+      localSelected.disabled = true;
+      try {
+        for (const remote of escolhidos) {
+          await startBridgeDownload(opcoes, `ftp://ftp.datasus.gov.br${remote.ftpPath ?? officialFtpPath(remote.address)}`);
+        }
+        setCatalogStatus(`${escolhidos.length} arquivo(s) na fila do TabSis Local. Ele baixa um de cada vez para ${bridgeReady?.directory ?? 'a pasta do computador'}, mesmo se você fechar esta página; depois eles aparecem em "No computador".`);
+      } catch (error) {
+        setCatalogStatus(`Não deu para mandar para o TabSis Local: ${error instanceof Error ? error.message : String(error)}`, true);
+      } finally {
+        localSelected.disabled = false;
+      }
+    })());
+
     syncSelection = (): void => {
       const chosen = selectedFiles().length;
+      localSelected.textContent = `Baixar no computador (${integerFormat.format(chosen)})`;
+      localSelected.disabled = chosen === 0;
       const everything = chosen === files.length;
       toggle.textContent = everything ? 'limpar seleção' : 'selecionar todos';
       count.textContent = `${integerFormat.format(chosen)} de ${integerFormat.format(files.length)} selecionado(s)`;
@@ -10319,7 +10402,7 @@ function renderCatalogSearchBatch(
     heading.append(toggle, count);
     const actions = document.createElement('div');
     actions.className = 'catalog-batch-bar-actions';
-    actions.append(openSelected, packageSelected);
+    actions.append(openSelected, packageSelected, localSelected);
     bar.append(heading, actions);
     catalogResults.append(bar);
   }

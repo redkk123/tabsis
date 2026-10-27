@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import ftplib
+import queue
 import hashlib
 import hmac
 import json
@@ -39,7 +40,7 @@ from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-VERSAO = '1.0.1'
+VERSAO = '1.0.2'
 PROTOCOLO = 1
 PORTA_PADRAO = 8787
 SITE = 'https://tabweb.me/'
@@ -308,6 +309,25 @@ class Local:
         self.tarefas: dict[str, Tarefa] = {}
         self.ouvintes = []
         self.trava = threading.Lock()
+        # Fila: um download de cada vez, em segundo plano. Vários ao mesmo
+        # tempo dividem a banda e o DATASUS derruba conexões em paralelo; um
+        # por vez termina cada arquivo mais cedo e continua mesmo se a página
+        # que pediu for fechada.
+        self.fila: queue.Queue[Tarefa] = queue.Queue()
+        threading.Thread(target=self._trabalhar, daemon=True).start()
+
+    def _trabalhar(self) -> None:
+        while True:
+            tarefa = self.fila.get()
+            if tarefa.cancelar.is_set():
+                tarefa.status = 'cancelled'
+                tarefa.terminada = time.time()
+                self.avisar(tarefa)
+                continue
+            baixar(tarefa, self.avisar)
+
+    def na_fila(self) -> int:
+        return sum(1 for t in self.tarefas.values() if t.status == 'pending')
 
     def avisar(self, evento) -> None:
         for ouvinte in list(self.ouvintes):
@@ -320,8 +340,12 @@ class Local:
         url = validar_url(url_bruta)
         tarefa = Tarefa(url=urllib.parse.urlunsplit(url), nome=nome_do_url(url), pasta=self.pasta, origem=origem)
         with self.trava:
+            # O mesmo arquivo já na fila ou baixando: devolve o pedido que existe.
+            for existente in self.tarefas.values():
+                if existente.url == tarefa.url and existente.status in ('pending', 'downloading'):
+                    return existente
             self.tarefas[tarefa.id] = tarefa
-        threading.Thread(target=baixar, args=(tarefa, self.avisar), daemon=True).start()
+        self.fila.put(tarefa)
         self.avisar(tarefa)
         return tarefa
 
@@ -706,7 +730,7 @@ def janela(local: Local, porta: int) -> None:
     lista.pack(fill='both', expand=True, pady=(10, 0))
 
 
-    rotulos = {'pending': 'na fila', 'downloading': 'baixando', 'done': 'pronto', 'failed': 'falhou', 'cancelled': 'cancelado'}
+    rotulos = {'pending': 'na fila (um de cada vez)', 'downloading': 'baixando', 'done': 'pronto', 'failed': 'falhou', 'cancelled': 'cancelado'}
 
     def processar():
         try:

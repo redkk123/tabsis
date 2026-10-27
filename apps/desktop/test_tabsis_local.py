@@ -103,6 +103,32 @@ class Arquivos(Servidor):
         self.assertEqual(self.pedir('/arquivos', token=False)[0], 401)
 
 
+class Fila(unittest.TestCase):
+    def test_um_de_cada_vez_e_sem_repetir(self):
+        ativos, maximo, trava = [0], [0], threading.Lock()
+
+        def baixar_falso(tarefa, avisar):
+            with trava:
+                ativos[0] += 1
+                maximo[0] = max(maximo[0], ativos[0])
+            time.sleep(0.1)
+            tarefa.status = 'done'
+            with trava:
+                ativos[0] -= 1
+
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(tl, 'baixar', baixar_falso):
+            local = tl.Local(Path(tmp))
+            base = 'ftp://ftp.datasus.gov.br/dissemin/publicos/SINAN/DADOS/FINAIS/'
+            tarefas = [local.iniciar_download(f'{base}DENGBR{a}.dbc') for a in (22, 23, 24)]
+            repetida = local.iniciar_download(f'{base}DENGBR24.dbc')
+            self.assertIs(repetida, tarefas[2])
+            fim = time.time() + 5
+            while any(t.status != 'done' for t in tarefas) and time.time() < fim:
+                time.sleep(0.05)
+            self.assertEqual([t.status for t in tarefas], ['done'] * 3)
+            self.assertEqual(maximo[0], 1)
+
+
 class Download(unittest.TestCase):
     def test_https_completo_e_tamanho_errado(self):
         with tempfile.TemporaryDirectory() as tmp:

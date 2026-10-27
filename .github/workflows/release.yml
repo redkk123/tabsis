@@ -52,12 +52,13 @@ jobs:
             macos)   modo="--onedir --windowed" ;;  # .app; onefile+windowed no macOS está obsoleto no PyInstaller
           esac
           python -m PyInstaller $modo --name TabSis-Local --clean tabsis_local.py
-          versao=$(python -c "import tabsis_local; print(tabsis_local.VERSAO)")
+          # Nomes fixos, sem a versão: os links de baixar.html apontam para
+          # releases/latest/download/<nome> e não mudam a cada versão.
           mkdir -p ../../saida
           case "${{ matrix.nome }}" in
-            windows) cp dist/TabSis-Local.exe "../../saida/TabSis-Local-$versao-windows.exe" ;;
-            linux)   cp dist/TabSis-Local "../../saida/TabSis-Local-$versao-linux" ;;
-            macos)   ditto -c -k --keepParent dist/TabSis-Local.app "../../saida/TabSis-Local-$versao-macos.zip" ;;
+            windows) cp dist/TabSis-Local.exe ../../saida/TabSis-Local-windows.exe ;;
+            linux)   cp dist/TabSis-Local ../../saida/TabSis-Local-linux ;;
+            macos)   ditto -c -k --keepParent dist/TabSis-Local.app ../../saida/TabSis-Local-macos.zip ;;
           esac
       - uses: actions/upload-artifact@v5
         with:
@@ -94,8 +95,7 @@ jobs:
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;37.0.0" > /dev/null
           cd apps/android
           TABSIS_KEYSTORE="$RUNNER_TEMP/tabsis.jks" ./gradlew assembleRelease --console=plain
-          versao=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
-          mkdir -p ../../saida && cp app/build/outputs/apk/release/app-release.apk "../../saida/TabSis-$versao-android.apk"
+          mkdir -p ../../saida && cp app/build/outputs/apk/release/app-release.apk ../../saida/TabSis-android.apk
       - uses: actions/upload-artifact@v5
         if: env.KEYSTORE_B64 != ''
         with:
