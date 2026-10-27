@@ -193,6 +193,8 @@ function isReservedWindowsName(name: string): boolean {
 export function bridgeAllowedWebOrigins(extra: readonly string[] = []): string[] {
   return [
     'https://redkk123.github.io',
+    'https://tabweb.me',
+    'https://www.tabweb.me',
     // Desenvolvimento local do próprio projeto.
     'http://localhost:5173',
     'http://127.0.0.1:5173',

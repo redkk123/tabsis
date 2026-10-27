@@ -22,6 +22,26 @@ export interface BridgeHealth {
   protocol: number;
   allowlist: string[];
   directory: string;
+  /** O TabSis Local (apps/desktop) se identifica e diz o que sabe fazer além de baixar. */
+  app?: string;
+  version?: string;
+  features?: string[];
+}
+
+/** Um arquivo que o app de computador gravou. */
+export interface BridgeSavedFile {
+  path: string;
+  bytes: number;
+  sha256: string;
+}
+
+/** Um arquivo de dados que já está na pasta do app de computador. */
+export interface BridgeLocalFile {
+  nome: string;
+  pasta: 'principal' | 'guardados';
+  bytes: number;
+  modificado: number;
+  caminho: string;
 }
 
 export type BridgeProbe =
@@ -180,4 +200,44 @@ export function describeBridgeProbe(probe: BridgeProbe): string {
     default:
       return `Não foi possível falar com o downloader local: ${probe.detail}`;
   }
+}
+
+export function bridgeHasFeature(health: Pick<BridgeHealth, 'features'>, feature: string): boolean {
+  return Boolean(health.features?.includes(feature));
+}
+
+async function bridgeBinary(options: BridgeClientOptions, route: string, init: RequestInit = {}): Promise<Response> {
+  const call = options.fetchImpl ?? fetch;
+  const response = await call(`${options.baseUrl ?? bridgeBaseUrl()}${route}`, {
+    ...init,
+    headers: { ...(init.headers ?? {}), authorization: `Bearer ${options.token}` },
+  });
+  if (!response.ok) {
+    let detail = `HTTP ${response.status}`;
+    try { detail = String(((await response.json()) as { error?: unknown }).error ?? detail); } catch { /* corpo sem JSON */ }
+    throw new Error(response.status === 401 ? `token recusado: ${detail}` : detail);
+  }
+  return response;
+}
+
+/**
+ * Manda um arquivo para a pasta do app de computador (TabSis Local). O app
+ * decide onde gravar: o nome é higienizado lá, e nada sai da pasta dele.
+ */
+export async function sendFileToBridge(options: BridgeClientOptions, nome: string, conteudo: Blob): Promise<BridgeSavedFile> {
+  const response = await bridgeBinary(options, `/guardados?nome=${encodeURIComponent(nome)}`, {
+    method: 'POST',
+    body: conteudo,
+    headers: { 'content-type': 'application/octet-stream' },
+  });
+  return await response.json() as BridgeSavedFile;
+}
+
+export async function listBridgeFiles(options: BridgeClientOptions): Promise<{ directory: string; files: BridgeLocalFile[] }> {
+  return await (await bridgeBinary(options, '/arquivos')).json() as { directory: string; files: BridgeLocalFile[] };
+}
+
+export async function fetchBridgeFile(options: BridgeClientOptions, arquivo: Pick<BridgeLocalFile, 'nome' | 'pasta'>): Promise<Uint8Array> {
+  const response = await bridgeBinary(options, `/arquivo?nome=${encodeURIComponent(arquivo.nome)}&pasta=${arquivo.pasta}`);
+  return new Uint8Array(await response.arrayBuffer());
 }

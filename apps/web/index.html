@@ -1289,6 +1289,16 @@
         </div>
         <div class="catalog-results" id="catalog-auxiliary-results"></div>
       </section>
+      <section class="catalog-recent" id="catalog-local" aria-labelledby="catalog-local-title" hidden>
+        <div class="catalog-recent-heading">
+          <div>
+            <span class="eyebrow">No computador · TabSis Local</span>
+            <h3 id="catalog-local-title">Arquivos na pasta</h3>
+            <p id="catalog-local-summary"></p>
+          </div>
+        </div>
+        <div class="catalog-results" id="catalog-local-list"></div>
+      </section>
       <section class="catalog-recent" aria-labelledby="catalog-recent-title">
         <div class="catalog-recent-heading">
           <div>
@@ -1301,13 +1311,15 @@
         <div class="catalog-results" id="catalog-recent-list"></div>
 
         <details class="sidebar-group" id="bridge-panel">
-          <summary>Downloader local <span>opcional</span></summary>
+          <summary>TabSis Local no computador <span>opcional</span></summary>
           <div>
             <p class="filter-info">
-              Quando o navegador não consegue concluir um download do DATASUS — instabilidade do
-              servidor, tempo esgotado, arquivo muito grande — um auxiliar rodando na sua máquina
-              pode terminar o trabalho. Ele é opcional, e é você quem o inicia: esta página nunca
-              executa nada sozinha.
+              O <b>TabSis Local</b> é um app para Windows, Linux e macOS
+              (<a href="https://github.com/redkk123/tabsis/releases/latest" target="_blank" rel="noreferrer">baixar</a>).
+              Com ele aberto, tudo o que você baixar aqui ganha uma cópia numa pasta do computador,
+              os arquivos guardados neste navegador podem ir para lá, e o que está na pasta abre
+              de novo aqui sem baixar outra vez. No app, "Abrir o TabSis conectado" já liga os dois;
+              ou cole aqui o token que ele mostra. Esta página nunca inicia programa nenhum.
             </p>
             <div class="bridge-controls">
               <label>
@@ -1318,6 +1330,7 @@
               <button class="secondary-button" id="bridge-check" type="button">Verificar</button>
             </div>
             <p class="filter-info" id="bridge-verdict" hidden></p>
+            <label class="check-label" id="bridge-auto-copy-label" hidden><input id="bridge-auto-copy" type="checkbox" checked /><span>Guardar uma cópia no computador de tudo o que eu baixar</span></label>
           </div>
         </details>
         <p class="catalog-cache-note">Os pacotes ficam somente neste navegador e podem ser reabertos sem internet. Removê-los não apaga arquivos que você salvou fora do aplicativo.</p>

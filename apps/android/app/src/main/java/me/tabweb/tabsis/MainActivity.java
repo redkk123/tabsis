@@ -17,6 +17,7 @@ import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.FrameLayout;
 import android.widget.Toast;
 
 import androidx.activity.ComponentActivity;
@@ -25,6 +26,8 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.webkit.WebViewAssetLoader;
 
@@ -50,14 +53,25 @@ public class MainActivity extends ComponentActivity {
         super.onCreate(savedInstanceState);
 
         webView = new WebView(this);
-        setContentView(webView, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        // O WebView ignora padding (desenha a página por baixo dele): quem
+        // recebe o espaço das barras do sistema é este contêiner, pintado com o
+        // azul do topo do TabSis. Sem isso, relógio e ícones ficavam em cima
+        // do cabeçalho do site (print do Red, 2026-10-27).
+        FrameLayout moldura = new FrameLayout(this);
+        moldura.setBackgroundColor(getColor(R.color.tabsis_azul));
+        moldura.addView(webView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        setContentView(moldura);
 
         // Android 15 desenha de ponta a ponta: as barras do sistema não podem cobrir o site.
-        ViewCompat.setOnApplyWindowInsetsListener(webView, (view, insets) -> {
+        ViewCompat.setOnApplyWindowInsetsListener(moldura, (view, insets) -> {
             Insets barras = insets.getInsets(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout() | WindowInsetsCompat.Type.ime());
             view.setPadding(barras.left, barras.top, barras.right, barras.bottom);
             return WindowInsetsCompat.CONSUMED;
         });
+        // Ícones claros na barra de status e na de navegação, sobre o azul.
+        WindowInsetsControllerCompat barrasDoSistema = WindowCompat.getInsetsController(getWindow(), moldura);
+        barrasDoSistema.setAppearanceLightStatusBars(false);
+        barrasDoSistema.setAppearanceLightNavigationBars(false);
 
         WebSettings ajustes = webView.getSettings();
         ajustes.setJavaScriptEnabled(true);

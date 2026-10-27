@@ -1,5 +1,9 @@
 # TabWin Bridge — auxiliar local de download
 
+> **Para quem usa o TabSis, prefira o [TabSis Local](../desktop/README.md)**: é o mesmo
+> protocolo, com janela, executável para Windows/Linux/macOS, download pelo FTP oficial
+> e cópia do que o navegador guardou. Este auxiliar em Node fica para desenvolvimento.
+
 **Opcional.** O TabSis funciona inteiro sem ele. Este auxiliar existe para
 um caso específico: downloads do DATASUS que o navegador não consegue concluir
 — CORS, instabilidade do servidor oficial, timeout de proxy, arquivo grande

@@ -1,0 +1,124 @@
+# Release de cada versão: uma tag v* (ex.: v1.0.0) gera os executáveis do
+# TabSis Local (Windows, Linux, macOS) e os publica num release do GitHub,
+# junto com o APK do app Android.
+#
+# O APK é assinado com a chave de release do projeto. Se o segredo
+# ANDROID_KEYSTORE_BASE64 (com ANDROID_KEYSTORE_PASSWORD) existir, ele é
+# construído aqui; se não, o APK assinado localmente é anexado ao release à mão
+# (`gh release upload`). Nunca com a chave de debug: cada máquina tem uma, e o
+# Android recusaria instalar a versão nova por cima da antiga.
+
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag já existente (ex.: v1.0.0)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  desktop:
+    name: TabSis Local (${{ matrix.nome }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, nome: windows }
+          - { os: ubuntu-22.04, nome: linux }
+          - { os: macos-latest, nome: macos }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Testar
+        working-directory: apps/desktop
+        run: python -m unittest test_tabsis_local -v
+      - name: Empacotar
+        working-directory: apps/desktop
+        shell: bash
+        run: |
+          python -m pip install "pyinstaller>=6,<7"
+          case "${{ matrix.nome }}" in
+            windows) modo="--onefile --windowed" ;;
+            linux)   modo="--onefile" ;;
+            macos)   modo="--onedir --windowed" ;;  # .app; onefile+windowed no macOS está obsoleto no PyInstaller
+          esac
+          python -m PyInstaller $modo --name TabSis-Local --clean tabsis_local.py
+          versao=$(python -c "import tabsis_local; print(tabsis_local.VERSAO)")
+          mkdir -p ../../saida
+          case "${{ matrix.nome }}" in
+            windows) cp dist/TabSis-Local.exe "../../saida/TabSis-Local-$versao-windows.exe" ;;
+            linux)   cp dist/TabSis-Local "../../saida/TabSis-Local-$versao-linux" ;;
+            macos)   ditto -c -k --keepParent dist/TabSis-Local.app "../../saida/TabSis-Local-$versao-macos.zip" ;;
+          esac
+      - uses: actions/upload-artifact@v5
+        with:
+          name: desktop-${{ matrix.nome }}
+          path: saida/*
+
+  android:
+    name: App Android
+    runs-on: ubuntu-latest
+    env:
+      KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+    steps:
+      - uses: actions/checkout@v6
+        if: env.KEYSTORE_B64 != ''
+      - uses: actions/setup-node@v7
+        if: env.KEYSTORE_B64 != ''
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: actions/setup-java@v5
+        if: env.KEYSTORE_B64 != ''
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Construir e assinar
+        if: env.KEYSTORE_B64 != ''
+        env:
+          TABSIS_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          npm ci
+          npm run android:site
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/tabsis.jks"
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;37.0.0" > /dev/null
+          cd apps/android
+          TABSIS_KEYSTORE="$RUNNER_TEMP/tabsis.jks" ./gradlew assembleRelease --console=plain
+          versao=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+          mkdir -p ../../saida && cp app/build/outputs/apk/release/app-release.apk "../../saida/TabSis-$versao-android.apk"
+      - uses: actions/upload-artifact@v5
+        if: env.KEYSTORE_B64 != ''
+        with:
+          name: android
+          path: saida/*
+
+  publicar:
+    needs: [desktop, android]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v6
+        with:
+          path: saida
+          merge-multiple: true
+      - name: Criar ou atualizar o release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          ls -l saida
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" saida/* --clobber
+          else
+            gh release create "$TAG" saida/* --title "TabSis $TAG" --notes-file .github/release-notes.md
+          fi

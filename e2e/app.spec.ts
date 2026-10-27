@@ -1751,6 +1751,53 @@ test('dentro do app Android, salvar vai pela ponte nativa (o WebView não baixa 
   expect(csv.split('\n').length).toBeGreaterThan(2);
   await page.evaluate(() => window.print());
   expect(await page.evaluate(() => (window as unknown as { __ponte: { impressoes: number } }).__ponte.impressoes)).toBe(1);
+  // No app, a área de abrir ensina a marcar vários arquivos no seletor do Android.
+  await expect(page.locator('.drop-zone-dica')).toContainText('toque e segure');
+});
+
+test('TabSis Local: o link do app conecta sozinho, os guardados vão para a pasta e reabrem dela', async ({ page }) => {
+  test.setTimeout(90_000);
+  const { spawn } = await import('node:child_process');
+  const { mkdtempSync, readFileSync, existsSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { zipSync } = await import('fflate');
+  const pasta = mkdtempSync(join(tmpdir(), 'tabsis-local-'));
+  const app = spawn('python3', ['apps/desktop/tabsis_local.py', '--sem-janela', '--porta', '0', '--pasta', pasta]);
+  try {
+    const ligacao = await new Promise<string>((resolve, reject) => {
+      let saida = '';
+      app.stdout.on('data', (pedaco) => {
+        saida += String(pedaco);
+        const achado = /#local=(\S+:\d+)/.exec(saida);
+        if (achado) resolve(achado[1]!);
+      });
+      app.on('exit', (codigo) => reject(new Error(`o app saiu (${codigo}): ${saida}`)));
+    });
+    await page.goto('/');
+    await page.evaluate(async (bytes) => {
+      const mod = await import('/src/archive-cache.ts');
+      await mod.writeCachedArchive('official-v1:DENGBR24', new Uint8Array(bytes), {
+        sha256: '24'.repeat(32), role: 'data',
+        sources: [{ name: 'DENGBR24.dbf', address: 'ftp://ftp.datasus.gov.br/dissemin/publicos/SINAN/DADOS/FINAIS/DENGBR24.dbc', source: 'SINAN', modality: 'Dados' }],
+      });
+    }, [...zipSync({ 'DENGBR24.dbf': new Uint8Array(readFileSync('e2e/fixtures/DENGBR24.dbf')) })]);
+    // Como o botão "Abrir o TabSis conectado" do app abre a página.
+    await page.goto(`/#local=${ligacao}`);
+    await expect(page.locator('#toast')).toContainText('Conectado ao TabSis Local');
+    expect(new URL(page.url()).hash).toBe('');
+    await page.locator('#catalog-button').click();
+    await page.locator('#catalog-recent-send-local').click();
+    await expect(page.locator('#catalog-status')).toContainText('1 arquivo(s) copiados');
+    expect(existsSync(join(pasta, 'Guardados do navegador', 'DENGBR24.dbf'))).toBe(true);
+    const item = page.locator('#catalog-local-list .catalog-recent-item').filter({ hasText: 'DENGBR24.dbf' });
+    await expect(item).toBeVisible();
+    await item.getByRole('button', { name: 'Abrir', exact: true }).click();
+    await expect(page.locator('#result-table tbody tr').first()).toBeVisible();
+    await expect(page.locator('#result-kicker')).toContainText('DENGBR24.dbf');
+  } finally {
+    app.kill();
+  }
 });
 
 test('um .TAB salvo pelo TabWin 4.15 abre aqui, somente para leitura', async ({ page }) => {
