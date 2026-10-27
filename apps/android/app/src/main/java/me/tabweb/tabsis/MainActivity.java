@@ -1,0 +1,190 @@
+package me.tabweb.tabsis;
+
+import android.annotation.SuppressLint;
+import android.content.ActivityNotFoundException;
+import android.content.ClipData;
+import android.content.Intent;
+import android.net.Uri;
+import android.os.Bundle;
+import android.print.PrintAttributes;
+import android.print.PrintManager;
+import android.view.ViewGroup;
+import android.webkit.ValueCallback;
+import android.webkit.WebChromeClient;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
+import android.widget.Toast;
+
+import androidx.activity.ComponentActivity;
+import androidx.activity.OnBackPressedCallback;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.webkit.WebViewAssetLoader;
+
+/**
+ * O TabSis inteiro roda aqui dentro: é o mesmo site do tabweb.me, empacotado no
+ * APK (assets/site) e servido pelo WebViewAssetLoader num endereço https que
+ * nunca sai do aparelho (https://app.tabweb.me). Os microdados abertos não vão
+ * para lugar nenhum; só a busca no DATASUS e no IBGE usa a internet.
+ */
+public class MainActivity extends ComponentActivity {
+
+    /** Domínio interceptado localmente; nenhuma requisição a ele chega à rede. */
+    static final String DOMINIO = "app.tabweb.me";
+    static final String INICIO = "https://" + DOMINIO + "/site/index.html";
+
+    private WebView webView;
+    private ValueCallback<Uri[]> escolhaPendente;
+    private ActivityResultLauncher<Intent> escolherArquivos;
+
+    @SuppressLint("SetJavaScriptEnabled")
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        webView = new WebView(this);
+        setContentView(webView, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        // Android 15 desenha de ponta a ponta: as barras do sistema não podem cobrir o site.
+        ViewCompat.setOnApplyWindowInsetsListener(webView, (view, insets) -> {
+            Insets barras = insets.getInsets(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout() | WindowInsetsCompat.Type.ime());
+            view.setPadding(barras.left, barras.top, barras.right, barras.bottom);
+            return WindowInsetsCompat.CONSUMED;
+        });
+
+        WebSettings ajustes = webView.getSettings();
+        ajustes.setJavaScriptEnabled(true);
+        ajustes.setDomStorageEnabled(true);
+        ajustes.setDatabaseEnabled(true);
+        // Nada de file:// nem content:// direto: tudo passa pelo carregador de assets.
+        ajustes.setAllowFileAccess(false);
+        ajustes.setAllowContentAccess(false);
+        ajustes.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
+        ajustes.setMediaPlaybackRequiresUserGesture(true);
+        ajustes.setSupportMultipleWindows(false);
+        ajustes.setUserAgentString(ajustes.getUserAgentString() + " TabSisAndroid/" + versao());
+
+        WebViewAssetLoader carregador = new WebViewAssetLoader.Builder()
+                .setDomain(DOMINIO)
+                .addPathHandler("/", new WebViewAssetLoader.AssetsPathHandler(this))
+                .build();
+
+        webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+                return carregador.shouldInterceptRequest(request.getUrl());
+            }
+
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                Uri destino = request.getUrl();
+                if (DOMINIO.equals(destino.getHost())) return false;
+                // Link para fora (DATASUS, manual on-line, GitHub): abre no navegador.
+                abrirFora(destino);
+                return true;
+            }
+        });
+
+        webView.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
+                if (escolhaPendente != null) escolhaPendente.onReceiveValue(null);
+                escolhaPendente = callback;
+                // O site pede extensões (.dbc, .dbf, .def…), que o Android não
+                // traduz em tipo: oferece tudo e o site confere o arquivo.
+                Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                intent.addCategory(Intent.CATEGORY_OPENABLE);
+                intent.setType("*/*");
+                intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, params.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE);
+                try {
+                    escolherArquivos.launch(intent);
+                } catch (ActivityNotFoundException e) {
+                    escolhaPendente = null;
+                    return false;
+                }
+                return true;
+            }
+        });
+
+        escolherArquivos = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), resultado -> {
+            if (escolhaPendente == null) return;
+            Uri[] escolhidos = null;
+            Intent dados = resultado.getData();
+            if (resultado.getResultCode() == RESULT_OK && dados != null) {
+                ClipData varios = dados.getClipData();
+                if (varios != null) {
+                    escolhidos = new Uri[varios.getItemCount()];
+                    for (int i = 0; i < varios.getItemCount(); i++) escolhidos[i] = varios.getItemAt(i).getUri();
+                } else if (dados.getData() != null) {
+                    escolhidos = new Uri[] { dados.getData() };
+                }
+            }
+            escolhaPendente.onReceiveValue(escolhidos);
+            escolhaPendente = null;
+        });
+
+        webView.addJavascriptInterface(new PonteAndroid(this), "TabSisAndroid");
+
+        // Voltar: fecha a janela aberta no site (busca, manual…); senão, volta a página; senão, sai.
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                webView.evaluateJavascript(
+                        "(function(){var d=document.querySelector('dialog[open]');if(d){d.close();return true;}return false;})()",
+                        fechou -> {
+                            if ("true".equals(fechou)) return;
+                            if (webView.canGoBack()) webView.goBack();
+                            else finish();
+                        });
+            }
+        });
+
+        if (savedInstanceState != null) webView.restoreState(savedInstanceState);
+        else webView.loadUrl(INICIO);
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        webView.saveState(outState);
+    }
+
+    private String versao() {
+        try {
+            return getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+        } catch (Exception e) {
+            return "?";
+        }
+    }
+
+    void abrirFora(Uri destino) {
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW, destino));
+        } catch (ActivityNotFoundException e) {
+            Toast.makeText(this, "Nenhum aplicativo abre " + destino, Toast.LENGTH_LONG).show();
+        }
+    }
+
+    /** O "Imprimir" do site: a página atual vai para o serviço de impressão (ou PDF). */
+    void imprimir() {
+        runOnUiThread(() -> {
+            PrintManager impressao = (PrintManager) getSystemService(PRINT_SERVICE);
+            impressao.print("TabSis", webView.createPrintDocumentAdapter("TabSis"), new PrintAttributes.Builder().build());
+        });
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (webView != null) {
+            webView.destroy();
+            webView = null;
+        }
+        super.onDestroy();
+    }
+}

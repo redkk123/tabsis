@@ -944,6 +944,11 @@ const documentosOficiais = new Map<string, { cacheKey: string; entry: string }>(
 
 function mostrarPdf(bytes: Uint8Array, nome: string): void {
   const blob = new Blob([bytes as BlobPart], { type: 'application/pdf' });
+  // No app, o PDF vai para Downloads e abre no leitor de PDF do aparelho.
+  if (ponteAndroid) {
+    void salvarNoAndroid(ponteAndroid, blob, nome, true);
+    return;
+  }
   const url = URL.createObjectURL(blob);
   // Sem 'noopener': com ele o navegador devolve null mesmo quando abre, e o
   // PDF ia também para Downloads. É um blob deste próprio site.
@@ -10347,7 +10352,45 @@ function exportBaseName(): string {
   return `${datasetName.replace(/\.[^.]+$/, '')}-${field.toLowerCase()}`;
 }
 
+/**
+ * Dentro do app Android (apps/android) o WebView não baixa `blob:`: o arquivo
+ * vai em pedaços para a ponte nativa, que o guarda em Downloads/TabSis.
+ */
+interface PonteAndroid {
+  iniciarArquivo(): string;
+  escreverParte(id: string, base64: string): void;
+  concluirArquivo(id: string, nome: string, tipo: string, abrir: boolean): string;
+  descartarArquivo(id: string): void;
+  imprimir(): void;
+}
+const ponteAndroid = (window as unknown as { TabSisAndroid?: PonteAndroid }).TabSisAndroid;
+if (ponteAndroid) window.print = () => ponteAndroid.imprimir();
+
+function paraBase64(bytes: Uint8Array): string {
+  let texto = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) texto += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(texto);
+}
+
+async function salvarNoAndroid(ponte: PonteAndroid, blob: Blob, filename: string, abrir: boolean): Promise<void> {
+  const id = ponte.iniciarArquivo();
+  try {
+    const pedaco = 768 * 1024;
+    for (let inicio = 0; inicio < blob.size; inicio += pedaco) {
+      ponte.escreverParte(id, paraBase64(new Uint8Array(await blob.slice(inicio, inicio + pedaco).arrayBuffer())));
+    }
+    showToast(ponte.concluirArquivo(id, filename, blob.type, abrir));
+  } catch (error) {
+    ponte.descartarArquivo(id);
+    showToast(`Não deu para salvar ${filename}: ${error instanceof Error ? error.message : String(error)}`, true);
+  }
+}
+
 function downloadBlob(blob: Blob, filename: string): void {
+  if (ponteAndroid) {
+    void salvarNoAndroid(ponteAndroid, blob, filename, false);
+    return;
+  }
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
   link.download = filename;

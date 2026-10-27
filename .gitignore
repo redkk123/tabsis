@@ -30,3 +30,10 @@ playwright/.cache/
 # São públicos e re-baixáveis; não precisam pesar no repositório.
 e2e/fixtures/manual/
 .wrangler/
+
+# App Android
+apps/android/.gradle/
+apps/android/**/build/
+apps/android/build/
+apps/android/local.properties
+apps/android/app/src/main/assets/site/
