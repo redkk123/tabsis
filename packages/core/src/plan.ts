@@ -1,3 +1,4 @@
+import { lerDefinicao } from './definicao-caso.js';
 import type { CrossFieldRuleSpec, FilterSpec, MeasureSpec, QueryPlan, TabulationSpec, TotalPolicy } from './model.js';
 
 export class QueryPlanError extends Error {
@@ -48,6 +49,18 @@ export function validateFilter(filter: FilterSpec, label: string): void {
     if (filter.minimum !== undefined && filter.maximum !== undefined && filter.minimum > filter.maximum) {
       throw new QueryPlanError(`${label} minimum exceeds maximum`);
     }
+  } else if (filter.kind === 'code-rules') {
+    if (filter.conversionId) throw new QueryPlanError(`${label} code rules cannot use a conversion`);
+    if (typeof filter.include !== 'string' || typeof filter.exclude !== 'string') {
+      throw new QueryPlanError(`${label} code rules are invalid`);
+    }
+    let definicao;
+    try {
+      definicao = lerDefinicao(filter.include, filter.exclude);
+    } catch (error) {
+      throw new QueryPlanError(`${label} code rules are invalid: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    if (!definicao.incluir.length && !definicao.excluir.length) throw new QueryPlanError(`${label} code rules are empty`);
   } else if (!Array.isArray(filter.acceptedCategories)) {
     throw new QueryPlanError(`${label} has no selected categories`);
   } else if (filter.acceptedCategories.length === 0 && !filter.includeUnclassified) {
@@ -170,6 +183,7 @@ export function compileQueryPlan(spec: TabulationSpec): QueryPlan {
     validateFilter(filter, `filter ${index + 1}`);
     if (filter.mode === 'exclude') warnings.push(`filter ${index + 1} uses explicit exclusion policy; TabWin default equivalence is pending`);
     if (filter.kind === 'numeric-range') warnings.push(`filter ${index + 1} uses an explicit numeric range policy`);
+    if (filter.kind === 'code-rules') warnings.push(`filter ${index + 1} uses code rules (modern, no TabWin equivalent)`);
     if (filter.origin === 'data-quality') warnings.push(`filter ${index + 1} is an explicit, non-destructive data-quality rule`);
   }
 

@@ -83,10 +83,18 @@ R/Python no Lab. As duas pessoas chegam ao mesmo número, conferível.
    - COMEÇADO (decisão do Red: aba "Microdados" dentro do TabSis): a aba já
      tem a definição de caso por códigos. Prefixo, faixa, excluir por cima,
      prévia por código e aviso de código que não aparece. O resultado vira uma
-     Seleção comum, e as definições ficam guardadas no navegador. Próximos
-     passos, dentro da mesma aba: as etapas da Fase 1 (faixa etária, caso
-     novo/confirmado, município → região) e a definição salva dentro da
-     receita `.twrecipe`, que hoje fica só no navegador.
+     Seleção comum, e as definições ficam guardadas no navegador.
+   - FEITO (2026-10-27): a Seleção guarda a regra (filtro `code-rules` no
+     motor, com o código R/Python equivalente), e não a lista de códigos que
+     apareceram; vai na receita `.twrecipe` e reabre com outros anos. Uma
+     regra por campo. Atalhos: RIDE-DF (LC 163/2018) e faixa etária no código
+     do SINAN. Município → UF, região e macrorregião de saúde já existiam como
+     CNV (`public/cnv`).
+   - Falta: "caso novo/confirmado" por agravo. Ficou de fora de propósito: é
+     definição clínica, e o motor não embute significado clínico. Ela segue
+     pelas Seleções comuns (no caso da LTA, `CLA_TIPO_N = 1` e
+     `EVOLUCAO ≠ 6`). Um modelo pronto, com a fonte citada, entra na Fase 3
+     (cadernos-modelo).
 
 ## Fases
 

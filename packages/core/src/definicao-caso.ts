@@ -129,3 +129,30 @@ export function descreverDefinicao(definicao: DefinicaoDeCaso): string {
   if (incluir) return incluir;
   return excluir ? `tudo, sem ${excluir}` : 'tudo';
 }
+
+/**
+ * RIDE-DF na composição da Lei Complementar nº 163/2018: o DF e 33 municípios
+ * (29 de Goiás, 4 de Minas Gerais), em códigos IBGE de 6 dígitos, os do SINAN
+ * e do SIM. Conferidos na API de localidades do IBGE em 25/10/2026.
+ */
+export const RIDE_DF_LC_163_2018: readonly string[] = [
+  '530010',
+  '520010', '520017', '520025', '520030', '520060', '520080', '520320', '520400', '520530', '520549',
+  '520551', '520580', '520620', '520790', '520800', '520860', '521250', '521305', '521460', '521523',
+  '521560', '521730', '521760', '521975', '522000', '522068', '522185', '522220', '522230',
+  '310450', '310930', '310945', '317040',
+];
+
+/**
+ * Faixa etária em anos completos, no código de idade do SINAN (`NU_IDADE_N`):
+ * 4 dígitos, o primeiro é a unidade (1 hora, 2 dia, 3 mês, 4 ano) e os outros
+ * três o valor. "0 a 9 anos" inclui quem tem a idade em horas, dias ou meses.
+ */
+export function faixaEtariaSinan(minimo: number, maximo: number): string {
+  if (!Number.isInteger(minimo) || !Number.isInteger(maximo) || minimo < 0 || maximo > 999 || minimo > maximo) {
+    throw new Error('Faixa etária inválida: use anos inteiros de 0 a 999, o início antes do fim.');
+  }
+  const ano = (valor: number) => `4${String(valor).padStart(3, '0')}`;
+  const anos = minimo === maximo ? ano(minimo) : `${ano(minimo)}-${ano(maximo)}`;
+  return minimo === 0 ? `1000-3999, ${anos}` : anos;
+}

@@ -685,8 +685,22 @@ quando a lista pronta junta coisas diferentes. Por exemplo, a
    tirou e avisa quando um código não aparece no arquivo (provável erro de
    digitação ou campo errado).
 5. **Aplicar como Seleção** filtra a tabela, o mapa e as exportações. A
-   Seleção aparece como "Caso" na lista de Seleções; aplicar de novo troca a
-   anterior, sem empilhar.
+   Seleção aparece como "Caso" na lista de Seleções. Cada campo tem a sua
+   regra: aplicar de novo no mesmo campo troca a anterior; em outro campo,
+   soma (a região no município de residência e o CID na causa, por exemplo).
+
+A Seleção guarda a **regra**, não a lista de códigos que apareceram. Ao
+salvar a análise e reabrir com outros anos, entram também os códigos que só
+existem nesses anos.
+
+**Atalhos:**
+- **RIDE-DF (DF e Entorno):** os 34 municípios da Lei Complementar 163/2018,
+  no município de residência.
+- **Idade (SINAN):** monta a faixa no código de idade do SINAN
+  (`NU_IDADE_N`), em que o primeiro dígito é a unidade. "0 a 9 anos" inclui
+  as idades em horas, dias e meses.
+- **Uma UF:** os 2 primeiros dígitos do código do município (53 = DF,
+  52 = GO).
 
 **Guardar definição** guarda campo e códigos neste navegador, para usar de
 novo com outros anos ou estados.

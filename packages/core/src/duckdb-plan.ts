@@ -87,6 +87,7 @@ export function analyzeDuckDbPlanSupport(plan: QueryPlan, schema: DuckDbSourceSc
   for (const [index, filter] of plan.spec.filters.entries()) {
     if (filter.conversionId) blockers.push(`filter ${index + 1} uses CNV conversion ${filter.conversionId}`);
     if (filter.startPosition !== undefined) blockers.push(`filter ${index + 1} uses startPosition`);
+    if (filter.kind === 'code-rules') blockers.push(`filter ${index + 1} uses code rules (reference executor only)`);
     if (filter.kind === 'numeric-range' && fieldKind(schema, filter.field) !== 'number') {
       blockers.push(`numeric filter ${index + 1} requires field ${filter.field} to be declared numeric`);
     }
@@ -137,6 +138,7 @@ function numericRangePredicate(
 function filterWhere(plan: QueryPlan, parameters: Array<string | number>): string[] {
   return plan.spec.filters.map((filter) => {
     const field = quoteIdentifier(filter.field);
+    if (filter.kind === 'code-rules') throw new Error('code rules are not compiled to DuckDB');
     const base = filter.kind === 'numeric-range'
       ? numericRangePredicate(field, filter, parameters)
       : categoryPredicate(field, filter.acceptedCategories, parameters);

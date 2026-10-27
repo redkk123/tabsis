@@ -1702,6 +1702,7 @@ test('Microdados: definição de caso por códigos, com prévia, vira uma Seleç
   await expect(page.locator('#result-table tbody')).toContainText('AM');
   await expect(page.locator('.active-filter')).toHaveCount(1);
   await expect(page.locator('.active-filter')).toContainText('Caso');
+  await expect(page.locator('.active-filter')).toContainText('A');
 
   // Código que não existe no campo é apontado, em vez de dar zero calado.
   await page.locator('[data-view="microdata"]').click();
@@ -1709,6 +1710,52 @@ test('Microdados: definição de caso por códigos, com prévia, vira uma Seleç
   await page.locator('#case-preview').click();
   await expect(page.locator('#case-status')).toContainText('Nenhum registro com: B57');
   await expect(page.locator('#case-apply')).toBeDisabled();
+});
+
+test('Microdados: atalhos de RIDE-DF e idade, com uma regra por campo', async ({ page }) => {
+  // Residência em Brasília, Alto Paraíso (RIDE), Goiânia (fora) e Unaí (RIDE, MG).
+  const csv = [
+    'ID_MN_RESI;NU_IDADE_N;CS_SEXO',
+    '530010;4065;M', '520060;4030;F', '520870;4070;M', '317040;3005;F', '530010;4005;F',
+  ].join('\n');
+  await page.goto('/');
+  await page.locator('#file-input').setInputFiles({ name: 'sinan-e2e.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
+  await expect(page.locator('#run-button')).toBeEnabled();
+  await page.locator('#row-field').selectOption('CS_SEXO');
+  await page.locator('#analysis-form').evaluate((form: HTMLFormElement) => form.requestSubmit());
+  await expect(page.locator('#result-table tbody')).toBeVisible();
+  await page.locator('[data-view="microdata"]').click();
+
+  await page.locator('#case-shortcut-ride').click();
+  await expect(page.locator('#case-field')).toHaveValue('ID_MN_RESI');
+  await expect(page.locator('#case-status')).toContainText('4 de 5 registros entram');
+  await page.locator('#case-apply').click();
+
+  // Idade de 60 anos ou mais, em outro campo: soma com a região, não troca.
+  await page.locator('#case-age-min').fill('60');
+  await page.locator('#case-shortcut-age').click();
+  await expect(page.locator('#case-field')).toHaveValue('NU_IDADE_N');
+  // A prévia já respeita a região: dos 4 da RIDE, 1 tem 60+.
+  await expect(page.locator('#case-status')).toContainText('1 de 4 registros entram');
+  await page.locator('#case-apply').click();
+  await expect(page.locator('.active-filter')).toHaveCount(2);
+  await page.locator('[data-view="table"]').click();
+  await expect(page.locator('#result-table tbody')).toContainText('M');
+  await expect(page.locator('#result-table tbody')).not.toContainText('F');
+});
+
+test('a página de licenças existe e diz a licença certa do TabSis', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('a[href="./licencas.html"]')).toHaveCount(1);
+  await page.goto('/licencas.html');
+  await expect(page.locator('h1')).toHaveText('Licenças');
+  await expect(page.locator('main')).toContainText('AGPL-3.0-or-later');
+  for (const peca of ['datasus-dbc', 'fflate', 'hyparquet', 'DuckDB-WASM', 'Pyodide', 'webR', 'AndroidX', 'PyInstaller']) {
+    await expect(page.locator('main')).toContainText(peca);
+  }
+  // A janela Sobre dizia "Licença MIT" depois da troca para AGPL.
+  await page.goto('/');
+  expect(await page.locator('body').innerHTML()).not.toMatch(/licença MIT/i);
 });
 
 test('o arquivo guardado pode ser baixado sem precisar abrir a análise', async ({ page }) => {

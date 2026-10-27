@@ -94,6 +94,18 @@ export type FilterSpec = FilterSpecBase & (
       includeMinimum?: boolean;
       includeMaximum?: boolean;
     }
+  | {
+      /**
+       * Definição de caso por códigos (aba Microdados): `include` e `exclude`
+       * como a pessoa escreveu ("B57", "B570-B575"; ver definicao-caso.ts).
+       * Guarda a regra, não a lista de valores: reaberta com outros anos, pega
+       * também os códigos que só aparecem neles. Filtro moderno, sem
+       * equivalente no TabWin; sem CNV, compara o valor bruto do campo.
+       */
+      kind: 'code-rules';
+      include: string;
+      exclude: string;
+    }
 );
 
 /**

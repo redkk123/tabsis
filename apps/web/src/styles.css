@@ -764,6 +764,10 @@ dialog p { color: #676d74; font-size: 13px; line-height: 1.6; }
 .case-form input { font-family: ui-monospace, "Cascadia Mono", "Consolas", monospace; }
 #case-status { margin-top: 12px; }
 .case-saved { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 10px 0 0; padding: 0; list-style: none; font-size: 12.5px; }
+.case-shortcuts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin-top: 12px; font-size: 12.5px; }
+.case-shortcuts > span:first-child { color: var(--muted); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; font-weight: 600; }
+.case-age { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.case-age input { width: 64px; min-height: 30px; padding: 4px 6px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); color: var(--ink); }
 .case-saved::before { content: "Guardadas:"; color: var(--muted); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; font-weight: 600; align-self: center; }
 .case-saved li { display: flex; align-items: center; gap: 6px; }
 .case-result { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 14px; }
