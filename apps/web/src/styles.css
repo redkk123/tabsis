@@ -1113,3 +1113,12 @@ dialog p { color: #676d74; font-size: 13px; line-height: 1.6; }
   .catalog-result:not(.catalog-batch-bar):not(.catalog-batch-actions) > div:not(.catalog-result-actions):not(.catalog-recent-actions) { flex: 1 1 calc(100% - 40px); }
   .catalog-result:not(.catalog-batch-bar) > .catalog-result-actions, .catalog-result:not(.catalog-batch-bar) > .catalog-recent-actions { flex: 1 1 100%; flex-wrap: wrap; justify-content: flex-start; }
 }
+/* Com "Baixar" no topo, quatro botões não cabem ao lado do nome em 360 px:
+   o nome encolhe primeiro e os links ficam mais justos. */
+@media (max-width: 420px) {
+  .topbar { padding: 0 10px; gap: 6px; }
+  .topbar .brand, .topbar > :first-child { min-width: 0; flex-shrink: 1; }
+  .topbar-links { gap: 4px; flex-shrink: 0; }
+  .topbar-links a { padding: 5px 6px; font-size: 11.5px; }
+  .topbar-links .icon-button { width: 30px; height: 30px; min-width: 30px; }
+}

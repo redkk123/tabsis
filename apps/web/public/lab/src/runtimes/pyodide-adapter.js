@@ -256,7 +256,7 @@ export class PyodideAdapter {
       // O worker posta o motivo e o navegador dispara este evento; a ordem
       // entre os dois não é garantida. Um instante de espera é o que separa
       // "Falha ao carregar o worker Python" de uma frase que diz o que fazer.
-      window.setTimeout(() => {
+      setTimeout(() => {
         if (this.worker !== worker) return;
         this.encerrarPorErro(worker, event);
       }, 60);

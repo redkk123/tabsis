@@ -31,6 +31,7 @@ import {
 } from './runtime-files.js';
 import { PyodideAdapter } from './runtimes/pyodide-adapter.js';
 import { WebRAdapter } from './runtimes/webr-adapter.js';
+import { listenForTabsis } from './tabsis-bridge.js';
 
 const STORAGE_KEY = 'tabwin-lab.notebook.v1';
 const RECOVERY_KEY = 'tabwin-lab.notebook.recovery.v1';
@@ -881,3 +882,42 @@ renderDataFiles();
 render();
 if (startupWarning) setStatus(startupWarning);
 else persistNow('Caderno pronto.');
+
+// Dados vindos do TabSis ("Abrir no Python"): caderno novo pronto, microdados
+// em /data. O caderno anterior vai para a recuperação, como numa importação.
+listenForTabsis({
+  onPayload: async ({ files, title, cells: celulas }) => {
+    if (runner.active || importing) {
+      setStatus('Há uma execução em andamento; feche esta aba e clique de novo em “Abrir no Python” no TabSis.');
+      return;
+    }
+    importing = true;
+    importGeneration += 1;
+    refreshControls();
+    try {
+      storeRecovery(serializeNotebook(notebook), 'Versão anterior aos dados do TabSis');
+      await runner.resetRuntimes(registeredRuntimes(), (kind, state) => {
+        setRuntimeState(kind, state === 'resetting' ? 'loading' : 'idle', state === 'resetting' ? 'reiniciando ambiente…' : null);
+      });
+      notebook = parseNotebook({
+        ...createNotebook({ title }),
+        cells: celulas.map((celula) => ({ id: crypto.randomUUID(), runtime: celula.runtime, code: celula.code })),
+      });
+      executions.clear();
+      markRunObsolete();
+      const transferencia = new DataTransfer();
+      for (const arquivo of files) transferencia.items.add(new File([arquivo.bytes], arquivo.name, { type: 'text/csv' }));
+      dataFiles.files = transferencia.files;
+      dataFiles.dispatchEvent(new Event('change'));
+      persistNow('Caderno criado pelo TabSis; o anterior ficou na recuperação.');
+      render();
+      setStatus(`Dados do TabSis em /data: ${files.map((arquivo) => arquivo.name).join(', ')}. Clique em “Executar tudo”, ou edite à vontade.`);
+    } catch (error) {
+      setStatus(humanError(error));
+    } finally {
+      importing = false;
+      refreshControls();
+    }
+  },
+  onError: (error) => setStatus(humanError(error)),
+});

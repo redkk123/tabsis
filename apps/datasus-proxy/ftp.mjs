@@ -217,23 +217,16 @@ export async function ftpRetrieve(path, environment, { timeoutMs, maxBytes }) {
     if (bytes > maxBytes) throw new FtpFailure(413, 'ftp_file_too_large', 'FTP file is larger than allowed');
     const dados = await canalDeDados(controle, connect);
     esperar(await controle.command(`RETR ${path}`), [125, 150], 'RETR');
-    let recebidos = 0;
-    const contador = new TransformStream({
-      transform(pedaco, saida) {
-        recebidos += pedaco.byteLength;
-        if (recebidos > bytes) throw new FtpFailure(502, 'ftp_size_mismatch', 'FTP sent more bytes than SIZE announced');
-        saida.enqueue(pedaco);
-      },
-      async flush() {
-        try {
-          if (recebidos !== bytes) throw new FtpFailure(502, 'ftp_size_mismatch', 'FTP transfer ended early');
-          await controle.reply().catch(() => {});
-        } finally {
-          controle.close();
-        }
-      },
-    });
-    return { size: bytes, stream: dados.readable.pipeThrough(contador) };
+    // Nada de JavaScript por pedaço: contar bytes num TransformStream estoura
+    // o limite de CPU da Cloudflare num arquivo grande e o corpo chega cortado
+    // sem erro (o mesmo defeito do Bloco 3.5 do plano, no /archive). Quem
+    // confere o tamanho é o FixedLengthStream, nativo, em handleFtp; a conexão
+    // de controle fecha quando o fluxo termina.
+    return {
+      size: bytes,
+      stream: dados.readable,
+      fechar: () => { controle.reply().catch(() => {}).finally(() => controle.close()); },
+    };
   } catch (error) {
     controle.close();
     throw error;

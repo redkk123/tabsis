@@ -1,4 +1,4 @@
-import { unzipSync, zip, zipSync } from 'fflate';
+import { unzipSync, zip, zipSync, type Zippable } from 'fflate';
 import {
   readDbfHeader,
   readDbfRecords,
@@ -86,6 +86,14 @@ import {
   labPackageEntries,
   labPackageFilename,
 } from '../../../packages/export/src/lab-package.ts';
+import {
+  arquivosRodarNoComputador,
+  PASTA_DADOS,
+  PYTHON_PASTA,
+  ZIP_ATTRS_COMUM,
+  ZIP_ATTRS_EXECUTAVEL,
+  type CelulaPython,
+} from '../../../packages/export/src/python-local.ts';
 import { extractSourceDbf } from '../../../packages/export/src/dbf-source.ts';
 import { describeDownloadStrategy } from '../../../packages/acquisition/src/ranged-download.ts';
 import { officialDocumentsFor, type OfficialDocument } from '../../../packages/acquisition/src/official-docs.ts';
@@ -378,6 +386,8 @@ const sourceDbfButton = element<HTMLButtonElement>('#source-dbf-button');
 const selectedDbfButton = element<HTMLButtonElement>('#selected-dbf-button');
 const microdatasusCsvButton = element<HTMLButtonElement>('#microdatasus-csv-button');
 const labPackageButton = element<HTMLButtonElement>('#lab-package-button');
+const openPythonButton = element<HTMLButtonElement>('#open-python-button');
+const pythonLocalButton = element<HTMLButtonElement>('#python-local-button');
 const decodeCancelButton = element<HTMLButtonElement>('#decode-cancel-button');
 const combineCompatibleFiles = element<HTMLInputElement>('#combine-compatible-files');
 const datasetFilesSection = element<HTMLElement>('#dataset-files');
@@ -3828,11 +3838,188 @@ function microdatasusSourceContexts(): MicrodatasusSourceContext[] {
   }));
 }
 
+/** Os registros da tabela atual (Seleções e transformações aplicadas) em CSV, com rótulos das CNV. */
+async function microdadosDaTabelaEmCsv(maxBytes: number): Promise<{ blob: Blob; filename: string; registros: number; bytes: number }> {
+  if (!dbfHeader || !currentPlan || !currentResult) throw new Error('Abra um arquivo e monte uma tabela antes.');
+  const chunks: BlobPart[] = [];
+  const fields = microdatasusFieldSpecs();
+  const conversions = conversionsForMicrodatasus(fields);
+  const reply = await askDataset<{ stats: { recordsSeen: number; recordsAccepted: number; rowsEmitted: number; bytesEmitted: number } }>(
+    {
+      type: 'microdatasus-csv',
+      plan: planWithoutPeriod(currentPlan),
+      conversions,
+      fields,
+      provenanceColumns: ['sourceName', 'system', 'fileType', 'year', 'month', 'uf'],
+      sourceContexts: microdatasusSourceContexts(),
+      maxBytes,
+    },
+    {
+      label: 'Microdados em CSV',
+      progress: datasetProgress('Separando os microdados'),
+      chunk: (bytes) => chunks.push(new Uint8Array(bytes)),
+    },
+  );
+  if (reply.stats.recordsAccepted !== currentResult.recordsAccepted || reply.stats.rowsEmitted !== currentResult.recordsAccepted) {
+    throw new Error('Os microdados divergiram da contagem da tabela; exportação interrompida');
+  }
+  return {
+    blob: new Blob(chunks, { type: 'text/csv;charset=utf-8' }),
+    filename: `${datasetName.replace(/\.[^.]+$/, '').replace(/[^A-Za-z0-9._ +-]/g, '_').slice(0, 80)}-microdados.csv`,
+    registros: reply.stats.rowsEmitted,
+    bytes: reply.stats.bytesEmitted,
+  };
+}
+
+/** O Laboratório aceita até 32 MB por arquivo (lab/src/runtimes/pyodide-runtime-guards.js). */
+const LIMITE_LAB_BYTES = 32 * 1024 * 1024;
+
+/**
+ * Caderno inicial: carrega os microdados no pandas, refaz a tabela e deixa o
+ * resto livre. O mesmo caderno vai para o Laboratório (dados em /data) e para
+ * o pacote "Rodar no computador" (dados em ./dados, ao lado do script).
+ */
+function celulasPython(arquivo: string, registros: number, destino: 'lab' | 'computador'): { titulo: string; celulas: CelulaPython[] } {
+  const campo = currentPlan?.spec.rows.field ?? '';
+  const comRotulo = microdatasusFieldSpecs().some((spec) => spec.field === campo && spec.valueMode === 'raw-and-label');
+  const coluna = comRotulo ? `${campo}__ROTULO` : campo;
+  const titulo = (resultTitle.textContent ?? '').trim() || datasetName;
+  const caminho = destino === 'lab' ? JSON.stringify(`/data/${arquivo}`) : `PASTA / ${JSON.stringify(PASTA_DADOS)} / ${JSON.stringify(arquivo)}`;
+  const celulas: CelulaPython[] = [{
+    code: [
+      `# Microdados enviados pelo TabSis: ${datasetName}`,
+      `# ${integerFormat.format(registros)} registros — os da tabela atual, com Seleções e transformações já aplicadas.`,
+      '# Colunas terminadas em __ROTULO trazem o nome da categoria (CNV); as outras, o código como está no DATASUS.',
+      'import pandas as pd',
+      ...(destino === 'computador' ? [PYTHON_PASTA] : []),
+      '',
+      `dados = pd.read_csv(${caminho}, sep=";", encoding="utf-8-sig", dtype=str, keep_default_na=False)`,
+      'print(dados.shape)',
+    ].join('\n'),
+    mostrar: 'dados.head()',
+  }];
+  if (campo && /^[A-Za-z_][A-Za-z0-9_]*$/.test(campo)) {
+    celulas.push({
+      code: [
+        `# A mesma pergunta da tabela do TabSis: ${titulo}`,
+        `# Contagem de registros por ${coluna} (confira com a coluna de Frequência do TabSis).`,
+        `tabela = dados.groupby(${JSON.stringify(coluna)}).size().sort_values(ascending=False)`,
+        ...(destino === 'computador' ? ['tabela.to_csv(PASTA / "resultado-tabela.csv", sep=";", header=["Frequencia"])'] : []),
+      ].join('\n'),
+      mostrar: destino === 'computador' ? 'tabela.to_string()' : 'tabela',
+    });
+  }
+  if (appliedTransformSteps.length) {
+    celulas.push({
+      code: [
+        '# As transformações do TabSis, em Python. Elas JÁ FORAM APLICADAS aos dados acima;',
+        '# o código fica aqui para você ver o que foi feito e reaproveitar com outros arquivos.',
+        ...transformPipelineToCode(appliedTransformSteps, 'python', 'dados').split('\n').map((linha) => `# ${linha}`),
+      ].join('\n'),
+    });
+  }
+  celulas.push({ code: '# Daqui em diante é com você: pandas, numpy, matplotlib, scipy, statsmodels…\n' });
+  return { titulo: `TabSis · ${titulo}`.slice(0, 120), celulas };
+}
+
+function cadernoParaPython(arquivo: string, registros: number): { title: string; cells: Array<{ runtime: 'python'; code: string }> } {
+  const { titulo, celulas } = celulasPython(arquivo, registros, 'lab');
+  return {
+    title: titulo,
+    cells: celulas.map((celula) => ({ runtime: 'python' as const, code: celula.mostrar ? `${celula.code}\n${celula.mostrar}` : celula.code })),
+  };
+}
+
+/** No computador não há o limite do navegador do Lab, só a memória para montar o zip. */
+const LIMITE_COMPUTADOR_BYTES = 512 * 1024 * 1024;
+
+/**
+ * "Rodar no computador": um zip com os microdados, o caderno em .py e .ipynb
+ * e um arquivo de dois cliques por sistema (packages/export/src/python-local.ts).
+ */
+async function baixarPythonParaComputador(): Promise<void> {
+  pythonLocalButton.disabled = true;
+  try {
+    const { blob, filename, registros, bytes } = await microdadosDaTabelaEmCsv(LIMITE_COMPUTADOR_BYTES);
+    const { titulo, celulas } = celulasPython(filename, registros, 'computador');
+    const textos = arquivosRodarNoComputador({ celulas, titulo, csvNome: filename, registros: integerFormat.format(registros) });
+    const pasta = filename.replace(/-microdados\.csv$/, '-python');
+    const codificar = new TextEncoder();
+    const entradas: Zippable = {};
+    for (const [nome, arquivo] of Object.entries(textos)) {
+      entradas[`${pasta}/${nome}`] = [codificar.encode(arquivo.texto), { os: 3, attrs: arquivo.executavel ? ZIP_ATTRS_EXECUTAVEL : ZIP_ATTRS_COMUM }];
+    }
+    entradas[`${pasta}/${PASTA_DADOS}/${filename}`] = [new Uint8Array(await blob.arrayBuffer()), { os: 3, attrs: ZIP_ATTRS_COMUM, level: bytes > 64 * 1024 * 1024 ? 1 : 6 }];
+    const pacote = await new Promise<Uint8Array>((resolve, reject) => {
+      zip(entradas, { level: 6 }, (error, data) => (error ? reject(error) : resolve(data)));
+    });
+    downloadBlob(new Blob([pacote], { type: 'application/zip' }), `${pasta}.zip`);
+    showToast(`Pacote para rodar no computador: ${integerFormat.format(registros)} registros. Descompacte e dê dois cliques em "Rodar no …".`);
+  } catch (error) {
+    const mensagem = error instanceof Error ? error.message : String(error);
+    throw new Error(/maxBytes|limite|exceed|larger|grande/i.test(mensagem)
+      ? `Os microdados desta tabela passam de ${formatBytes(LIMITE_COMPUTADOR_BYTES)}. Use Seleções para recortar (um ano, um estado).`
+      : mensagem);
+  } finally {
+    pythonLocalButton.disabled = !dbfHeader || !currentPlan || !currentResult;
+  }
+}
+
+/**
+ * "Abrir no Python": os microdados da tabela atual vão para o Laboratório
+ * (tabweb.me/lab, mesma origem), num caderno pronto e livre para editar. A
+ * página do Lab avisa quando está pronta e recebe os bytes por postMessage;
+ * nada passa por servidor.
+ */
+async function abrirNoPython(): Promise<void> {
+  // Abre a aba já no clique: depois de preparar o CSV, o navegador bloquearia a janela.
+  const lab = window.open('./lab/?origem=tabsis', '_blank');
+  if (!lab) throw new Error('O navegador bloqueou a nova aba do Laboratório; permita janelas para este site.');
+  let pronto = false;
+  let envio: (() => void) | null = null;
+  const ouvir = (event: MessageEvent) => {
+    if (event.origin !== window.location.origin || event.source !== lab || (event.data as { tipo?: string })?.tipo !== 'tabsis:pronto') return;
+    pronto = true;
+    envio?.();
+  };
+  window.addEventListener('message', ouvir);
+  openPythonButton.disabled = true;
+  pythonLocalButton.disabled = true;
+  try {
+    const { blob, filename, registros, bytes } = await microdadosDaTabelaEmCsv(LIMITE_LAB_BYTES);
+    const conteudo = await blob.arrayBuffer();
+    const caderno = cadernoParaPython(filename, registros);
+    await new Promise<void>((resolve, reject) => {
+      const prazo = window.setTimeout(() => reject(new Error('O Laboratório não respondeu em 60 segundos.')), 60_000);
+      envio = () => {
+        window.clearTimeout(prazo);
+        lab.postMessage({ tipo: 'tabsis:dados', arquivos: [{ name: filename, bytes: conteudo }], caderno }, window.location.origin, [conteudo]);
+        resolve();
+      };
+      if (pronto) envio();
+    });
+    showToast(`Laboratório aberto com ${integerFormat.format(registros)} registros (${formatBytes(bytes)}) e um caderno pronto.`);
+  } catch (error) {
+    const mensagem = error instanceof Error ? error.message : String(error);
+    const grande = /maxBytes|limite|exceed|larger|grande/i.test(mensagem);
+    lab.close();
+    throw new Error(grande
+      ? `Os microdados desta tabela passam de ${formatBytes(LIMITE_LAB_BYTES)}, o limite do Laboratório no navegador. Use Seleções para recortar (um ano, um estado), ou use “Rodar no computador”, que não tem esse limite.`
+      : mensagem);
+  } finally {
+    window.removeEventListener('message', ouvir);
+    openPythonButton.disabled = !dbfHeader || !currentPlan || !currentResult;
+    pythonLocalButton.disabled = openPythonButton.disabled;
+  }
+}
+
 async function downloadMicrodatasusCsv(): Promise<void> {
   if (!dbfHeader || !currentPlan || !currentResult) return;
   const label = microdatasusCsvButton.textContent;
   microdatasusCsvButton.disabled = true;
   labPackageButton.disabled = true;
+  openPythonButton.disabled = true;
+  pythonLocalButton.disabled = true;
   microdatasusCsvButton.textContent = 'Preparando Microdatasus…';
   const chunks: BlobPart[] = [];
   try {
@@ -4196,6 +4383,8 @@ async function runAnalysis(measureOverride?: MeasureSpec, planOverride?: QueryPl
   selectedDbfButton.disabled = true;
   microdatasusCsvButton.disabled = true;
   labPackageButton.disabled = true;
+  openPythonButton.disabled = true;
+  pythonLocalButton.disabled = true;
   await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
   decodeCancelButton.hidden = false;
   try {
@@ -4244,6 +4433,8 @@ async function runAnalysis(measureOverride?: MeasureSpec, planOverride?: QueryPl
     saveRecipeButton.disabled = false;
     saveTableButton.disabled = false;
     labPackageButton.disabled = false;
+    openPythonButton.disabled = false;
+    pythonLocalButton.disabled = false;
     selectedDbfButton.disabled = false;
     setControlsEnabled(true);
     if (currentView === 'map' || rowField.value.toUpperCase().includes('MUNIC')) await ensureMap();
@@ -8166,6 +8357,8 @@ let bridgeReady: { token: string; directory: string; baseUrl: string; features: 
 /** Porta do auxiliar: 8787, ou a que o TabSis Local mandou no link (#local=token:porta). */
 let bridgePort = 8787;
 const bridgeAutoCopy = element<HTMLInputElement>('#bridge-auto-copy');
+const bridgeViaLocal = element<HTMLInputElement>('#bridge-via-local');
+const bridgeViaLocalLabel = element<HTMLElement>('#bridge-via-local-label');
 const bridgeAutoCopyLabel = element<HTMLElement>('#bridge-auto-copy-label');
 const catalogLocal = element<HTMLElement>('#catalog-local');
 const catalogLocalSummary = element<HTMLElement>('#catalog-local-summary');
@@ -8204,6 +8397,7 @@ async function checkBridge(): Promise<void> {
       : `${describeBridgeProbe(probe)}. Endereços que ele pode acessar: ${probe.health.allowlist.join(' | ')}`,
     'ok');
     bridgeAutoCopyLabel.hidden = !local;
+    bridgeViaLocalLabel.hidden = !bridgeHasFeature(probe.health, 'ftp');
     void renderLocalFiles();
     void renderRecentArchives();
   } finally {
@@ -8235,6 +8429,56 @@ async function copiarParaComputador(arquivos: ReadonlyArray<{ name: string; byte
     }
   }
   void renderLocalFiles();
+}
+
+/** Pode baixar pela fila do TabSis Local: conectado, opção marcada e todo arquivo com endereço no FTP oficial. */
+function podeBaixarPeloComputador(files: readonly DatasusRemoteFile[]): boolean {
+  return Boolean(bridgeReady?.features.includes('ftp') && bridgeViaLocal.checked && files.length
+    && files.every((file) => file.ftpPath ?? officialFtpPath(file.address)));
+}
+
+/**
+ * Baixa pela fila do TabSis Local (Python): um arquivo de cada vez, em segundo
+ * plano, retomando de onde parou se a conexão cair — o que o navegador não
+ * garante (prazos, aba suspensa). O arquivo já fica na pasta do computador; o
+ * site só o lê de lá para abrir. Devolve um .zip, como os outros caminhos.
+ */
+async function baixarPeloComputador(
+  files: readonly DatasusRemoteFile[],
+  signal: AbortSignal | undefined,
+  onActivity?: () => void,
+): Promise<Uint8Array> {
+  const opcoes = bridgeOptions();
+  if (!opcoes) throw new Error('O TabSis Local não está conectado.');
+  const entradas: Record<string, [Uint8Array, { level: 0 }]> = {};
+  for (const file of files) {
+    const caminho = file.ftpPath ?? officialFtpPath(file.address)!;
+    let job = await startBridgeDownload(opcoes, `ftp://ftp.datasus.gov.br${caminho}`);
+    const aoCancelar = () => { void cancelBridgeDownload(opcoes, job.id).catch(() => {}); };
+    signal?.addEventListener('abort', aoCancelar, { once: true });
+    try {
+      while (job.status === 'pending' || job.status === 'downloading') {
+        await new Promise((resolve) => setTimeout(resolve, 700));
+        if (signal?.aborted) throw new DOMException('Operação cancelada', 'AbortError');
+        job = await readBridgeJob(opcoes, job.id);
+        onActivity?.();
+        setCatalogStatus(job.status === 'pending'
+          ? `${job.filename} na fila do TabSis Local (um arquivo de cada vez)…`
+          : `Baixando ${job.filename} pelo TabSis Local… ${job.totalBytes
+            ? `${Math.min(100, Math.round(job.receivedBytes / job.totalBytes * 100))}% · ${formatBytes(job.receivedBytes)} / ${formatBytes(job.totalBytes)}`
+            : formatBytes(job.receivedBytes)}`);
+      }
+    } finally {
+      signal?.removeEventListener('abort', aoCancelar);
+    }
+    if (job.status !== 'done') throw new Error(`O TabSis Local não conseguiu baixar ${job.filename}: ${job.error ?? job.status}`);
+    const bytes = await fetchBridgeFile(opcoes, { nome: job.filename, pasta: 'principal' });
+    copiadosParaComputador.add(`${job.filename}:${bytes.byteLength}`);
+    entradas[job.filename] = [bytes, { level: 0 }];
+    showToast(`${job.filename} baixado pelo TabSis Local e guardado em ${job.path ?? bridgeReady?.directory}`);
+  }
+  void renderLocalFiles();
+  return zipSync(entradas);
 }
 
 /** "No computador": o que está na pasta do TabSis Local, para abrir de novo aqui sem baixar. */
@@ -8883,7 +9127,10 @@ async function downloadCatalogEntries(
       return zipSync(entradas);
     };
     let bytes: Uint8Array;
-    if (files.length && files.every((file) => file.ftpPath)) {
+    if (podeBaixarPeloComputador(files)) {
+      bytes = await baixarPeloComputador(files, signal, onActivity);
+      attempts = 1;
+    } else if (files.length && files.every((file) => file.ftpPath)) {
       bytes = await baixarPeloFtp();
       attempts = 1;
     } else {
@@ -10276,8 +10523,35 @@ function renderCatalogSearchBatch(
     packageSelected.type = 'button';
     packageSelected.title = 'Baixa os escolhidos e entrega um .zip com os DBC e um manifesto de procedência, sem abrir nem combinar';
 
+    // Com o TabSis Local: manda tudo para a fila do computador e não abre nada.
+    // Ele baixa um de cada vez, em segundo plano, mesmo com esta página fechada.
+    const localSelected = document.createElement('button');
+    localSelected.className = 'secondary-button';
+    localSelected.type = 'button';
+    localSelected.id = 'catalog-send-local-queue';
+    localSelected.title = 'O TabSis Local baixa um de cada vez para a pasta do computador, mesmo que você feche esta página';
+    localSelected.hidden = !bridgeReady?.features.includes('ftp');
+    localSelected.addEventListener('click', () => void (async () => {
+      const opcoes = bridgeOptions();
+      if (!opcoes) return;
+      const escolhidos = selectedFiles().filter((remote) => remote.ftpPath ?? officialFtpPath(remote.address));
+      localSelected.disabled = true;
+      try {
+        for (const remote of escolhidos) {
+          await startBridgeDownload(opcoes, `ftp://ftp.datasus.gov.br${remote.ftpPath ?? officialFtpPath(remote.address)}`);
+        }
+        setCatalogStatus(`${escolhidos.length} arquivo(s) na fila do TabSis Local. Ele baixa um de cada vez para ${bridgeReady?.directory ?? 'a pasta do computador'}, mesmo se você fechar esta página; depois eles aparecem em "No computador".`);
+      } catch (error) {
+        setCatalogStatus(`Não deu para mandar para o TabSis Local: ${error instanceof Error ? error.message : String(error)}`, true);
+      } finally {
+        localSelected.disabled = false;
+      }
+    })());
+
     syncSelection = (): void => {
       const chosen = selectedFiles().length;
+      localSelected.textContent = `Baixar no computador (${integerFormat.format(chosen)})`;
+      localSelected.disabled = chosen === 0;
       const everything = chosen === files.length;
       toggle.textContent = everything ? 'limpar seleção' : 'selecionar todos';
       count.textContent = `${integerFormat.format(chosen)} de ${integerFormat.format(files.length)} selecionado(s)`;
@@ -10319,7 +10593,7 @@ function renderCatalogSearchBatch(
     heading.append(toggle, count);
     const actions = document.createElement('div');
     actions.className = 'catalog-batch-bar-actions';
-    actions.append(openSelected, packageSelected);
+    actions.append(openSelected, packageSelected, localSelected);
     bar.append(heading, actions);
     catalogResults.append(bar);
   }
@@ -10788,6 +11062,8 @@ async function openPortableTable(file: File): Promise<void> {
   selectedDbfButton.disabled = true;
   microdatasusCsvButton.disabled = true;
   labPackageButton.disabled = true;
+  openPythonButton.disabled = true;
+  pythonLocalButton.disabled = true;
   resetAnalysisState();
   renderCrossFieldRules();
   renderExtraMeasures();
@@ -10845,6 +11121,8 @@ async function openPortableTable(file: File): Promise<void> {
   saveRecipeButton.disabled = true;
   saveTableButton.disabled = false;
   labPackageButton.disabled = false;
+  openPythonButton.disabled = false;
+  pythonLocalButton.disabled = false;
   exportCsvButton.disabled = false;
   exportJsonButton.disabled = false;
   exportXlsxButton.disabled = false;
@@ -10931,6 +11209,8 @@ function openLegacyTabText(text: string, name: string, kind: string): void {
   saveRecipeButton.disabled = true;
   saveTableButton.disabled = false;
   labPackageButton.disabled = false;
+  openPythonButton.disabled = false;
+  pythonLocalButton.disabled = false;
   for (const button of [exportCsvButton, exportJsonButton, exportXlsxButton, exportXmlButton, exportTabButton, exportPrnButton, exportSqlButton]) {
     button.disabled = false;
   }
@@ -11383,6 +11663,12 @@ sourceDbfButton.addEventListener('click', () => void downloadSourceDbf().catch((
   showToast(error instanceof Error ? error.message : String(error), true)));
 microdatasusCsvButton.addEventListener('click', () => void downloadMicrodatasusCsv().catch((error) =>
   showToast(error instanceof Error ? error.message : String(error), true)));
+openPythonButton.addEventListener('click', () => {
+  void abrirNoPython().catch((error) => showToast(error instanceof Error ? error.message : String(error), true));
+});
+pythonLocalButton.addEventListener('click', () => {
+  void baixarPythonParaComputador().catch((error) => showToast(error instanceof Error ? error.message : String(error), true));
+});
 labPackageButton.addEventListener('click', () => {
   try {
     downloadLabPackage();

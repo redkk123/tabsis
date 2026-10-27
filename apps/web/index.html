@@ -63,6 +63,7 @@
                aba. Recarregar é a ação inteira, então o botão é a mensagem. -->
           <button class="topbar-update" id="reload-button" type="button" hidden
             title="O site foi atualizado depois que esta aba foi aberta">Atualizar</button>
+          <a href="./baixar.html" target="_blank" rel="noopener" title="App para Android e TabSis Local para o computador">Baixar</a>
           <a href="./manual.html" target="_blank" rel="noopener">Manual</a>
           <!-- O Lab é publicado por uma etapa separada. O link só aparece se
                a pasta existir de fato, para não oferecer um 404. -->
@@ -131,6 +132,8 @@
             <button class="secondary-button" id="selected-dbf-button" type="button" disabled>Salvar seleção em DBF</button>
             <button class="secondary-button" id="microdatasus-csv-button" type="button" disabled>Microdatasus filtrado CSV</button>
             <button class="secondary-button" id="lab-package-button" type="button" disabled>Pacote para o Lab</button>
+            <button class="secondary-button" id="open-python-button" type="button" disabled title="Abre o Laboratório com os microdados desta tabela num caderno Python pronto, livre para editar">Abrir no Python</button>
+            <button class="secondary-button" id="python-local-button" type="button" disabled title="Baixa um .zip com os microdados desta tabela, o caderno em Python e um arquivo de dois cliques para Windows, macOS e Linux">Rodar no computador</button>
           </div>
           <p class="group-hint">
             <b>Extrair DBF original</b> devolve o arquivo de dentro do DBC, sem alteração.
@@ -1330,6 +1333,7 @@
               <button class="secondary-button" id="bridge-check" type="button">Verificar</button>
             </div>
             <p class="filter-info" id="bridge-verdict" hidden></p>
+            <label class="check-label" id="bridge-via-local-label" hidden><input id="bridge-via-local" type="checkbox" checked /><span>Baixar pelo TabSis Local: fila no computador, um de cada vez, continua se a conexão cair ou a página fechar</span></label>
             <label class="check-label" id="bridge-auto-copy-label" hidden><input id="bridge-auto-copy" type="checkbox" checked /><span>Guardar uma cópia no computador de tudo o que eu baixar</span></label>
           </div>
         </details>

@@ -26,10 +26,10 @@ Baixe o executável do seu sistema em
 [Releases](https://github.com/redkk123/tabsis/releases/latest). Não precisa
 instalar Python.
 
-- **Windows:** `TabSis-Local-…-windows.exe`. O SmartScreen pode avisar de
+- **Windows:** `TabSis-Local-windows.exe`. O SmartScreen pode avisar de
   "editor desconhecido": clique em "Mais informações → Executar assim mesmo".
-- **Linux:** `TabSis-Local-…-linux`; rode `chmod +x` e abra.
-- **macOS:** `TabSis-Local-…-macos.zip`. Na primeira vez, abra com o botão
+- **Linux:** `TabSis-Local-linux`; rode `chmod +x` e abra.
+- **macOS:** `TabSis-Local-macos.zip`. Na primeira vez, abra com o botão
   direito → Abrir, porque o app não é assinado pela Apple.
 
 Ou rode o código direto, com Python 3.10+ e Tkinter:

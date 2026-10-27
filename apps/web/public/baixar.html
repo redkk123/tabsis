@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; script-src 'none'; form-action 'none'; base-uri 'self'">
+<meta name="theme-color" content="#0e3f6c">
+<title>Baixar o TabSis</title>
+<style>
+:root { color-scheme: light; --brand: #14548c; --brand-strong: #0e3f6c; --ink: #17202a; --muted: #55606b; --line: #dfe3e8; --soft: #f4f6f9; --ok: #1d6b45; --warn: #8a5a00; --bg: #ffffff; --card: #ffffff; }
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) { color-scheme: dark; --brand: #6fa8e0; --brand-strong: #0b2f52; --ink: #edf1f5; --muted: #a9b4bf; --line: #2e3742; --soft: #1b222b; --ok: #6cc59a; --warn: #e2b55a; --bg: #12171d; --card: #171e26; }
+}
+:root[data-theme="dark"] { color-scheme: dark; --brand: #6fa8e0; --brand-strong: #0b2f52; --ink: #edf1f5; --muted: #a9b4bf; --line: #2e3742; --soft: #1b222b; --ok: #6cc59a; --warn: #e2b55a; --bg: #12171d; --card: #171e26; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.55 "Inter", "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+header { background: var(--brand-strong); color: #fff; padding: 22px 16px; }
+header .in, main { max-width: 1000px; margin: 0 auto; }
+header a { color: #cfe2f5; }
+h1 { margin: 6px 0 4px; font-size: 28px; line-height: 1.2; }
+header p { margin: 0; color: #d7e6f5; }
+main { padding: 24px 16px 56px; }
+h2 { font-size: 20px; margin: 32px 0 10px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 8px; }
+.card h3 { margin: 0; font-size: 18px; }
+.card .tag { align-self: flex-start; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--brand); }
+.card p { margin: 0; color: var(--muted); font-size: 15px; }
+.card ul { margin: 4px 0 0; padding-left: 18px; color: var(--muted); font-size: 14.5px; }
+.botoes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; padding-top: 8px; }
+.botao { display: inline-block; padding: 10px 14px; border-radius: 8px; background: var(--brand); color: #fff; text-decoration: none; font-weight: 600; font-size: 14.5px; }
+.botao.sec { background: transparent; color: var(--brand); border: 1px solid var(--line); }
+@media (prefers-color-scheme: dark) { :root:where(:not([data-theme="light"])) .botao { color: #0b1624; } :root:where(:not([data-theme="light"])) .botao.sec { color: var(--brand); } }
+.tabela { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; }
+table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 14.5px; }
+th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+thead th { background: var(--soft); font-weight: 700; }
+tbody th { font-weight: 600; width: 22%; }
+tr:last-child td, tr:last-child th { border-bottom: 0; }
+.sim { color: var(--ok); font-weight: 600; }
+.aviso { color: var(--warn); font-weight: 600; }
+.passos { counter-reset: p; list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.passos li { counter-increment: p; background: var(--soft); border-radius: 10px; padding: 12px 14px 12px 48px; position: relative; }
+.passos li::before { content: counter(p); position: absolute; left: 14px; top: 11px; width: 24px; height: 24px; border-radius: 50%; background: var(--brand); color: #fff; font-weight: 700; font-size: 13px; display: grid; place-items: center; }
+.nota { color: var(--muted); font-size: 14px; }
+code { background: var(--soft); padding: 1px 5px; border-radius: 4px; font-size: 13.5px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="in">
+    <a href="./">← Voltar ao TabSis</a>
+    <h1>Baixar o TabSis</h1>
+    <p>O mesmo TabSis em três lugares. Os microdados ficam sempre no seu aparelho.</p>
+  </div>
+</header>
+<main>
+  <div class="cards">
+    <article class="card">
+      <span class="tag">Sem instalar</span>
+      <h3>No navegador</h3>
+      <p>Abra tabweb.me no Chrome, Edge, Firefox ou no celular. É o jeito mais rápido de começar.</p>
+      <ul>
+        <li>Abre DBC, DBF, DEF e CNV, monta tabelas, gráficos e mapas.</li>
+        <li>Busca e baixa do DATASUS pela internet.</li>
+      </ul>
+      <div class="botoes"><a class="botao" href="./">Abrir o TabSis</a></div>
+    </article>
+    <article class="card">
+      <span class="tag">Android 10 ou mais novo</span>
+      <h3>App para celular</h3>
+      <p>O TabSis inteiro dentro de um app, que funciona sem internet para o que já está no celular.</p>
+      <ul>
+        <li>Abre vários arquivos de uma vez (no seletor, toque e segure o primeiro).</li>
+        <li>Salva tabelas e arquivos em <code>Downloads/TabSis</code>.</li>
+      </ul>
+      <div class="botoes"><a class="botao" href="https://github.com/redkk123/tabsis/releases/latest/download/TabSis-android.apk">Baixar o APK</a></div>
+    </article>
+    <article class="card">
+      <span class="tag">Windows · Linux · macOS</span>
+      <h3>TabSis Local, no computador</h3>
+      <p>Um app pequeno que trabalha junto com o site e cuida dos downloads do DATASUS.</p>
+      <ul>
+        <li>Baixa pelo computador, um arquivo de cada vez, em segundo plano.</li>
+        <li>Guarda tudo numa pasta sua, para abrir de novo aqui ou em outro programa.</li>
+      </ul>
+      <div class="botoes">
+        <a class="botao" href="https://github.com/redkk123/tabsis/releases/latest/download/TabSis-Local-windows.exe">Windows</a>
+        <a class="botao sec" href="https://github.com/redkk123/tabsis/releases/latest/download/TabSis-Local-macos.zip">macOS</a>
+        <a class="botao sec" href="https://github.com/redkk123/tabsis/releases/latest/download/TabSis-Local-linux">Linux</a>
+      </div>
+    </article>
+  </div>
+
+  <h2>Qual é a diferença nos downloads do DATASUS?</h2>
+  <div class="tabela">
+    <table>
+      <thead><tr><th></th><th>Navegador e app Android</th><th>Com o TabSis Local</th></tr></thead>
+      <tbody>
+        <tr><th>Quem baixa</th><td>A própria página.</td><td>O TabSis Local, no seu computador. A página só pede e depois abre o arquivo.</td></tr>
+        <tr><th>Se a conexão cair</th><td><span class="aviso">Recomeça do zero.</span> O navegador tem prazos e pode suspender uma aba parada, então um arquivo de centenas de MB às vezes não chega.</td><td><span class="sim">Continua de onde parou</span> na próxima tentativa.</td></tr>
+        <tr><th>Vários arquivos</th><td>Um depois do outro, com a página aberta.</td><td><span class="sim">Uma fila, um de cada vez, em segundo plano.</span> Continua mesmo se você fechar a página.</td></tr>
+        <tr><th>Onde o arquivo fica</th><td>Guardado dentro do navegador (some se você limpar os dados do site).</td><td>Numa pasta comum do computador (<code>Downloads/TabSis</code>), que TabWin, R, Python ou Excel também abrem.</td></tr>
+        <tr><th>Portal do DATASUS fora do ar</th><td>Busca e baixa pelo FTP oficial, por um intermediário na nuvem.</td><td>Busca e baixa direto do FTP oficial, sem intermediário.</td></tr>
+        <tr><th>Abrir de novo</th><td>"Downloads recentes", enquanto o navegador guardar.</td><td>"No computador", sem baixar de novo, um ou vários juntos.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Como usar o TabSis Local com o site</h2>
+  <ol class="passos">
+    <li>Baixe e abra o TabSis Local. Ele mostra a pasta onde guarda os arquivos (dá para trocar).</li>
+    <li>Clique em <b>Abrir o TabSis conectado</b>. O site abre já ligado ao app, sem colar nada.</li>
+    <li>Busque no DATASUS normalmente. Com o app conectado, cada arquivo é baixado pela fila do computador, guardado na pasta e aberto no site.</li>
+    <li>Para baixar muitos de uma vez sem abrir, marque os arquivos e use <b>Baixar no computador</b>. Eles aparecem depois em <b>No computador</b>.</li>
+  </ol>
+  <p class="nota">O TabSis Local também funciona sozinho: escolha sistema, tipo, anos e UF na própria janela e clique em "Procurar e baixar".</p>
+
+  <h2>Segurança e instalação</h2>
+  <ul class="nota">
+    <li>O TabSis Local só escuta este computador (<code>127.0.0.1</code>), só aceita o site do TabSis e pede um código que muda a cada vez que ele abre. Ele só baixa os arquivos públicos do DATASUS.</li>
+    <li><b>Windows:</b> o SmartScreen pode avisar de "editor desconhecido": clique em "Mais informações → Executar assim mesmo". <b>macOS:</b> na primeira vez, botão direito → Abrir. <b>Linux:</b> <code>chmod +x</code> e abra.</li>
+    <li><b>Android:</b> o celular pede para permitir instalar de "fontes desconhecidas" para o app onde você abriu o arquivo.</li>
+    <li>Código aberto (AGPL-3.0): <a href="https://github.com/redkk123/tabsis">github.com/redkk123/tabsis</a>. Todas as versões em <a href="https://github.com/redkk123/tabsis/releases">Releases</a>.</li>
+  </ul>
+</main>
+</body>
+</html>
