@@ -1,6 +1,6 @@
 # Plano — Laboratório e microdados sem código
 
-Data: 2026-10-27. Status: proposta para discussão. Implementado até agora: itens 1 e 2 dos pedidos abaixo.
+Data: 2026-10-27. Status: proposta para discussão. Implementado até agora: itens 1 e 2 dos pedidos abaixo, e o começo do 3 (aba Microdados com definição de caso por códigos).
 
 ## Onde estamos
 
@@ -80,6 +80,13 @@ R/Python no Lab. As duas pessoas chegam ao mesmo número, conferível.
      microdados precisa permitir escolher CIDs à mão (lista ou faixa, por
      exemplo B57.0–B57.5 sem B56) sobre SIM, SIH e SINAN, e salvar essa
      definição de caso como receita reaproveitável.
+   - COMEÇADO (decisão do Red: aba "Microdados" dentro do TabSis): a aba já
+     tem a definição de caso por códigos. Prefixo, faixa, excluir por cima,
+     prévia por código e aviso de código que não aparece. O resultado vira uma
+     Seleção comum, e as definições ficam guardadas no navegador. Próximos
+     passos, dentro da mesma aba: as etapas da Fase 1 (faixa etária, caso
+     novo/confirmado, município → região) e a definição salva dentro da
+     receita `.twrecipe`, que hoje fica só no navegador.
 
 ## Fases
 

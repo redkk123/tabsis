@@ -193,6 +193,10 @@ function isReservedWindowsName(name: string): boolean {
 export function bridgeAllowedWebOrigins(extra: readonly string[] = []): string[] {
   return [
     'https://redkk123.github.io',
+    // tabsis.me: o endereço novo. Liberado antes da virada, pelo mesmo motivo
+    // do Worker (apps/datasus-proxy/wrangler.jsonc).
+    'https://tabsis.me',
+    'https://www.tabsis.me',
     'https://tabweb.me',
     'https://www.tabweb.me',
     // Desenvolvimento local do próprio projeto.

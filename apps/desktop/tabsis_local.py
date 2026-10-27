@@ -50,6 +50,8 @@ MAXIMO_BYTES = 1024 ** 3  # 1 GB, o mesmo teto do site
 
 # Páginas que podem falar com o app (CORS). Nada de '*'.
 ORIGENS_WEB = (
+    'https://tabsis.me',
+    'https://www.tabsis.me',
     'https://tabweb.me',
     'https://www.tabweb.me',
     'https://redkk123.github.io',

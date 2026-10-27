@@ -7,6 +7,15 @@ Sem instalar nada. Sem enviar dados para lugar nenhum.
 
 [**▶ Abrir a aplicação**](https://tabweb.me/) · [**📖 Manual do usuário**](./docs/product/MANUAL_DO_USUARIO.md)
 
+**Baixar**
+
+[![Android: baixar o APK](https://img.shields.io/badge/Android-baixar%20o%20APK-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/redkk123/tabsis/releases/latest/download/TabSis-android.apk)
+[![Windows: TabSis Local](https://img.shields.io/badge/Windows-TabSis%20Local-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/redkk123/tabsis/releases/latest/download/TabSis-Local-windows.exe)
+[![macOS: TabSis Local](https://img.shields.io/badge/macOS-TabSis%20Local-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/redkk123/tabsis/releases/latest/download/TabSis-Local-macos.zip)
+[![Linux: TabSis Local](https://img.shields.io/badge/Linux-TabSis%20Local-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/redkk123/tabsis/releases/latest/download/TabSis-Local-linux)
+
+[Todas as versões e notas](https://github.com/redkk123/tabsis/releases) · [Qual baixar?](https://tabweb.me/baixar.html)
+
 </div>
 
 ---

@@ -755,6 +755,26 @@ dialog p { color: #676d74; font-size: 13px; line-height: 1.6; }
 .query-result .vazio { color: var(--faint); font-style: italic; }
 .query-fields { width: 100%; padding: 6px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); color: var(--ink); font-family: ui-monospace, "Cascadia Mono", "Consolas", monospace; font-size: 12px; }
 
+/* Microdados: o laboratório sem código. Listas e campos curtos, como o resto
+   do aplicativo; a prévia por código fica em tabelas estreitas lado a lado. */
+.case-form { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr); gap: 10px; margin-top: 12px; }
+.case-form label { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.case-form label span { color: var(--muted); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; font-weight: 600; }
+.case-form select, .case-form input { min-height: 38px; padding: 7px 9px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); color: var(--ink); font-size: 13px; width: 100%; }
+.case-form input { font-family: ui-monospace, "Cascadia Mono", "Consolas", monospace; }
+#case-status { margin-top: 12px; }
+.case-saved { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 10px 0 0; padding: 0; list-style: none; font-size: 12.5px; }
+.case-saved::before { content: "Guardadas:"; color: var(--muted); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; font-weight: 600; align-self: center; }
+.case-saved li { display: flex; align-items: center; gap: 6px; }
+.case-result { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 14px; }
+.case-block { min-width: 180px; }
+.case-block strong { display: block; margin-bottom: 6px; color: var(--muted); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
+.case-block small { display: block; margin-top: 6px; color: var(--muted); font-size: 12px; }
+.case-table { border-collapse: collapse; font-size: 12.5px; }
+.case-table td { padding: 4px 12px 4px 0; border-bottom: 1px solid var(--line); font-family: ui-monospace, "Cascadia Mono", "Consolas", monospace; }
+.case-table td.numeric { text-align: right; font-variant-numeric: tabular-nums; font-family: inherit; }
+@media (max-width: 720px) { .case-form { grid-template-columns: 1fr; } }
+
 /* Prévia pelo TabNet. O aviso de que a pergunta sai daqui precisa ser visível
    sem esforço: é a única exceção à promessa de que nada sai do aparelho. */
 .tabnet-aviso { font-size: 12px; padding: 8px 11px; border-radius: 5px; background: #f9f2e1; color: var(--warn); border-left: 3px solid var(--warn); }
