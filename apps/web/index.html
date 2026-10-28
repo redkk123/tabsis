@@ -582,6 +582,7 @@
               <button class="secondary-button" id="export-tab-button" type="button" disabled title="Tabela do TabWin: abre em Arquivo → Abrir tabela do TabWin 4.15, com o log da consulta">TAB</button>
               <button class="secondary-button" id="export-prn-button" type="button" disabled title="Texto separado por vírgulas, como o .PRN do TabWin">PRN</button>
               <button class="secondary-button" id="export-sql-button" type="button" disabled title="SQL script, como o do TabWin: CREATE TABLE e um INSERT por linha">SQL</button>
+              <button class="primary-button" id="report-button" type="button" disabled title="Monta um relatório com a tabela, o gráfico, o mapa e um mapa por ano, pronto para imprimir ou salvar em PDF"><span>Relatório</span></button>
             </div>
           </div>
 
@@ -1273,6 +1274,25 @@
         <div class="dialog-form-actions cnv-editor-actions"><button class="primary-button" type="submit">OK</button></div>
       </form>
     </dialog>
+
+    <dialog id="report-dialog" class="cnv-editor-dialog">
+      <button class="dialog-close" id="report-close" type="button" aria-label="Fechar">×</button>
+      <span class="eyebrow">Relatório para imprimir</span>
+      <h2>O que entra no relatório</h2>
+      <p>Sai uma página pronta para imprimir ou salvar em PDF (na impressão, escolha "Salvar como PDF"), com a tabela como está na tela, o mapa com legenda e um mapa por período, a procedência e as Seleções.</p>
+      <form id="report-form" class="report-form">
+        <label><span>Título</span><input id="report-title" type="text" maxlength="160" /></label>
+        <label class="check-label"><input id="report-table" type="checkbox" checked><span>Tabela</span></label>
+        <label class="check-label"><input id="report-chart" type="checkbox"><span>Gráfico</span></label>
+        <label class="check-label"><input id="report-map" type="checkbox" checked><span>Mapa</span></label>
+        <label class="check-label" id="report-periods-label"><input id="report-periods" type="checkbox" checked><span>Um mapa por período (ano, mês…), na mesma escala de cor</span></label>
+        <label id="report-focus-label"><span>Foco dos mapas</span><select id="report-focus"><option value="__atual__">Como está no mapa agora</option></select></label>
+        <p class="filter-info" id="report-status" aria-live="polite"></p>
+        <div class="dialog-form-actions cnv-editor-actions"><button class="primary-button" id="report-print" type="submit">Montar e imprimir</button></div>
+      </form>
+    </dialog>
+
+    <div id="relatorio-impressao" hidden></div>
 
     <dialog id="paste-table-dialog" class="cnv-editor-dialog">
       <button class="dialog-close" id="paste-table-close" type="button" aria-label="Fechar">×</button>

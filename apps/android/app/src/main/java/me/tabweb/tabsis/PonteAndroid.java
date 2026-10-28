@@ -33,10 +33,12 @@ final class PonteAndroid {
 
     private final MainActivity atividade;
     private final File pasta;
+    private final LocalAndroid local;
 
-    PonteAndroid(MainActivity atividade) {
+    PonteAndroid(MainActivity atividade, LocalAndroid local) {
         this.atividade = atividade;
         this.pasta = new File(atividade.getCacheDir(), "salvando");
+        this.local = local;
     }
 
     private File temporario(String id) {
@@ -118,6 +120,46 @@ final class PonteAndroid {
     public void descartarArquivo(String id) {
         //noinspection ResultOfMethodCallIgnored
         temporario(id).delete();
+    }
+
+    // ---- TabSis Local dentro do app (ver LocalAndroid): o mesmo protocolo do
+    // app de computador, pela ponte em vez de HTTP.
+
+    /** O /health do protocolo. */
+    @JavascriptInterface
+    public String localSaude() {
+        try {
+            return local.saude(atividade.versao());
+        } catch (Exception e) {
+            return "{}";
+        }
+    }
+
+    /** As rotas de texto do protocolo; devolve {"status": código, "corpo": JSON}. */
+    @JavascriptInterface
+    public String localPedido(String metodo, String rota, String corpo) {
+        return local.pedido(metodo, rota, corpo);
+    }
+
+    /**
+     * Um guardado do navegador, montado em pedaços por iniciarArquivo /
+     * escreverParte, vai para Downloads/TabSis/Guardados do navegador.
+     */
+    @JavascriptInterface
+    public String localGuardado(String id, String nome) {
+        File origem = temporario(id);
+        try {
+            return "{\"status\":201,\"corpo\":" + org.json.JSONObject.quote(local.guardar(origem, nome)) + "}";
+        } catch (Exception e) {
+            try {
+                return new org.json.JSONObject().put("status", 400).put("corpo", new org.json.JSONObject().put("error", String.valueOf(e.getMessage())).toString()).toString();
+            } catch (org.json.JSONException impossivel) {
+                return "{\"status\":400,\"corpo\":\"{}\"}";
+            }
+        } finally {
+            //noinspection ResultOfMethodCallIgnored
+            origem.delete();
+        }
     }
 
     @JavascriptInterface
