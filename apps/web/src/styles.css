@@ -1169,3 +1169,35 @@ dialog p { color: #676d74; font-size: 13px; line-height: 1.6; }
   .topbar-links a { padding: 5px 6px; font-size: 11.5px; }
   .topbar-links .icon-button { width: 30px; height: 30px; min-width: 30px; }
 }
+
+/* Relatório para imprimir: um documento à parte (#relatorio-impressao) que só
+   aparece na impressão marcada com data-print-target="relatorio". */
+.report-form { display: grid; gap: 10px; margin-top: 10px; }
+.report-form label:not(.check-label) { display: grid; gap: 5px; }
+.report-form label span { font-size: 12px; color: var(--muted); }
+.report-form select { min-height: 36px; padding: 6px 9px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); }
+.report-form input[type="text"] { min-height: 36px; padding: 6px 9px; border: 1px solid var(--line-strong); border-radius: 6px; }
+#relatorio-impressao { color: #000; font: 11px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+#relatorio-impressao h1 { font-size: 18px; margin: 0 0 4px; }
+#relatorio-impressao h2 { font-size: 13px; margin: 18px 0 6px; break-after: avoid; }
+#relatorio-impressao .rel-sub { margin: 0 0 4px; color: #222; }
+#relatorio-impressao .rel-meta { margin: 0; color: #444; font-size: 10px; }
+#relatorio-impressao table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+#relatorio-impressao th, #relatorio-impressao td { border-bottom: 1px solid #bbb; padding: 2px 6px; text-align: right; }
+#relatorio-impressao th:first-child, #relatorio-impressao td:first-child { text-align: left; }
+#relatorio-impressao thead th { background: #eee; }
+#relatorio-impressao tr { break-inside: avoid; }
+#relatorio-impressao .rel-mapa { width: 100%; max-width: 680px; display: block; margin: 0 auto; }
+#relatorio-impressao .rel-grafico svg { width: 100%; height: auto; }
+#relatorio-impressao .rel-anos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+#relatorio-impressao .rel-anos figure { margin: 0; break-inside: avoid; }
+#relatorio-impressao .rel-anos img { width: 100%; display: block; }
+#relatorio-impressao .rel-anos figcaption { font-weight: 700; font-size: 11px; }
+#relatorio-impressao .rel-quebra { break-before: page; }
+#relatorio-impressao .rel-proc li { margin: 2px 0; }
+@media print {
+  body[data-print-target="relatorio"] > :not(#relatorio-impressao) { display: none !important; }
+  body[data-print-target="relatorio"] #relatorio-impressao { display: block !important; }
+  html:has(body[data-print-target="relatorio"]), body[data-print-target="relatorio"] { background: #fff !important; }
+  @page { margin: 14mm; }
+}

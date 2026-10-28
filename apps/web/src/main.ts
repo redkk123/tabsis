@@ -117,6 +117,7 @@ import {
 import { criarAbaConsulta, type AbaConsulta } from './aba-consulta.ts';
 import { criarAbaMicrodados, type AbaMicrodados } from './aba-microdados.ts';
 import { CAMPOS_DE_CNES, carregarCnes, normalizarCnes } from './cnes.ts';
+import { BASE_DO_APARELHO, TOKEN_DO_APARELHO, criarFetchDaPonte, temPonteLocal } from './ponte-local-android.ts';
 import { descreverDefinicao, lerDefinicao } from '../../../packages/core/src/definicao-caso.ts';
 import {
   tabulationToTabwinPrn,
@@ -561,6 +562,7 @@ const discriminateUnclassified = element<HTMLInputElement>('#discriminate-unclas
 const discriminateColumnUnclassified = element<HTMLInputElement>('#discriminate-column-unclassified');
 const runButton = element<HTMLButtonElement>('#run-button');
 const exportCsvButton = element<HTMLButtonElement>('#export-csv-button');
+const reportButton = element<HTMLButtonElement>('#report-button');
 const exportJsonButton = element<HTMLButtonElement>('#export-json-button');
 const exportXlsxButton = element<HTMLButtonElement>('#export-xlsx-button');
 const exportXmlButton = element<HTMLButtonElement>('#export-xml-button');
@@ -4276,7 +4278,7 @@ function clearAnalysisResult(message: string): void {
   tablePresentation.hidden = true;
   tableEditing.hidden = true;
   includeTableButton.disabled = true;
-  for (const button of [exportCsvButton, exportJsonButton, exportXlsxButton, exportXmlButton,
+  for (const button of [exportCsvButton, exportJsonButton, exportXlsxButton, exportXmlButton, reportButton,
     exportTabButton, exportPrnButton, exportSqlButton, chartPngButton, chartSvgButton, chartPrintButton, microdatasusCsvButton, saveRecipeButton,
     saveTableButton, selectedDbfButton]) button.disabled = true;
   chart.replaceChildren();
@@ -4450,6 +4452,7 @@ async function runAnalysis(measureOverride?: MeasureSpec, planOverride?: QueryPl
     exportJsonButton.disabled = false;
     exportXlsxButton.disabled = false;
     exportXmlButton.disabled = false;
+    reportButton.disabled = false;
     for (const button of [exportTabButton, exportPrnButton, exportSqlButton]) button.disabled = false;
     chartPngButton.disabled = false;
     chartSvgButton.disabled = false;
@@ -5290,6 +5293,7 @@ function printChart(): void {
   if (!svg) return;
   const zoomedViewBox = svg.getAttribute('viewBox');
   svg.setAttribute('viewBox', `0 0 ${CHART_VIEWBOX.width} ${CHART_VIEWBOX.height}`);
+  limparRelatorio();
   document.body.setAttribute('data-print-target', 'chart');
   const restore = () => {
     document.body.removeAttribute('data-print-target');
@@ -8581,7 +8585,16 @@ const bridgeVerdict = element<HTMLElement>('#bridge-verdict');
  * própria nem o inicia. Sem isso, um site qualquer poderia sondar portas da
  * máquina de quem abrisse a página.
  */
-let bridgeReady: { token: string; directory: string; baseUrl: string; features: string[] } | null = null;
+let bridgeReady: { token: string; directory: string; baseUrl: string; features: string[]; fetchImpl?: typeof fetch } | null = null;
+/**
+ * No app Android, o TabSis Local mora dentro do próprio app (LocalAndroid.java)
+ * e fala pela ponte do WebView: a página o acha sozinha, sem token para colar
+ * e sem porta aberta no aparelho.
+ */
+const ponteDoAparelho = (window as unknown as { TabSisAndroid?: unknown }).TabSisAndroid;
+const fetchDoAparelho = temPonteLocal(ponteDoAparelho) ? criarFetchDaPonte(ponteDoAparelho) : null;
+/** Onde fica a pasta do TabSis Local, nas frases da tela. */
+const ONDE_LOCAL = fetchDoAparelho ? 'aparelho' : 'computador';
 /** Porta do auxiliar: 8787, ou a que o TabSis Local mandou no link (#local=token:porta). */
 let bridgePort = 8787;
 const bridgeAutoCopy = element<HTMLInputElement>('#bridge-auto-copy');
@@ -8591,7 +8604,7 @@ const bridgeAutoCopyLabel = element<HTMLElement>('#bridge-auto-copy-label');
 const catalogLocal = element<HTMLElement>('#catalog-local');
 const catalogLocalSummary = element<HTMLElement>('#catalog-local-summary');
 const catalogLocalList = element<HTMLElement>('#catalog-local-list');
-const bridgeOptions = () => (bridgeReady ? { token: bridgeReady.token, baseUrl: bridgeReady.baseUrl } : null);
+const bridgeOptions = () => (bridgeReady ? { token: bridgeReady.token, baseUrl: bridgeReady.baseUrl, ...(bridgeReady.fetchImpl ? { fetchImpl: bridgeReady.fetchImpl } : {}) } : null);
 
 function setBridgeVerdict(message: string, kind: 'ok' | 'off' | 'warn'): void {
   bridgeVerdict.hidden = false;
@@ -8604,7 +8617,7 @@ async function checkBridge(): Promise<void> {
   bridgeCheckButton.disabled = true;
   setBridgeVerdict('Perguntando ao auxiliar…', 'off');
   try {
-    const probe = await probeBridge(bridgeBaseUrl(bridgePort));
+    const probe = await probeBridge(fetchDoAparelho ? BASE_DO_APARELHO : bridgeBaseUrl(bridgePort), fetchDoAparelho ?? fetch);
     if (!probe.available) {
       bridgeReady = null;
       setBridgeVerdict(describeBridgeProbe(probe), probe.reason === 'offline' ? 'off' : 'warn');
@@ -8618,7 +8631,7 @@ async function checkBridge(): Promise<void> {
       );
       return;
     }
-    bridgeReady = { token, directory: probe.health.directory, baseUrl: probe.baseUrl, features: probe.health.features ?? [] };
+    bridgeReady = { token, directory: probe.health.directory, baseUrl: probe.baseUrl, features: probe.health.features ?? [], ...(fetchDoAparelho ? { fetchImpl: fetchDoAparelho } : {}) };
     const local = bridgeHasFeature(probe.health, 'guardados');
     setBridgeVerdict(local
       ? `TabSis Local ${probe.health.version ?? ''} conectado. Pasta: ${probe.health.directory}`
@@ -8651,9 +8664,9 @@ async function copiarParaComputador(arquivos: ReadonlyArray<{ name: string; byte
     try {
       const salvo = await sendFileToBridge(opcoes, nome, new Blob([arquivo.bytes as BlobPart]));
       copiadosParaComputador.add(chave);
-      showToast(`Cópia no computador: ${salvo.path}`);
+      showToast(`Cópia no ${ONDE_LOCAL}: ${salvo.path}`);
     } catch (error) {
-      showToast(`Não deu para copiar ${nome} para o computador: ${error instanceof Error ? error.message : String(error)}`, true);
+      showToast(`Não deu para copiar ${nome} para o ${ONDE_LOCAL}: ${error instanceof Error ? error.message : String(error)}`, true);
     }
   }
   void renderLocalFiles();
@@ -8731,11 +8744,11 @@ async function renderLocalFiles(): Promise<void> {
   const abrir = async (escolhidos: BridgeLocalFile[], juntar: boolean): Promise<void> => {
     setCatalogBusy(true);
     try {
-      setCatalogStatus(`Abrindo ${escolhidos.length} arquivo(s) da pasta do computador…`);
+      setCatalogStatus(`Abrindo ${escolhidos.length} arquivo(s) da pasta do ${ONDE_LOCAL}…`);
       const arquivos = [];
       for (const arquivo of escolhidos) arquivos.push(new File([(await fetchBridgeFile(opcoes, arquivo)) as BlobPart], arquivo.nome));
       await loadFiles(arquivos, juntar ? { juntar: true } : {});
-      setCatalogStatus(`${escolhidos.map((arquivo) => arquivo.nome).join(', ')} aberto(s) da pasta do computador, sem baixar de novo.`);
+      setCatalogStatus(`${escolhidos.map((arquivo) => arquivo.nome).join(', ')} aberto(s) da pasta do ${ONDE_LOCAL}, sem baixar de novo.`);
       catalogDialog.close();
     } catch (error) {
       setCatalogStatus(error instanceof Error ? error.message : String(error), true);
@@ -8816,6 +8829,18 @@ function conectarPeloLink(): void {
   });
 }
 conectarPeloLink();
+if (fetchDoAparelho) {
+  // As frases do painel falam do aparelho, e a ligação é automática.
+  element<HTMLElement>('#catalog-local .eyebrow').textContent = 'No aparelho · TabSis Local';
+  element<HTMLElement>('#bridge-panel summary').firstChild!.textContent = 'TabSis Local do app ';
+  element<HTMLElement>('#bridge-panel .filter-info').textContent = 'O TabSis Local já vem dentro deste app: o que você baixar pode ir direto do FTP do DATASUS para Downloads/TabSis, '
+    + 'um arquivo de cada vez e em segundo plano, e o que está lá abre de novo aqui sem baixar outra vez.';
+  element<HTMLElement>('#bridge-panel .bridge-controls').hidden = true;
+  element<HTMLElement>('#bridge-via-local-label span').textContent = 'Baixar pelo TabSis Local do app: direto do FTP para Downloads/TabSis, um de cada vez, continua se a conexão cair ou a página fechar';
+  element<HTMLElement>('#bridge-auto-copy-label span').textContent = 'Guardar uma cópia em Downloads/TabSis de tudo o que eu baixar';
+  bridgeTokenInput.value = TOKEN_DO_APARELHO;
+  void checkBridge();
+}
 // Com o TabSis já aberto nesta aba, o link só troca o #: a página não recarrega.
 window.addEventListener('hashchange', conectarPeloLink);
 
@@ -10520,12 +10545,12 @@ async function renderRecentArchives(): Promise<void> {
       const enviar = document.createElement('div');
       enviar.className = 'catalog-result catalog-batch-bar';
       const texto = document.createElement('div');
-      texto.innerHTML = `<b>Enviar ${dataArchives.length === 1 ? 'o guardado' : `os ${integerFormat.format(dataArchives.length)} guardados`} para o computador</b><small>Copia para ${bridgeReady.directory}</small>`;
+      texto.innerHTML = `<b>Enviar ${dataArchives.length === 1 ? 'o guardado' : `os ${integerFormat.format(dataArchives.length)} guardados`} para o ${ONDE_LOCAL}</b><small>Copia para ${bridgeReady.directory}</small>`;
       const botao = document.createElement('button');
       botao.className = 'secondary-button';
       botao.type = 'button';
       botao.id = 'catalog-recent-send-local';
-      botao.textContent = 'Enviar para o computador';
+      botao.textContent = `Enviar para o ${ONDE_LOCAL}`;
       botao.addEventListener('click', () => void (async () => {
         const opcoes = bridgeOptions();
         if (!opcoes) return;
@@ -10538,12 +10563,12 @@ async function renderRecentArchives(): Promise<void> {
             await sendFileToBridge(opcoes, file.name, file);
             feitos += 1;
           }
-          setCatalogStatus(`${feitos} arquivo(s) copiados para ${bridgeReady?.directory ?? 'o computador'}.`);
+          setCatalogStatus(`${feitos} arquivo(s) copiados para ${bridgeReady?.directory ?? `o ${ONDE_LOCAL}`}.`);
         } catch (error) {
           setCatalogStatus(`Parou em ${feitos} de ${dataArchives.length}: ${error instanceof Error ? error.message : String(error)}`, true);
         } finally {
           botao.disabled = false;
-          botao.textContent = 'Enviar para o computador';
+          botao.textContent = `Enviar para o ${ONDE_LOCAL}`;
           void renderLocalFiles();
         }
       })());
@@ -10757,7 +10782,7 @@ function renderCatalogSearchBatch(
     localSelected.className = 'secondary-button';
     localSelected.type = 'button';
     localSelected.id = 'catalog-send-local-queue';
-    localSelected.title = 'O TabSis Local baixa um de cada vez para a pasta do computador, mesmo que você feche esta página';
+    localSelected.title = `O TabSis Local baixa um de cada vez para a pasta do ${ONDE_LOCAL}, mesmo que você feche esta página`;
     localSelected.hidden = !bridgeReady?.features.includes('ftp');
     localSelected.addEventListener('click', () => void (async () => {
       const opcoes = bridgeOptions();
@@ -10768,7 +10793,7 @@ function renderCatalogSearchBatch(
         for (const remote of escolhidos) {
           await startBridgeDownload(opcoes, `ftp://ftp.datasus.gov.br${remote.ftpPath ?? officialFtpPath(remote.address)}`);
         }
-        setCatalogStatus(`${escolhidos.length} arquivo(s) na fila do TabSis Local. Ele baixa um de cada vez para ${bridgeReady?.directory ?? 'a pasta do computador'}, mesmo se você fechar esta página; depois eles aparecem em "No computador".`);
+        setCatalogStatus(`${escolhidos.length} arquivo(s) na fila do TabSis Local. Ele baixa um de cada vez para ${bridgeReady?.directory ?? `a pasta do ${ONDE_LOCAL}`}, mesmo se você fechar esta página; depois eles aparecem em "No ${ONDE_LOCAL}".`);
       } catch (error) {
         setCatalogStatus(`Não deu para mandar para o TabSis Local: ${error instanceof Error ? error.message : String(error)}`, true);
       } finally {
@@ -10778,7 +10803,7 @@ function renderCatalogSearchBatch(
 
     syncSelection = (): void => {
       const chosen = selectedFiles().length;
-      localSelected.textContent = `Baixar no computador (${integerFormat.format(chosen)})`;
+      localSelected.textContent = `Baixar no ${ONDE_LOCAL} (${integerFormat.format(chosen)})`;
       localSelected.disabled = chosen === 0;
       const everything = chosen === files.length;
       toggle.textContent = everything ? 'limpar seleção' : 'selecionar todos';
@@ -10859,7 +10884,7 @@ function renderCatalogSearchBatch(
     save.className = 'text-button';
     save.type = 'button';
     save.textContent = 'Salvar .dbc';
-    save.title = `Baixar ${remote.name} para o computador, sem abrir`;
+    save.title = `Baixar ${remote.name} para o ${ONDE_LOCAL}, sem abrir`;
     save.addEventListener('click', () => void saveOfficialFileToDisk(remote));
     const buttons = document.createElement('div');
     buttons.className = 'catalog-result-actions';
@@ -11356,6 +11381,7 @@ async function openPortableTable(file: File): Promise<void> {
   exportJsonButton.disabled = false;
   exportXlsxButton.disabled = false;
   exportXmlButton.disabled = false;
+  reportButton.disabled = false;
   for (const button of [exportTabButton, exportPrnButton, exportSqlButton]) button.disabled = false;
   chartPngButton.disabled = false;
   chartSvgButton.disabled = false;
@@ -11440,7 +11466,7 @@ function openLegacyTabText(text: string, name: string, kind: string): void {
   labPackageButton.disabled = false;
   openPythonButton.disabled = false;
   pythonLocalButton.disabled = false;
-  for (const button of [exportCsvButton, exportJsonButton, exportXlsxButton, exportXmlButton, exportTabButton, exportPrnButton, exportSqlButton]) {
+  for (const button of [exportCsvButton, exportJsonButton, exportXlsxButton, exportXmlButton, exportTabButton, exportPrnButton, exportSqlButton, reportButton]) {
     button.disabled = false;
   }
 
@@ -11733,7 +11759,17 @@ let ultimaLegenda: { titulo: string; baixo: string; alto: string; cores: string[
  * antes, não dizia o que era nem de quando.
  */
 function exportMapPng(): void {
-  if (!activeMap || !currentResult) return;
+  const tela = comporImagemDoMapa();
+  if (!tela) return;
+  const periodo = mapPeriodList().find((item) => item.name === mapPeriod)?.label;
+  tela.toBlob((blob) => {
+    if (blob) downloadBlob(blob, `${exportBaseName()}-mapa${periodo ? `-${periodo.replace(/[^\w-]+/g, '')}` : ''}.png`);
+  }, 'image/png');
+}
+
+/** O mapa desenhado agora, com título, lugar, período, legenda e fonte (o PNG e o relatório). */
+function comporImagemDoMapa(): HTMLCanvasElement | null {
+  if (!activeMap || !currentResult) return null;
   const escala = Math.min(window.devicePixelRatio || 1, 2);
   const largura = mapCanvas.width;
   const cabecalho = Math.round(76 * escala);
@@ -11742,7 +11778,7 @@ function exportMapPng(): void {
   tela.width = largura;
   tela.height = cabecalho + mapCanvas.height + rodape;
   const g = tela.getContext('2d');
-  if (!g) return;
+  if (!g) return null;
   const margem = 16 * escala;
   const caber = (texto: string, maximo: number): string => {
     if (g.measureText(texto).width <= maximo) return texto;
@@ -11795,10 +11831,196 @@ function exportMapPng(): void {
   g.font = `${10 * escala}px system-ui, sans-serif`;
   const fonte = caber(`TabSis · ${datasetName} · ${new Date().toLocaleDateString('pt-BR')}`, largura - 2 * margem);
   g.fillText(fonte, largura - margem - g.measureText(fonte).width, base + 70 * escala);
+  return tela;
+}
 
-  tela.toBlob((blob) => {
-    if (blob) downloadBlob(blob, `${exportBaseName()}-mapa${periodo ? `-${periodo.replace(/[^\w-]+/g, '')}` : ''}.png`);
-  }, 'image/png');
+// --- Relatório para imprimir ---------------------------------------------
+
+const reportDialog = element<HTMLDialogElement>('#report-dialog');
+const reportForm = element<HTMLFormElement>('#report-form');
+const reportTitle = element<HTMLInputElement>('#report-title');
+const reportTable = element<HTMLInputElement>('#report-table');
+const reportChart = element<HTMLInputElement>('#report-chart');
+const reportMap = element<HTMLInputElement>('#report-map');
+const reportPeriods = element<HTMLInputElement>('#report-periods');
+const reportPeriodsLabel = element<HTMLElement>('#report-periods-label');
+const reportFocus = element<HTMLSelectElement>('#report-focus');
+const reportFocusLabel = element<HTMLElement>('#report-focus-label');
+const reportStatus = element<HTMLElement>('#report-status');
+const reportPrint = element<HTMLButtonElement>('#report-print');
+const relatorioImpressao = element<HTMLElement>('#relatorio-impressao');
+
+let limpezaDoRelatorio = 0;
+
+/** Tira o relatório da impressão: a próxima impressão volta a ser a tabela (ou o gráfico). */
+function limparRelatorio(): void {
+  if (document.body.getAttribute('data-print-target') === 'relatorio') document.body.removeAttribute('data-print-target');
+  relatorioImpressao.replaceChildren();
+}
+
+function abrirRelatorio(): void {
+  if (!currentResult) return;
+  reportTitle.value = tableTitle.value.trim() || resultTitle.textContent?.trim() || 'Relatório';
+  const temMapa = Boolean(dbfHeader && findGeographicFields(dbfHeader.fields).length) || Boolean(inferMapLevel(currentResult));
+  reportMap.disabled = !temMapa;
+  reportMap.checked = temMapa;
+  reportPeriodsLabel.hidden = !temMapa;
+  reportChart.disabled = !element<HTMLElement>('#chart-view').querySelector('svg');
+  reportStatus.textContent = '';
+  reportFocusLabel.hidden = !temMapa;
+  reportFocus.replaceChildren(new Option('Como está no mapa agora', '__atual__'));
+  reportDialog.showModal();
+  // Os estados com dado saem da leitura do mapa: lida agora, se ainda não foi.
+  if (temMapa) void ensureMap().then(preencherFocosDoRelatorio);
+}
+
+/** Brasil e cada estado com dado, como no Recorte do mapa. */
+function preencherFocosDoRelatorio(): void {
+  const escolhido = reportFocus.value;
+  const opcoes = [new Option('Como está no mapa agora', '__atual__')];
+  if (mapLevel === 'municipality' && !mapClassic) {
+    opcoes.push(new Option('Brasil, por estado', ''));
+    for (const [uf, total] of [...mapFocusStates.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+      opcoes.push(new Option(`${ufNameForCode(uf)}, por município (${integerFormat.format(total)})`, uf));
+    }
+  }
+  reportFocus.replaceChildren(...opcoes);
+  reportFocus.value = [...reportFocus.options].some((opcao) => opcao.value === escolhido) ? escolhido : '__atual__';
+}
+
+/** Espera o mapa ficar pronto para desenhar (o contorno do estado chega pela rede). */
+async function esperarMapaPronto(limiteMs: number): Promise<void> {
+  const fim = Date.now() + limiteMs;
+  while (Date.now() < fim && !activeMap) await new Promise((resolve) => setTimeout(resolve, 150));
+}
+
+/** Espera os períodos do mapa chegarem (eles leem em segundo plano), até um limite. */
+async function esperarPeriodosDoMapa(limiteMs: number): Promise<void> {
+  const fim = Date.now() + limiteMs;
+  while (Date.now() < fim) {
+    const lista = mapPeriodList();
+    if (!mapPeriodLoading && lista.every((periodo) => mapPeriodResults.has(periodo.name))) return;
+    reportStatus.textContent = `Lendo os períodos do mapa: ${lista.filter((periodo) => mapPeriodResults.has(periodo.name)).length} de ${lista.length}…`;
+    await new Promise((resolve) => setTimeout(resolve, 300));
+  }
+}
+
+async function montarRelatorio(): Promise<void> {
+  if (!currentResult) return;
+  reportPrint.disabled = true;
+  const partes: HTMLElement[] = [];
+  const bloco = <K extends keyof HTMLElementTagNameMap>(tag: K, texto?: string, classe?: string): HTMLElementTagNameMap[K] => {
+    const novo = document.createElement(tag);
+    if (texto !== undefined) novo.textContent = texto;
+    if (classe) novo.className = classe;
+    return novo;
+  };
+  try {
+    partes.push(bloco('h1', reportTitle.value.trim() || 'Relatório'));
+    const arquivos = activeDatasetSources.map((source) => source.name).join(', ') || datasetName;
+    partes.push(bloco('p', `${arquivos} · ${integerFormat.format(datasetRecordCount)} registros`, 'rel-sub'));
+    if (configuredFilters.length) {
+      partes.push(bloco('p', `Seleções: ${configuredFilters.map((filtro) => describeFilter(filtro, filtro.mode === 'exclude' ? 'Excluir' : 'Incluir')).join('; ')}`, 'rel-meta'));
+    }
+
+    if (reportTable.checked) {
+      // A tabela como está na tela, com operações e formatação; o corpo inteiro,
+      // não só as linhas que a rolagem mostra.
+      renderTableBody({ full: true });
+      partes.push(bloco('h2', resultTitle.textContent?.trim() || 'Tabela'));
+      partes.push(element<HTMLTableElement>('#result-table').cloneNode(true) as HTMLTableElement);
+    }
+    if (reportChart.checked && !reportChart.disabled) {
+      const svg = element<HTMLElement>('#chart-view').querySelector('svg');
+      if (svg) {
+        const figura = bloco('div', undefined, 'rel-grafico rel-quebra');
+        figura.append(bloco('h2', 'Gráfico'), svg.cloneNode(true));
+        partes.push(figura);
+      }
+    }
+    if (reportMap.checked && !reportMap.disabled) {
+      const vistaAnterior = currentView;
+      const periodoAnterior = mapPeriod;
+      const focoAnterior = mapUfFilter;
+      showView('map');
+      reportStatus.textContent = 'Desenhando o mapa…';
+      await ensureMap();
+      // Foco pedido para o relatório: o mapa da tela volta ao que era no fim.
+      const foco = reportFocus.value;
+      const trocarFoco = foco !== '__atual__' && foco !== mapUfFilter;
+      if (trocarFoco) {
+        setMapFocus(foco);
+        await ensureMap();
+        await esperarMapaPronto(15_000);
+      }
+      if (activeMap) {
+        renderMap();
+        const geral = comporImagemDoMapa();
+        if (geral) {
+          const secao = bloco('section', undefined, 'rel-quebra');
+          const imagem = bloco('img', undefined, 'rel-mapa');
+          imagem.src = geral.toDataURL('image/png');
+          imagem.alt = 'Mapa';
+          secao.append(bloco('h2', 'Mapa'), imagem);
+          partes.push(secao);
+        }
+        if (reportPeriods.checked && mapPeriodList().length > 1) {
+          await esperarPeriodosDoMapa(60_000);
+          const figuras: HTMLElement[] = [];
+          for (const periodo of mapPeriodList()) {
+            if (!mapPeriodResults.has(periodo.name)) continue;
+            mapPeriod = periodo.name;
+            renderMap();
+            const tela = comporImagemDoMapa();
+            if (!tela) continue;
+            const figura = bloco('figure');
+            const imagem = bloco('img');
+            imagem.src = tela.toDataURL('image/png');
+            imagem.alt = `Mapa de ${periodo.label}`;
+            figura.append(bloco('figcaption', periodo.label), imagem);
+            figuras.push(figura);
+          }
+          mapPeriod = periodoAnterior;
+          renderMapPeriodBar();
+          if (!trocarFoco) renderMap();
+          if (figuras.length) {
+            const secao = bloco('section', undefined, 'rel-quebra');
+            const grade = bloco('div', undefined, 'rel-anos');
+            grade.append(...figuras);
+            secao.append(bloco('h2', `Um mapa por ${mapPeriodUnit(false)} (mesma escala de cor)`), grade);
+            partes.push(secao);
+          }
+        }
+      }
+      if (trocarFoco) {
+        setMapFocus(focoAnterior);
+        await ensureMap();
+      }
+      showView(vistaAnterior);
+    }
+
+    const procedencia = bloco('ul', undefined, 'rel-proc');
+    procedencia.append(
+      bloco('li', `Arquivos: ${arquivos}`),
+      bloco('li', `Gerado pelo TabSis (tabweb.me) em ${new Date().toLocaleString('pt-BR')}`),
+    );
+    partes.push(bloco('h2', 'Procedência'), procedencia);
+
+    relatorioImpressao.replaceChildren(...partes);
+    reportDialog.close();
+    document.body.setAttribute('data-print-target', 'relatorio');
+    window.addEventListener('afterprint', limparRelatorio, { once: true });
+    window.print();
+    // No app Android a impressão é outra tela, que lê a página enquanto a
+    // pessoa ajusta papel e páginas, e o fim não é avisado: o relatório fica
+    // pronto por um tempo (só aparece na impressão) e sai sozinho.
+    window.clearTimeout(limpezaDoRelatorio);
+    limpezaDoRelatorio = window.setTimeout(limparRelatorio, 10 * 60_000);
+  } catch (error) {
+    reportStatus.textContent = `Não deu para montar o relatório: ${error instanceof Error ? error.message : String(error)}`;
+  } finally {
+    reportPrint.disabled = false;
+  }
 }
 
 function updateMapZoom(next: number): void {
@@ -12238,7 +12460,10 @@ tableLocate.addEventListener('input', () => {
 });
 tableCopy.addEventListener('click', () => void copyPresentedTable().catch((error) =>
   showToast(error instanceof Error ? error.message : String(error), true)));
-tablePrint.addEventListener('click', () => window.print());
+tablePrint.addEventListener('click', () => { limparRelatorio(); window.print(); });
+reportButton.addEventListener('click', abrirRelatorio);
+element<HTMLButtonElement>('#report-close').addEventListener('click', () => reportDialog.close());
+reportForm.addEventListener('submit', (event) => { event.preventDefault(); void montarRelatorio(); });
 tableEditColumn.addEventListener('change', updateColumnEditButtons);
 tableColumnRename.addEventListener('click', () => {
   try {

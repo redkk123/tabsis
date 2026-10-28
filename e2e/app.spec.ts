@@ -2016,6 +2016,53 @@ test('TabSis Local: o link do app conecta sozinho, os guardados vão para a past
   }
 });
 
+test('TabSis Local do app Android: liga sozinho pela ponte, guarda em Downloads/TabSis e reabre de lá', async ({ page }) => {
+  const { readFileSync } = await import('node:fs');
+  const { zipSync } = await import('fflate');
+  // A ponte do app (LocalAndroid.java), simulada: a pasta é um objeto na página.
+  await page.addInitScript(() => {
+    const pasta: Record<string, number> = {};
+    const partes: Record<string, string[]> = {};
+    (window as unknown as { TabSisAndroid: unknown }).TabSisAndroid = {
+      localSaude: () => JSON.stringify({ service: 'tabwin-bridge', protocol: 1, app: 'tabsis-android', version: '1.0.5', features: ['ftp', 'guardados', 'arquivos'], directory: 'Downloads/TabSis', allowlist: [] }),
+      localPedido: (metodo: string, rota: string) => JSON.stringify(rota === '/arquivos' && metodo === 'GET'
+        ? { status: 200, corpo: JSON.stringify({ directory: 'Downloads/TabSis', files: Object.entries(pasta).map(([nome, bytes]) => ({ nome, pasta: 'guardados', bytes, modificado: 1, caminho: `Downloads/TabSis/Guardados do navegador/${nome}` })) }) }
+        : { status: 404, corpo: JSON.stringify({ error: 'rota desconhecida' }) }),
+      iniciarArquivo: () => { const id = crypto.randomUUID(); partes[id] = []; return id; },
+      escreverParte: (id: string, base64: string) => { partes[id]!.push(base64); },
+      descartarArquivo: (id: string) => { delete partes[id]; },
+      localGuardado: (id: string, nome: string) => {
+        pasta[nome] = partes[id]!.reduce((soma, parte) => soma + atob(parte).length, 0);
+        return JSON.stringify({ status: 201, corpo: JSON.stringify({ path: `Downloads/TabSis/Guardados do navegador/${nome}`, bytes: pasta[nome], sha256: '0'.repeat(64) }) });
+      },
+      iniciarArquivoSalvo: () => '', imprimir: () => {},
+    };
+  });
+  const dbf = readFileSync('e2e/fixtures/DENGBR24.dbf');
+  await page.route('**/__local/arquivo**', (route) => route.fulfill({ contentType: 'application/octet-stream', body: dbf }));
+  await page.goto('/');
+  await page.evaluate(async (bytes) => {
+    const mod = await import('/src/archive-cache.ts');
+    await mod.writeCachedArchive('official-v1:DENGBR24', new Uint8Array(bytes), {
+      sha256: '24'.repeat(32), role: 'data',
+      sources: [{ name: 'DENGBR24.dbf', address: 'ftp://ftp.datasus.gov.br/dissemin/publicos/SINAN/DADOS/FINAIS/DENGBR24.dbc', source: 'SINAN', modality: 'Dados' }],
+    });
+  }, [...zipSync({ 'DENGBR24.dbf': new Uint8Array(dbf) })]);
+  await page.reload();
+  await page.locator('#catalog-button').click();
+  // Sem token para colar: o app se apresenta, e as frases falam do aparelho.
+  await expect(page.locator('#bridge-verdict')).toContainText('conectado');
+  await expect(page.locator('#catalog-recent-send-local')).toContainText('para o aparelho');
+  await page.locator('#catalog-recent-send-local').click();
+  await expect(page.locator('#catalog-status')).toContainText('1 arquivo(s) copiados para Downloads/TabSis');
+  await expect(page.locator('#catalog-local .eyebrow')).toHaveText('No aparelho · TabSis Local');
+  const item = page.locator('#catalog-local-list .catalog-recent-item').filter({ hasText: 'DENGBR24.dbf' });
+  await expect(item).toBeVisible();
+  await item.getByRole('button', { name: 'Abrir', exact: true }).click();
+  await expect(page.locator('#result-table tbody tr').first()).toBeVisible();
+  await expect(page.locator('#result-kicker')).toContainText('DENGBR24.dbf');
+});
+
 test('um .TAB salvo pelo TabWin 4.15 abre aqui, somente para leitura', async ({ page }) => {
   // O leitor era provado contra o golden G023 e não estava ligado: a
   // biblioteca lia o formato, o aplicativo não abria o arquivo. Esta fixture é
@@ -3152,6 +3199,39 @@ test('CNES: nome do estabelecimento na Microdados e um ponto por estabelecimento
   await expect(page.locator('#map-cnes-label')).toBeVisible({ timeout: 20000 });
   await page.locator('#map-cnes-check').check();
   await expect(page.locator('#map-message')).toContainText('2 estabelecimentos (ID_UNIDADE) com 4 de 5 registros; 1 sem coordenada');
+});
+
+test('relatório para imprimir: título, tabela, mapa e um mapa por ano, só na impressão', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#file-input').setInputFiles([
+    'e2e/fixtures/DENGBR23.dbf', 'e2e/fixtures/DENGBR24.dbf', 'e2e/fixtures/DENGBR25.dbf',
+  ]);
+  await expect(page.locator('#report-button')).toBeEnabled({ timeout: 20000 });
+  await page.evaluate(() => { (window as unknown as { __impressoes: number }).__impressoes = 0; window.print = () => { (window as unknown as { __impressoes: number }).__impressoes += 1; }; });
+  await page.locator('#report-button').click();
+  await expect(page.locator('#report-dialog')).toBeVisible();
+  await page.locator('#report-title').fill('Dengue no teste');
+  // Foco num estado só para o relatório: a lista sai dos estados com dado.
+  await expect.poll(() => page.locator('#report-focus option').count(), { timeout: 20000 }).toBeGreaterThan(2);
+  const estado = await page.locator('#report-focus option').nth(2).getAttribute('value');
+  await page.locator('#report-focus').selectOption(estado!);
+  await page.locator('#report-print').click();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __impressoes: number }).__impressoes), { timeout: 60000 }).toBe(1);
+  const relatorio = page.locator('#relatorio-impressao');
+  await expect(relatorio.locator('h1')).toHaveText('Dengue no teste');
+  await expect(relatorio.locator('table tbody tr').first()).toBeAttached();
+  await expect(relatorio.locator('img.rel-mapa')).toHaveCount(1);
+  // Três arquivos, três anos: um mapa para cada.
+  await expect(relatorio.locator('.rel-anos figure')).toHaveCount(3);
+  await expect(relatorio.locator('.rel-anos figcaption')).toHaveText(['2023', '2024', '2025']);
+  await expect(page.locator('body')).toHaveAttribute('data-print-target', 'relatorio');
+  // O mapa da tela volta ao Brasil depois do relatório.
+  await expect(page.locator('#map-uf')).toHaveValue('');
+  // Na tela nada muda; imprimir a tabela depois volta a imprimir a tabela.
+  await expect(relatorio).toBeHidden();
+  await page.locator('[data-view="table"]').click();
+  await page.locator('#table-print').click();
+  await expect(page.locator('body')).not.toHaveAttribute('data-print-target', 'relatorio');
 });
 
 test('taxa por 100 mil: a população aberta no mapa troca contagem por taxa, e desliga de volta', async ({ page }) => {

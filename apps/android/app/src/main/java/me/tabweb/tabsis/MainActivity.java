@@ -44,6 +44,8 @@ public class MainActivity extends ComponentActivity {
     static final String INICIO = "https://" + DOMINIO + "/site/index.html";
 
     private WebView webView;
+    /** Sobrevive a recomeçar a tela: os downloads em andamento continuam e o site os acha de novo. */
+    private static LocalAndroid local;
     private ValueCallback<Uri[]> escolhaPendente;
     private ActivityResultLauncher<Intent> escolherArquivos;
 
@@ -93,7 +95,12 @@ public class MainActivity extends ComponentActivity {
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
-                return carregador.shouldInterceptRequest(request.getUrl());
+                Uri endereco = request.getUrl();
+                // Um arquivo de Downloads/TabSis que o site pediu ao TabSis Local do app.
+                if (DOMINIO.equals(endereco.getHost()) && "/__local/arquivo".equals(endereco.getPath())) {
+                    return arquivoLocal(endereco);
+                }
+                return carregador.shouldInterceptRequest(endereco);
             }
 
             // Um arquivo grande demais pode esgotar a memória do processo que
@@ -161,7 +168,8 @@ public class MainActivity extends ComponentActivity {
             escolhaPendente = null;
         });
 
-        webView.addJavascriptInterface(new PonteAndroid(this), "TabSisAndroid");
+        if (local == null) local = new LocalAndroid(this);
+        webView.addJavascriptInterface(new PonteAndroid(this, local), "TabSisAndroid");
 
         // Voltar: fecha a janela aberta no site (busca, manual…); senão, volta a página; senão, sai.
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
@@ -187,7 +195,22 @@ public class MainActivity extends ComponentActivity {
         if (webView != null) webView.saveState(outState);
     }
 
-    private String versao() {
+    private WebResourceResponse arquivoLocal(Uri endereco) {
+        java.util.Map<String, String> cabecalhos = new java.util.HashMap<>();
+        cabecalhos.put("Cache-Control", "no-store");
+        try {
+            String nome = endereco.getQueryParameter("nome");
+            String pasta = endereco.getQueryParameter("pasta");
+            java.io.InputStream entrada = local.abrir(nome == null ? "" : nome, pasta == null ? "principal" : pasta);
+            return new WebResourceResponse("application/octet-stream", null, 200, "OK", cabecalhos, entrada);
+        } catch (Exception e) {
+            String erro = "{\"error\":" + org.json.JSONObject.quote(String.valueOf(e.getMessage())) + "}";
+            return new WebResourceResponse("application/json", "utf-8", 404, "Not Found", cabecalhos,
+                    new java.io.ByteArrayInputStream(erro.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        }
+    }
+
+    String versao() {
         try {
             return getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
         } catch (Exception e) {
