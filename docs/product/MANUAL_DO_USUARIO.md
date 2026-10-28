@@ -679,6 +679,7 @@ histórico do TabWin 4.15.
 | **Extrair DBF original** | o DBF de dentro do DBC, sem alteração |
 | **Pacote para o Lab** | a tabela mais um `PROVENIENCIA.json` (origem, hash das fontes, filtros e transformações), para analisar no Tabwin Lab |
 | **Abrir no Python** | abre o Laboratório numa aba nova com os microdados da tabela em `/data` e um caderno pandas pronto (até 32 MB) |
+| **Abrir no R** | o mesmo, com um caderno em R base (webR); os dois conferem a tabela refeita com a do TabSis |
 | **Rodar no computador** | um `.zip` com os microdados, o caderno em `.py` e `.ipynb` e um arquivo de dois cliques para Windows, macOS e Linux |
 
 A receita carrega o pipeline junto. Sem isso ela reconstruiria uma tabela
@@ -862,13 +863,23 @@ existem nesses anos.
 **Guardar definição** guarda campo e códigos neste navegador, para usar de
 novo com outros anos ou estados.
 
-### Python com os microdados: no navegador ou no computador
+### Python e R com os microdados: no navegador ou no computador
 
-**Abrir no Python** leva os registros da tabela atual (com Seleções e
-transformações aplicadas) para o Laboratório, num caderno que já carrega os
-dados no pandas e refaz a tabela. Daí em diante o código é seu: edite e rode.
-O caderno que estava aberto no Lab fica em "Recuperar versão anterior". O
-limite é o do Lab no navegador, 32 MB.
+**Abrir no Python** e **Abrir no R** levam os registros da tabela atual (com
+Seleções e transformações aplicadas) para o Laboratório, num caderno que já
+carrega os dados (pandas ou R base) e refaz a tabela. Vão junto:
+
+- **a conferência:** a tabela da tela vai como `tabela-tabsis.csv`, e uma
+  célula refaz a contagem a partir dos microdados e diz **CONFERE** (todas as
+  linhas batem) ou **DIVERGE**, com as linhas diferentes. Aparece quando a
+  tabela é uma contagem de registros sem operação por cima;
+- **a receita em código:** as Seleções em pandas ou em R, comentadas (elas já
+  valem nos dados enviados), para aplicar aos microdados inteiros de outros
+  anos ou estados.
+
+Daí em diante o código é seu: edite e rode. O caderno que estava aberto no Lab
+fica em "Recuperar versão anterior". O limite é o do Lab no navegador, 32 MB
+por arquivo; acima disso, recorte com Seleções ou use **Rodar no computador**.
 
 **Rodar no computador** baixa o mesmo caderno para rodar fora do navegador,
 sem esse limite e sem instalar nada além do Python:
@@ -882,7 +893,9 @@ sem esse limite e sem instalar nada além do Python:
 
 O resultado aparece na janela e fica salvo em `resultado-tabela.csv`. Para
 mexer, edite `analise.py` (ou abra `analise.ipynb` no Jupyter, VS Code ou
-Colab) e rode de novo. Pacotes extras entram em `requirements.txt`.
+Colab) e rode de novo. Pacotes extras entram em `requirements.txt`. O mesmo
+caderno em R vem em `analise.R`: abra no RStudio, escolha *Session → Set
+Working Directory → To Source File Location* e rode.
 
 ### Abrir um `.TAB` do TabWin 4.15
 
