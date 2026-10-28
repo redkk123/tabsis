@@ -12,8 +12,8 @@ android {
         // Android 10: salvar em Downloads (MediaStore) sem pedir permissão de armazenamento.
         minSdk = 29
         targetSdk = 36
-        versionCode = 9
-        versionName = "1.0.7"
+        versionCode = 10
+        versionName = "1.0.8"
     }
 
     // Chave de release fora do repositório: caminho e senhas vêm do ambiente

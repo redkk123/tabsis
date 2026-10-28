@@ -19,7 +19,7 @@ o padrão — porque um padrão invisível é uma armadilha, não uma conveniên
 - [9. As abas de resultado: Tabela, Gráfico, Mapa, Estatística, Comparar, Investigar, Consulta, Auditoria](#9-as-abas-de-resultado)
 - [10. Microdados: receita e recortes](#10-microdados-receita-e-recortes)
 - [11. Python, R e cadernos-modelo](#11-python-r-e-cadernos-modelo)
-- [12. Relatório e impressão](#12-relatorio-e-impressao)
+- [12. Relatório e impressão (e o relatório epidemiológico em HTML)](#12-relatorio-e-impressao)
 - [13. Salvar e reabrir](#13-salvar-e-reabrir)
 - [14. Editor de CNV e Inspetor de DEF](#14-editor-de-cnv-e-inspetor-de-def)
 - [15. O que o programa promete e o que não promete](#15-o-que-o-programa-promete-e-o-que-nao-promete)
@@ -862,7 +862,10 @@ com o script Python que fez o resumo.
 7. **Relatório.** Toque em **Relatório**, escolha o foco dos mapas e marque
    *um mapa por período*: sai a página com a tabela, o mapa e um mapa por
    ano, pronta para imprimir ou salvar em PDF.
-8. **Guardar.** Em *Análises e tabelas salvas*, **Salvar análise** grava a receita
+8. **Relatório epidemiológico.** Com a receita pronta (Caso novo, Forma
+   cutânea e DF e Entorno), toque em **Relatório epidemiológico (HTML)**: em
+   cerca de um minuto sai o mesmo resumo, num arquivo só (veja a seção 12.1).
+9. **Guardar.** Em *Análises e tabelas salvas*, **Salvar análise** grava a receita
    (com as etapas desligadas). Reaberta com os arquivos de outro ano, ela
    refaz tudo.
 
@@ -995,6 +998,46 @@ Android, que também salva em PDF.
 Outras impressões: **Imprimir** na aba Tabela (a tabela inteira, mesmo a parte
 que a rolagem esconde), **Imprimir** no Gráfico e **Baixar imagem** no Mapa (PNG
 com título, lugar, período, legenda e fonte).
+
+### 12.1 Relatório epidemiológico (HTML)
+
+Na receita (aba **Microdados**), **Relatório epidemiológico (HTML)** baixa um
+**arquivo HTML único**, no desenho do resumo da leishmaniose, para qualquer
+agravo. Abre em qualquer navegador, sem internet, e vai por e-mail ou
+WhatsApp como um anexo comum. No app Android ele vai para *Downloads/TabSis* e
+abre no navegador do aparelho.
+
+A receita é a **definição de caso**; a etapa de **município de residência**
+(DF e Entorno, por exemplo) é a **região**. Sem essa etapa, vale o estado
+escolhido no *Recorte* do mapa; sem nenhum dos dois, o relatório traz só o
+Brasil. O ano é o de cada arquivo (abra os arquivos com o nome do DATASUS,
+LTANBR16, LTANBR17…), e a população vem do IBGE (precisa de internet na hora de
+gerar).
+
+O que vem nele:
+
+- **Números do topo:** casos e coeficiente médio no Brasil e na região (na
+  RIDE-DF, também o DF e o Entorno, e quantos casos do DF se infectaram no
+  próprio município);
+- **Mapa** do coeficiente médio por município da região, com os vizinhos de
+  fundo e o contorno dos estados; toque num município para ver casos,
+  coeficiente e infecções;
+- **Onde a infecção acontece** (pelo município provável de infecção, quando o
+  arquivo tem COMUNINF) e a **tendência** (variação percentual anual com
+  IC95%, pela regressão do logaritmo do coeficiente; a tabela traz também
+  Prais-Winsten);
+- **Gráfico** e **tabela por ano** (casos e coeficiente de cada grupo, a fonte
+  da população de cada ano, o total e a variação anual);
+- **Municípios**, do maior para o menor coeficiente;
+- **Perfil** (sexo, faixa etária, raça/cor, escolaridade, critério,
+  autoctonia…) em porcentagem, um grupo por coluna;
+- **Como foi feito:** arquivos, definição de caso com os valores e o que
+  querem dizer, região, população e as contas.
+
+Conferência com a leishmaniose (seção 10.4): Brasil 131.581 casos, 6,30 por
+100 mil, variação −5,1% ao ano (−8,8 a −1,3); DF e Entorno 1.246 (2,70); DF 265
+(0,89), com 7,5% de casos autóctones; Entorno 981 (5,97); 57,8% das infecções
+da região em Niquelândia, Alto Paraíso de Goiás e Cavalcante.
 
 ---
 
