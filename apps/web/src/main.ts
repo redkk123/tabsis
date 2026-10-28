@@ -8848,7 +8848,7 @@ async function baixarPeloComputador(
           ? `${job.filename} na fila do TabSis Local (um arquivo de cada vez)…`
           : `Baixando ${job.filename} pelo TabSis Local… ${job.totalBytes
             ? `${Math.min(100, Math.round(job.receivedBytes / job.totalBytes * 100))}% · ${formatBytes(job.receivedBytes)} / ${formatBytes(job.totalBytes)}`
-            : formatBytes(job.receivedBytes)}`);
+            : formatBytes(job.receivedBytes)}${(job.attempts ?? 1) > 1 ? ` · a conexão caiu, continuando de onde parou (tentativa ${job.attempts})` : ''}`);
       }
     } finally {
       signal?.removeEventListener('abort', aoCancelar);

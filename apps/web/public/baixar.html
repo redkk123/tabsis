@@ -53,7 +53,7 @@ code { background: var(--soft); padding: 1px 5px; border-radius: 4px; font-size:
     <a href="./">← Voltar ao TabSis</a>
     <h1>Baixar o TabSis</h1>
     <p>O mesmo TabSis em três lugares. Os microdados ficam sempre no seu aparelho.</p>
-    <p class="versao">Versão atual: <strong>1.0.9</strong> (28/10/2026) · <a href="https://github.com/redkk123/tabsis/releases/latest">o que mudou</a></p>
+    <p class="versao">Versão atual: <strong>1.0.10</strong> (28/10/2026) · <a href="https://github.com/redkk123/tabsis/releases/latest">o que mudou</a></p>
   </div>
 </header>
 <main>
@@ -77,6 +77,7 @@ code { background: var(--soft); padding: 1px 5px; border-radius: 4px; font-size:
       <ul>
         <li>Abre vários arquivos de uma vez (no seletor, toque e segure o primeiro).</li>
         <li>Já traz o TabSis Local: baixa direto do FTP do DATASUS para <code>Downloads/TabSis</code>, um arquivo de cada vez, e reabre de lá sem baixar de novo.</li>
+        <li>Baixa em segundo plano (tela apagada ou outro app, com o progresso na notificação) e, se a conexão cair, continua de onde parou.</li>
         <li>Salva tabelas, relatórios e arquivos em <code>Downloads/TabSis</code>.</li>
       </ul>
       <div class="botoes"><a class="botao" href="https://github.com/redkk123/tabsis/releases/latest/download/TabSis-android.apk">Baixar o APK</a></div>
@@ -103,8 +104,8 @@ code { background: var(--soft); padding: 1px 5px; border-radius: 4px; font-size:
       <thead><tr><th></th><th>Navegador</th><th>Com o TabSis Local no computador</th><th>App Android</th></tr></thead>
       <tbody>
         <tr><th>Quem baixa</th><td>A própria página.</td><td>O TabSis Local, no seu computador. A página só pede e depois abre o arquivo.</td><td>O próprio app, por baixo da página, já ligado.</td></tr>
-        <tr><th>Se a conexão cair</th><td><span class="aviso">Recomeça do zero.</span> O navegador tem prazos e pode suspender uma aba parada, então um arquivo de centenas de MB às vezes não chega.</td><td><span class="sim">Continua de onde parou</span> na próxima tentativa.</td><td>Recomeça o arquivo. Se o FTP não responder (tem rede que bloqueia), tenta pelo caminho do navegador.</td></tr>
-        <tr><th>Vários arquivos</th><td>Um depois do outro, com a página aberta.</td><td><span class="sim">Uma fila, um de cada vez, em segundo plano.</span> Continua mesmo se você fechar a página.</td><td><span class="sim">Uma fila, um de cada vez,</span> com o app aberto.</td></tr>
+        <tr><th>Se a conexão cair</th><td><span class="aviso">Recomeça do zero.</span> O navegador tem prazos e pode suspender uma aba parada, então um arquivo de centenas de MB às vezes não chega.</td><td><span class="sim">Continua de onde parou</span> na próxima tentativa.</td><td><span class="sim">Continua de onde parou</span>, sozinho, até 6 tentativas. Se o FTP não responder (tem rede que bloqueia), tenta pelo caminho do navegador.</td></tr>
+        <tr><th>Vários arquivos</th><td>Um depois do outro, com a página aberta.</td><td><span class="sim">Uma fila, um de cada vez, em segundo plano.</span> Continua mesmo se você fechar a página.</td><td><span class="sim">Uma fila, um de cada vez, em segundo plano:</span> continua com a tela apagada ou em outro app, com o progresso na notificação.</td></tr>
         <tr><th>Onde o arquivo fica</th><td>Guardado dentro do navegador (some se você limpar os dados do site).</td><td>Numa pasta comum do computador (<code>Downloads/TabSis</code>), que TabWin, R, Python ou Excel também abrem.</td><td>Em <code>Downloads/TabSis</code> no celular, que outros apps também abrem.</td></tr>
         <tr><th>Portal do DATASUS fora do ar</th><td>Busca e baixa pelo FTP oficial, por um intermediário na nuvem.</td><td>Busca e baixa direto do FTP oficial, sem intermediário.</td><td>Baixa direto do FTP oficial, sem intermediário.</td></tr>
         <tr><th>Abrir de novo</th><td>"Downloads recentes", enquanto o navegador guardar.</td><td>"No computador", sem baixar de novo, um ou vários juntos.</td><td>"No aparelho", sem baixar de novo.</td></tr>

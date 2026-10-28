@@ -214,8 +214,13 @@ Excel também abrem. Ele existe em dois lugares:
   conexão cair. Funciona sozinho também: escolha sistema, tipo, anos e UF na
   janela dele e clique em *Procurar e baixar*.
 - **No app Android:** já vem dentro do app e se liga sozinho. Os arquivos vão
-  para `Downloads/TabSis` do celular. Se o FTP não responder (tem rede que
-  bloqueia), o download tenta pelo caminho de sempre, pelo navegador.
+  para `Downloads/TabSis` do celular. O download **continua em segundo plano**
+  — com a tela apagada ou em outro app —, com o progresso na barra de
+  notificações (no primeiro download o Android pergunta se o TabSis pode
+  mostrar notificações; sem elas o download segue igual, só sem o aviso). Se a
+  conexão cair, ele **continua de onde parou** (até 6 tentativas). Se o FTP não
+  responder de jeito nenhum (tem rede que bloqueia), o download tenta pelo
+  caminho de sempre, pelo navegador.
 
 Com ele ligado, a busca no DATASUS ganha:
 

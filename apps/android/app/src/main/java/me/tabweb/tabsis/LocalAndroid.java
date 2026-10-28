@@ -7,6 +7,7 @@ import android.content.Context;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Environment;
+import android.os.ParcelFileDescriptor;
 import android.provider.MediaStore;
 
 import org.json.JSONArray;
@@ -16,12 +17,14 @@ import org.json.JSONObject;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
+import java.nio.channels.FileChannel;
 import java.net.HttpURLConnection;
 import java.net.InetSocketAddress;
 import java.net.Socket;
@@ -89,6 +92,8 @@ final class LocalAndroid {
         volatile String salvoComo;
         volatile Long terminada;
         volatile boolean cancelar;
+        /** Quantas vezes a conexão foi aberta (a primeira conta). */
+        volatile int tentativas = 1;
 
         Tarefa(String url, String nome) { this.url = url; this.nome = nome; }
 
@@ -96,11 +101,61 @@ final class LocalAndroid {
             JSONObject o = new JSONObject();
             o.put("id", id).put("url", url).put("filename", salvoComo != null ? salvoComo : nome).put("status", status)
                     .put("receivedBytes", recebidos).put("totalBytes", total == null ? JSONObject.NULL : total)
-                    .put("bytesPerSecond", velocidade == null ? JSONObject.NULL : velocidade).put("attempts", 1)
+                    .put("bytesPerSecond", velocidade == null ? JSONObject.NULL : velocidade).put("attempts", tentativas)
                     .put("startedAt", iso(iniciada)).put("finishedAt", terminada == null ? JSONObject.NULL : iso(terminada))
                     .put("error", erro == null ? JSONObject.NULL : erro)
                     .put("path", "done".equals(status) && caminho != null ? caminho : JSONObject.NULL);
             return o;
+        }
+    }
+
+    /** Quantas vezes tenta de novo quando a conexão cai, continuando de onde parou. */
+    private static final int TENTATIVAS = 6;
+    private static final long[] ESPERA_MS = { 2_000, 5_000, 10_000, 20_000, 30_000 };
+
+    /** O que vale para o arquivo inteiro (não existe, maior que 1 GB…): tentar de novo não adianta. */
+    static final class Definitivo extends IOException {
+        Definitivo(String motivo) { super(motivo); }
+    }
+
+    /** O mesmo objeto para a tela e para o serviço que segura os downloads em segundo plano. */
+    private static volatile LocalAndroid instancia;
+
+    static LocalAndroid instancia() { return instancia; }
+
+    /** Para a notificação: o arquivo em andamento, ou null se a fila está parada. */
+    static final class Situacao {
+        final String nome; final long recebidos; final Long total; final int naFila; final int tentativa;
+        Situacao(String nome, long recebidos, Long total, int naFila, int tentativa) {
+            this.nome = nome; this.recebidos = recebidos; this.total = total; this.naFila = naFila; this.tentativa = tentativa;
+        }
+    }
+
+    /** O que terminou desde a última pergunta (para a notificação final). */
+    private final List<String> concluidos = new ArrayList<>();
+    private final List<String> falhos = new ArrayList<>();
+
+    Situacao situacao() {
+        synchronized (tarefas) {
+            Tarefa atual = null;
+            int naFila = 0;
+            for (Tarefa t : tarefas.values()) {
+                if ("downloading".equals(t.status)) atual = t;
+                else if ("pending".equals(t.status)) naFila++;
+            }
+            if (atual == null && naFila == 0) return null;
+            if (atual == null) return new Situacao("", 0, null, naFila, 1);
+            return new Situacao(atual.nome, atual.recebidos, atual.total, naFila, atual.tentativas);
+        }
+    }
+
+    /** Os nomes concluídos e os que falharam desde a última chamada; esvazia as listas. */
+    String[][] terminadosDesdeAUltima() {
+        synchronized (tarefas) {
+            String[][] r = { concluidos.toArray(new String[0]), falhos.toArray(new String[0]) };
+            concluidos.clear();
+            falhos.clear();
+            return r;
         }
     }
 
@@ -111,6 +166,7 @@ final class LocalAndroid {
 
     LocalAndroid(Context contexto) {
         this.contexto = contexto.getApplicationContext();
+        instancia = this;
     }
 
     private static String iso(long instante) {
@@ -238,6 +294,8 @@ final class LocalAndroid {
             tarefas.put(nova.id, nova);
         }
         fila.execute(() -> baixar(nova));
+        // Segura o processo vivo com a tela apagada ou o app em segundo plano, com o progresso na notificação.
+        DownloadsEmSegundoPlano.comecar(contexto);
         return nova;
     }
 
@@ -261,10 +319,33 @@ final class LocalAndroid {
             valores.put(MediaStore.Downloads.IS_PENDING, 1);
             destino = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, valores);
             if (destino == null) throw new IOException("o Android não criou o arquivo em Downloads");
-            try (OutputStream saida = resolver.openOutputStream(destino)) {
-                if (saida == null) throw new IOException("sem acesso a Downloads");
-                if ("ftp".equals(url.getScheme())) baixarFtp(url, tarefa, saida);
-                else baixarHttps(url, tarefa, saida);
+            ParcelFileDescriptor descritor = resolver.openFileDescriptor(destino, "rw");
+            if (descritor == null) throw new IOException("sem acesso a Downloads");
+            // Um descritor de leitura e escrita: dá para voltar ao começo se o servidor não aceitar continuar.
+            try (FileOutputStream saida = new ParcelFileDescriptor.AutoCloseOutputStream(descritor)) {
+                FileChannel canal = saida.getChannel();
+                // A conexão caiu no meio: espera um pouco e pede só o que falta (REST no FTP, Range no HTTPS).
+                for (int tentativa = 1; ; tentativa++) {
+                    tarefa.tentativas = tentativa;
+                    try {
+                        if ("ftp".equals(url.getScheme())) baixarFtp(url, tarefa, canal);
+                        else baixarHttps(url, tarefa, canal);
+                        if (tarefa.total != null && tarefa.recebidos < tarefa.total) {
+                            throw new IOException("a conexão caiu com " + tarefa.recebidos + " de " + tarefa.total + " bytes");
+                        }
+                        break;
+                    } catch (CanceladoException | Definitivo e) {
+                        throw e;
+                    } catch (IOException e) {
+                        if (tentativa >= TENTATIVAS) throw new IOException(e.getMessage() + " (depois de " + tentativa + " tentativas)");
+                        long ate = System.currentTimeMillis() + ESPERA_MS[Math.min(tentativa - 1, ESPERA_MS.length - 1)];
+                        while (System.currentTimeMillis() < ate) {
+                            if (tarefa.cancelar) throw new CanceladoException();
+                            try { Thread.sleep(250); } catch (InterruptedException parar) { throw new CanceladoException(); }
+                        }
+                    }
+                }
+                saida.getFD().sync();
             }
             if (tarefa.total != null && tarefa.recebidos != tarefa.total) {
                 throw new IOException("veio " + tarefa.recebidos + " de " + tarefa.total + " bytes; tente de novo");
@@ -279,34 +360,47 @@ final class LocalAndroid {
             resolver.update(destino, valores, null, null);
             tarefa.salvoComo = nomeGuardado(destino, tarefa.nome);
             tarefa.caminho = "Downloads/TabSis/" + tarefa.salvoComo;
+            // Antes do status: o serviço só olha os concluídos depois que a fila fica parada.
+            synchronized (tarefas) { concluidos.add(tarefa.salvoComo); }
             tarefa.status = "done";
         } catch (CanceladoException e) {
             tarefa.status = "cancelled";
             if (destino != null) resolver.delete(destino, null, null);
         } catch (Exception e) {
-            tarefa.status = "failed";
             tarefa.erro = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
             if (destino != null) resolver.delete(destino, null, null);
+            synchronized (tarefas) { falhos.add(tarefa.nome); }
+            tarefa.status = "failed";
         } finally {
             tarefa.terminada = System.currentTimeMillis();
         }
     }
 
+    /** Volta o arquivo para o começo: o servidor não aceitou continuar de onde parou. */
+    private static void recomecar(FileChannel canal, Tarefa tarefa) throws IOException {
+        canal.truncate(0);
+        canal.position(0);
+        tarefa.recebidos = 0;
+    }
+
     private static final class CanceladoException extends IOException {}
 
-    private static void copiar(InputStream entrada, OutputStream saida, Tarefa tarefa) throws IOException {
+    private static void copiar(InputStream entrada, FileChannel canal, Tarefa tarefa) throws IOException {
         long inicio = System.currentTimeMillis();
+        long desdeOInicio = 0;
         byte[] buffer = new byte[256 * 1024];
+        canal.position(tarefa.recebidos);
         for (int lidos; (lidos = entrada.read(buffer)) > 0; ) {
             if (tarefa.cancelar) throw new CanceladoException();
-            saida.write(buffer, 0, lidos);
+            canal.write(java.nio.ByteBuffer.wrap(buffer, 0, lidos));
             tarefa.recebidos += lidos;
-            if (tarefa.recebidos > MAXIMO) throw new IOException("arquivo maior que 1 GB");
-            tarefa.velocidade = tarefa.recebidos * 1000 / Math.max(1, System.currentTimeMillis() - inicio);
+            desdeOInicio += lidos;
+            if (tarefa.recebidos > MAXIMO) throw new Definitivo("arquivo maior que 1 GB");
+            tarefa.velocidade = desdeOInicio * 1000 / Math.max(1, System.currentTimeMillis() - inicio);
         }
     }
 
-    private static void baixarHttps(URI url, Tarefa tarefa, OutputStream saida) throws IOException {
+    private static void baixarHttps(URI url, Tarefa tarefa, FileChannel canal) throws IOException {
         HttpURLConnection conexao = null;
         // Redirecionamento só é seguido se o destino também estiver na lista do que é permitido.
         for (int saltos = 0; ; saltos++) {
@@ -315,24 +409,34 @@ final class LocalAndroid {
             conexao.setReadTimeout(60_000);
             conexao.setInstanceFollowRedirects(false);
             conexao.setRequestProperty("User-Agent", "TabSis-Android");
+            if (tarefa.recebidos > 0) conexao.setRequestProperty("Range", "bytes=" + tarefa.recebidos + "-");
             int codigo = conexao.getResponseCode();
             if (codigo / 100 != 3) break;
             String destino = conexao.getHeaderField("Location");
             conexao.disconnect();
-            if (destino == null || saltos >= 5) throw new IOException("o DATASUS redirecionou sem destino válido");
+            if (destino == null || saltos >= 5) throw new Definitivo("o DATASUS redirecionou sem destino válido");
             try {
                 url = validarUrl(url.resolve(destino).toString());
             } catch (Recusado e) {
-                throw new IOException("o DATASUS redirecionou para um endereço fora da lista: " + destino);
+                throw new Definitivo("o DATASUS redirecionou para um endereço fora da lista: " + destino);
             }
         }
         try {
             int codigo = conexao.getResponseCode();
-            if (codigo != 200) throw new IOException("o DATASUS respondeu HTTP " + codigo);
             long tamanho = conexao.getContentLengthLong();
-            tarefa.total = tamanho >= 0 ? tamanho : null;
+            if (codigo == 206 && tarefa.recebidos > 0) {
+                // Continua: o tamanho que veio é só o que falta.
+                if (tamanho >= 0) tarefa.total = tarefa.recebidos + tamanho;
+            } else if (codigo == 200) {
+                if (tarefa.recebidos > 0) recomecar(canal, tarefa);
+                tarefa.total = tamanho >= 0 ? tamanho : null;
+            } else if (codigo / 100 == 4) {
+                throw new Definitivo("o DATASUS respondeu HTTP " + codigo);
+            } else {
+                throw new IOException("o DATASUS respondeu HTTP " + codigo);
+            }
             try (InputStream entrada = conexao.getInputStream()) {
-                copiar(entrada, saida, tarefa);
+                copiar(entrada, canal, tarefa);
             }
         } finally {
             conexao.disconnect();
@@ -340,7 +444,7 @@ final class LocalAndroid {
     }
 
     /** FTP anônimo, passivo e binário: o mínimo para o RETR de um arquivo do DATASUS. */
-    private static void baixarFtp(URI url, Tarefa tarefa, OutputStream saida) throws IOException {
+    private static void baixarFtp(URI url, Tarefa tarefa, FileChannel canal) throws IOException {
         String caminho = url.getPath();
         try (Socket controle = new Socket()) {
             controle.connect(new InetSocketAddress(FTP_HOST, 21), 30_000);
@@ -361,7 +465,12 @@ final class LocalAndroid {
             if (resposta.startsWith("213")) {
                 try { tarefa.total = Long.parseLong(resposta.substring(4).trim()); } catch (NumberFormatException ignorado) { tarefa.total = null; }
             } else if (resposta.startsWith("550")) {
-                throw new IOException("o arquivo não está no FTP do DATASUS");
+                throw new Definitivo("o arquivo não está no FTP do DATASUS");
+            }
+            if (tarefa.recebidos > 0) {
+                // Continua de onde parou; se o servidor não aceitar, recomeça o arquivo.
+                comando(escritor, "REST " + tarefa.recebidos);
+                if (!resposta(leitor).startsWith("350")) recomecar(canal, tarefa);
             }
             comando(escritor, "PASV");
             resposta = resposta(leitor);
@@ -377,10 +486,15 @@ final class LocalAndroid {
                 resposta = resposta(leitor);
                 if (!resposta.startsWith("150") && !resposta.startsWith("125")) throw new IOException("o FTP recusou o arquivo: " + resposta);
                 try (InputStream entrada = dados.getInputStream()) {
-                    copiar(entrada, saida, tarefa);
+                    copiar(entrada, canal, tarefa);
                 }
             }
-            exigir(resposta(leitor), "226");
+            // Com o arquivo inteiro, um "226" que não chega não estraga nada.
+            try {
+                exigir(resposta(leitor), "226");
+            } catch (IOException e) {
+                if (tarefa.total == null || tarefa.recebidos < tarefa.total) throw e;
+            }
             try { comando(escritor, "QUIT"); } catch (IOException ignorado) { /* fechar não pode esconder o resultado */ }
         }
     }
