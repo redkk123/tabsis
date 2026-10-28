@@ -1221,3 +1221,6 @@ dialog p { color: #676d74; font-size: 13px; line-height: 1.6; }
 .receita-config select { min-height: 30px; padding: 4px 6px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); color: var(--ink); max-width: 260px; }
 .receita-etapa[draggable="true"] { cursor: grab; }
 .receita-arrastando { opacity: .5; }
+.receita-modelo { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; }
+.receita-modelo span { color: var(--muted); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; font-weight: 600; }
+.receita-modelo select { min-height: 36px; padding: 6px 9px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); color: var(--ink); max-width: 100%; }

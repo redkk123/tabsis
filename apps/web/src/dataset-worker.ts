@@ -249,10 +249,22 @@ interface CrcRequest {
   requestId: number;
 }
 
+/**
+ * Preenchimento de cada campo, arquivo por arquivo (caderno de qualidade do
+ * dado): registros, em branco e com código de "ignorado", só dos que passam
+ * pelas Seleções. Uma passada pelo arquivo, para todos os campos de uma vez.
+ */
+interface CompletudeRequest {
+  type: 'completude';
+  requestId: number;
+  filters?: FilterSpec[];
+  conversions?: ConversionRegistry;
+}
+
 type DatasetRequest =
   | OpenRequest | AppendRequest | TabulateRequest | CrcRequest
   | NumericProfileRequest | CombinationProfileRequest | DistinctRequest | SelectedDbfRequest
-  | RecordsRequest
+  | RecordsRequest | CompletudeRequest
   | FlowRequest | MicrodatasusCsvRequest | AuditScanRequest | TransformApplyRequest;
 
 const workerScope: Worker = self as unknown as Worker;
@@ -753,6 +765,32 @@ function handle(request: DatasetRequest): void {
         seen: vistos,
         truncated: cortado,
       });
+      return;
+    }
+    case 'completude': {
+      if (!header) throw new Error('Nenhum conjunto de dados aberto');
+      const campos = header.fields.map((field) => field.name);
+      // "Ignorado" no DATASUS: 9, 99, 999, 9999 ou I (sexo). Contado à parte do branco.
+      const ignorado = /^(?:9{1,4}|I)$/;
+      const porFonte = sources.map((source) => ({
+        fonte: source.name, registros: 0,
+        brancos: Object.fromEntries(campos.map((campo) => [campo, 0])) as Record<string, number>,
+        ignorados: Object.fromEntries(campos.map((campo) => [campo, 0])) as Record<string, number>,
+      }));
+      streamAll(request.requestId, undefined, (batch, indice) => {
+        const conta = porFonte[indice]!;
+        for (const record of batch.records) {
+          if (request.filters?.length && !matchesFilters(record, request.filters, undefined, request.conversions ?? {})) continue;
+          conta.registros += 1;
+          for (const campo of campos) {
+            const valor = record[campo];
+            const texto = valor === null || valor === undefined ? '' : valor instanceof Date ? 'data' : String(valor).trim();
+            if (texto === '') conta.brancos[campo]! += 1;
+            else if (ignorado.test(texto)) conta.ignorados[campo]! += 1;
+          }
+        }
+      });
+      post({ type: 'completude', requestId: request.requestId, campos, porFonte });
       return;
     }
     case 'distinct': {

@@ -186,8 +186,14 @@ que hoje foi feito à mão no resumo do CONBRASP.
   (2,70), VPA por mínimos quadrados −5,1% (−8,8 a −1,3) e 0,1% (−9,9 a 11,3),
   iguais ao resumo; Prais-Winsten −5,0% (−9,0 a −0,8) e 0,1% (−10,9 a 12,5).
   No caminho, corrigido no Lab (tabwin-lab#2): a saída do R perdia as quebras
-  de linha. Próximos modelos: qualidade do dado, mapa e conglomerados,
-  comparação de regiões.
+  de linha.
+- **Depois (mesmo dia):** **qualidade do dado** (completude por campo e ano,
+  escala de Romero & Cunha; uma passada pelo arquivo no worker) e **mapa e
+  conglomerados** (Bayes empírico global, Moran global e LISA com 999
+  permutações; vizinhança por fronteira tirada do br_municip.MAP). Conferidos
+  com a LTA real. Falta **comparação de regiões** (razão padronizada por
+  idade): precisa da população por faixa etária e município, que a API de
+  agregados do IBGE tem só no Censo; fica para quando houver essa fonte.
 
 ### Fase 4 — Compartilhar e reproduzir
 
