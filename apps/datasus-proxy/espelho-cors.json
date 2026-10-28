@@ -1,0 +1,13 @@
+{
+  "rules": [
+    {
+      "allowed": {
+        "origins": ["https://tabweb.me", "https://www.tabweb.me", "https://app.tabweb.me", "https://redkk123.github.io"],
+        "methods": ["GET", "HEAD"],
+        "headers": ["Range"]
+      },
+      "exposeHeaders": ["ETag", "Content-Range", "Content-Length", "Accept-Ranges"],
+      "maxAgeSeconds": 86400
+    }
+  ]
+}

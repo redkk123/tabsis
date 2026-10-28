@@ -787,6 +787,7 @@ dialog p { color: #676d74; font-size: 13px; line-height: 1.6; }
 .values-table td:first-child, .values-table td:last-child { cursor: default; }
 .values-table input[type="checkbox"] { width: 18px; height: 18px; }
 .values-table .numeric { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.values-table td:nth-child(3) { text-align: left; }
 .values-table .values-code { font-family: ui-monospace, "Cascadia Mono", "Consolas", monospace; white-space: nowrap; }
 .values-table tbody tr:hover { background: var(--surface-2, rgba(0,0,0,.03)); }
 .values-examples { margin-top: 14px; }

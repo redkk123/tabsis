@@ -3114,6 +3114,46 @@ test('mapa: lugar de infecção, separar por uma variável e pintar a porcentage
   await expect(page.locator('#map-message')).toContainText('município provável de infecção');
 });
 
+test('CNES: nome do estabelecimento na Microdados e um ponto por estabelecimento no mapa', async ({ page }) => {
+  // O cadastro vem do espelho, conferido pelo hash do manifesto do site; aqui os dois são simulados.
+  const { createHash } = await import('node:crypto');
+  const cadastro = JSON.stringify([
+    ['0010456', 'HOSPITAL TESTE A', '530010', -15.79, -47.88],
+    ['2649527', 'UBS TESTE B', '530010', -15.83, -48.05],
+    ['3000001', 'SEM COORDENADA', '530010', null, null],
+  ]);
+  const sha256 = createHash('sha256').update(cadastro).digest('hex');
+  await page.route('**/cnes.json', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({
+    schema: 'tabsis.cnes', version: 1, baseUrl: 'https://pub-41df939070d7465a8513416a16be8f88.r2.dev', fonte: 'CNES (teste)', dataDaFonte: '2025-06-11',
+    campos: ['cnes', 'nome', 'municipio', 'latitude', 'longitude'], ufs: { 53: { registros: 3, bytes: cadastro.length, bytesComprimidos: 0, sha256 } },
+  }) }));
+  await page.route('https://pub-41df939070d7465a8513416a16be8f88.r2.dev/cnes/53.json', (route) => route.fulfill({ contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: cadastro }));
+
+  const { writeDbf } = await import('../dist/packages/export/src/dbf-writer.js');
+  const campo = (name: string, length: number) => ({ name, type: 'C', length, decimalCount: 0 });
+  const linhas = [['0010456', 'M'], ['0010456', 'F'], ['0010456', 'M'], ['2649527', 'F'], ['3000001', 'M']]
+    .map(([ID_UNIDADE, CS_SEXO]) => ({ ID_MN_RESI: '530010', ID_UNIDADE, CS_SEXO }));
+  await page.goto('/');
+  await page.locator('#file-input').setInputFiles({ name: 'LTANBR23.dbf', mimeType: 'application/octet-stream', buffer: Buffer.from(writeDbf(linhas, [campo('ID_MN_RESI', 6), campo('ID_UNIDADE', 7), campo('CS_SEXO', 1)])) });
+  await expect(page.locator('#run-button')).toBeEnabled();
+  await page.locator('#analysis-form').evaluate((form: HTMLFormElement) => form.requestSubmit());
+  await expect(page.locator('#result-table tbody')).toBeVisible();
+
+  // Microdados: o código ganha o nome, e a busca acha pelo nome.
+  await page.locator('[data-view="microdata"]').click();
+  await page.locator('#case-field').selectOption('ID_UNIDADE');
+  await expect(page.locator('#values-table tbody tr').first()).toContainText('HOSPITAL TESTE A');
+  await page.locator('#values-filter').fill('teste b');
+  await expect(page.locator('#values-table tbody tr')).toHaveCount(1);
+  await expect(page.locator('#values-table tbody tr')).toContainText('2649527');
+
+  // Mapa: um ponto por estabelecimento com coordenada; o que fica de fora é dito.
+  await page.locator('[data-view="map"]').click();
+  await expect(page.locator('#map-cnes-label')).toBeVisible({ timeout: 20000 });
+  await page.locator('#map-cnes-check').check();
+  await expect(page.locator('#map-message')).toContainText('2 estabelecimentos (ID_UNIDADE) com 4 de 5 registros; 1 sem coordenada');
+});
+
 test('taxa por 100 mil: a população aberta no mapa troca contagem por taxa, e desliga de volta', async ({ page }) => {
   await page.goto('/');
   await page.locator('#file-input').setInputFiles([

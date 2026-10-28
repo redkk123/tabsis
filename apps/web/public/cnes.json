@@ -1,0 +1,179 @@
+{
+ "schema": "tabsis.cnes",
+ "version": 1,
+ "baseUrl": "https://pub-41df939070d7465a8513416a16be8f88.r2.dev",
+ "fonte": "Cadastro Nacional de Estabelecimentos de Saúde (CNES), OpenDataSUS, Ministério da Saúde: cnes_estabelecimentos.zip",
+ "dataDaFonte": "2025-06-11",
+ "geradoEm": "2026-10-28T02:02:28.929Z",
+ "campos": [
+  "cnes",
+  "nome",
+  "municipio",
+  "latitude",
+  "longitude"
+ ],
+ "ufs": {
+  "11": {
+   "registros": 6444,
+   "bytes": 435686,
+   "bytesComprimidos": 124733,
+   "sha256": "c60ceffe250a783222a8e517957e2239585da2980a04c0f28575f3f90d5e0bbb"
+  },
+  "12": {
+   "registros": 1844,
+   "bytes": 124925,
+   "bytesComprimidos": 35028,
+   "sha256": "2ad01596ed772205a5e4d838f7e70c3774ed0c79e28385658407722ec3e96ebe"
+  },
+  "13": {
+   "registros": 4182,
+   "bytes": 289175,
+   "bytesComprimidos": 85690,
+   "sha256": "a4086a5f43d05524ad6497a9598daac330eb48c81335412c762940a97558c11f"
+  },
+  "14": {
+   "registros": 1544,
+   "bytes": 105320,
+   "bytesComprimidos": 27675,
+   "sha256": "cffa8faf2783f73cd2223552a76d72289fb2615bfeba91914c60da584190fa5e"
+  },
+  "15": {
+   "registros": 11313,
+   "bytes": 777502,
+   "bytesComprimidos": 229761,
+   "sha256": "bf3e44d5c7ad694a19822406091f1f4e008badf3dbc04ff59fcddb6e93e91624"
+  },
+  "16": {
+   "registros": 1204,
+   "bytes": 82010,
+   "bytesComprimidos": 24180,
+   "sha256": "f393dafbc5e96f58297ee81423430d3b4550959a730a9aac4020a5052b92463c"
+  },
+  "17": {
+   "registros": 3258,
+   "bytes": 234088,
+   "bytesComprimidos": 63104,
+   "sha256": "16dfdce88223dd816d638c396285df25559409a105f5389cc61347906e3dd569"
+  },
+  "21": {
+   "registros": 8687,
+   "bytes": 604982,
+   "bytesComprimidos": 172014,
+   "sha256": "5d7227165cbb039258ab65def0af66cffca82602e38f07555dbb894f6312a223"
+  },
+  "22": {
+   "registros": 5962,
+   "bytes": 398877,
+   "bytesComprimidos": 119618,
+   "sha256": "7173e2a80c64e26dd20ec416536214a767cbdaac6a53e8f1c875f28d6c2f309b"
+  },
+  "23": {
+   "registros": 17724,
+   "bytes": 1229788,
+   "bytesComprimidos": 370493,
+   "sha256": "a2c9a15e1f05e86b6b931bf2de7aed55c32a7d812e72dab50933197b2bb84d9b"
+  },
+  "24": {
+   "registros": 7062,
+   "bytes": 493412,
+   "bytesComprimidos": 140218,
+   "sha256": "6a02fce90907fa0ed44056013f0451fab42e9450b8810b9e029576ce010ef809"
+  },
+  "25": {
+   "registros": 9913,
+   "bytes": 716429,
+   "bytesComprimidos": 205904,
+   "sha256": "014ff47c8e6f855a116a63fbfc6dadb298df2661baa828ee5f6aeccfd42c2bbc"
+  },
+  "26": {
+   "registros": 16338,
+   "bytes": 1102638,
+   "bytesComprimidos": 331465,
+   "sha256": "d5386cb89357652dbd044d19621c5d852f5b8c5c99d698b8b9352d9f4399935c"
+  },
+  "27": {
+   "registros": 5074,
+   "bytes": 362913,
+   "bytesComprimidos": 103467,
+   "sha256": "2f6b13a21e8d2c18ab1a3cf76021cc4f48849cf739a9cdb154044da7e087b554"
+  },
+  "28": {
+   "registros": 5444,
+   "bytes": 377570,
+   "bytesComprimidos": 105686,
+   "sha256": "5dd90dc16b5839d4a68e09263bab331fbc716126c8d71806ce88f89c32170cb4"
+  },
+  "29": {
+   "registros": 27315,
+   "bytes": 1855079,
+   "bytesComprimidos": 548814,
+   "sha256": "e556f8df4dcee297ff73f0fa82a96b1916311fa8a43347baa7193ebfd4cb4893"
+  },
+  "31": {
+   "registros": 70624,
+   "bytes": 4957799,
+   "bytesComprimidos": 1520670,
+   "sha256": "a669f6591f339ac5ad518da947306a54ebb561010b9836064e652bd3dbffd226"
+  },
+  "32": {
+   "registros": 12040,
+   "bytes": 823732,
+   "bytesComprimidos": 245378,
+   "sha256": "efcf82e2c5b60ca43dab412c2f952505b0a5d7f8f9b86511550475d69178b30e"
+  },
+  "33": {
+   "registros": 52694,
+   "bytes": 3622115,
+   "bytesComprimidos": 1073536,
+   "sha256": "42d750071f61ef1a75ff48adde42e94d83875ddefa2540ac76d3b4be7e0914a5"
+  },
+  "35": {
+   "registros": 140172,
+   "bytes": 10042435,
+   "bytesComprimidos": 3086008,
+   "sha256": "883037f33573aaabcb2214a765c6c3b4ff8cacd873c82471d36ad33dbd469283"
+  },
+  "41": {
+   "registros": 40105,
+   "bytes": 2742533,
+   "bytesComprimidos": 847040,
+   "sha256": "d4627df6cc6356042bb6dc9006e4a99e41586fbffd1ef10538924c768b262c05"
+  },
+  "42": {
+   "registros": 31968,
+   "bytes": 2193440,
+   "bytesComprimidos": 671221,
+   "sha256": "321495fc91cc0d42a8ed3dcbd7c84d19f52dcfac72a5f1e70d909d5a046409be"
+  },
+  "43": {
+   "registros": 44060,
+   "bytes": 3018642,
+   "bytesComprimidos": 943175,
+   "sha256": "e79f23f57f99eec08e574235ec64463101916e696678646d5b6f0b83e48d7b01"
+  },
+  "50": {
+   "registros": 8546,
+   "bytes": 602047,
+   "bytesComprimidos": 183433,
+   "sha256": "8de473777f995a078bf3c4d52b81b60d45e51db1f948e4292c9d023d2698f00e"
+  },
+  "51": {
+   "registros": 12202,
+   "bytes": 849636,
+   "bytesComprimidos": 251022,
+   "sha256": "522e7bd23483a50b6209cb89773e7c926e00f0805022c83cdf478a47902863a3"
+  },
+  "52": {
+   "registros": 16679,
+   "bytes": 1158996,
+   "bytesComprimidos": 352591,
+   "sha256": "ef0c54dee59190d9745be99b2c77d42d922a40c06dd4947a10bcd32de6d30fd5"
+  },
+  "53": {
+   "registros": 11608,
+   "bytes": 723914,
+   "bytesComprimidos": 190020,
+   "sha256": "7dabcfbe0478d41a3528618e1431bd439a9f06f0e7827bd14ae8b2102505ec30"
+  }
+ }
+}

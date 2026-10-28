@@ -116,6 +116,7 @@ import {
 } from '../../../packages/analysis/src/geographic-fields.ts';
 import { criarAbaConsulta, type AbaConsulta } from './aba-consulta.ts';
 import { criarAbaMicrodados, type AbaMicrodados } from './aba-microdados.ts';
+import { CAMPOS_DE_CNES, carregarCnes, normalizarCnes } from './cnes.ts';
 import { descreverDefinicao, lerDefinicao } from '../../../packages/core/src/definicao-caso.ts';
 import {
   tabulationToTabwinPrn,
@@ -606,6 +607,8 @@ const mapValueColumn = element<HTMLSelectElement>('#map-value-column');
 const mapGeoFieldSelect = element<HTMLSelectElement>('#map-geo-field');
 const mapCrossFieldSelect = element<HTMLSelectElement>('#map-cross-field');
 const mapCrossLabel = element<HTMLElement>('#map-cross-label');
+const mapCnesCheck = element<HTMLInputElement>('#map-cnes-check');
+const mapCnesLabel = element<HTMLElement>('#map-cnes-label');
 const geoFilter = element<HTMLDetailsElement>('#geo-filter');
 const geoFilterCount = element<HTMLElement>('#geo-filter-count');
 const geoFilterInfo = element<HTMLElement>('#geo-filter-info');
@@ -6949,6 +6952,31 @@ function renderMap(): void {
     context.restore();
   }
 
+  // Estabelecimentos (CNES): um ponto por estabelecimento, área proporcional
+  // aos registros. No estado em foco, só os dele.
+  if (mapCnesCheck.checked && mapCnesPontos.length) {
+    const doRecorte = mapUfFilter && mapLevel === 'municipality' && !mapClassic
+      ? mapCnesPontos.filter((ponto) => ponto.municipio.startsWith(mapUfFilter))
+      : mapCnesPontos;
+    const maior = Math.max(1, ...doRecorte.map((ponto) => ponto.registros));
+    context.save();
+    context.fillStyle = 'rgba(196, 55, 38, .55)';
+    context.strokeStyle = 'rgba(255, 255, 255, .95)';
+    context.lineWidth = 1;
+    for (const ponto of mapCnesPontos) ponto.raio = undefined;
+    for (const ponto of doRecorte) {
+      const lugar = project(ponto.longitude, ponto.latitude);
+      ponto.x = lugar.x;
+      ponto.y = lugar.y;
+      ponto.raio = 2.5 + 11 * Math.sqrt(ponto.registros / maior);
+      context.beginPath();
+      context.arc(lugar.x, lugar.y, ponto.raio, 0, Math.PI * 2);
+      context.fill();
+      context.stroke();
+    }
+    context.restore();
+  }
+
   // O mapa deixou de seguir a tabela, então ele precisa dizer o que mostra.
   // Sem isto a pessoa vê um mapa de óbitos por município ao lado de uma tabela
   // por sexo e não tem como saber que são recortes diferentes do mesmo
@@ -6970,13 +6998,14 @@ function renderMap(): void {
     const campoDaTabela = currentPlan?.spec.rows.field ?? '';
     mapMessage.textContent = mapSource === 'tabela' && campoDaTabela
       ? `Mapa da tabela: ${currentRowLabel || friendlyFieldLabel(campoDaTabela)} (${campoDaTabela})${recorteDito}`
-        + ` · ${integerFormat.format(matched)} áreas com dado${colunaDita}. Para mapear outro campo (residência, notificação, hospital), mude as Linhas.`
+        + ` · ${integerFormat.format(matched)} áreas com dado${colunaDita}. Para mapear outro lugar (residência, infecção, notificação, hospital), escolha em Lugar.`
       : mapGeoField
         ? `Mapa por ${mapGeoField.reason} (${mapGeoField.field})${recorteDito}`
           + ` · ${integerFormat.format(matched)} áreas com dado${colunaDita}. A tabela continua como você a montou.`
         : colunaDita
           ? `${integerFormat.format(matched)} áreas com dado${colunaDita}.`
           : '';
+    if (mapCnesCheck.checked && mapCnesResumo) mapMessage.textContent = `${mapMessage.textContent} Pontos: ${mapCnesResumo}`.trim();
     mapMessage.hidden = !mapMessage.textContent;
     // Com o mapa desenhado o texto é legenda, no topo: no meio ele cobria o
     // mapa e engolia o clique e o tooltip.
@@ -7208,6 +7237,83 @@ let mapCrossField = '';
 const MAPA_TOTAL = '__total__';
 /** Prefixo do Valor que pinta a porcentagem de uma coluna no total do lugar. */
 const MAPA_PCT = 'pct:';
+
+/** Campo de CNES do arquivo aberto, se houver. */
+function campoCnesDoArquivo(): string | undefined {
+  return CAMPOS_DE_CNES.find((nome) => dbfHeader?.fields.some((field) => field.name === nome));
+}
+
+interface PontoCnes {
+  cnes: string;
+  nome: string;
+  municipio: string;
+  registros: number;
+  longitude: number;
+  latitude: number;
+  /** Onde foi desenhado (px do canvas), para a dica achar o ponto. */
+  x?: number;
+  y?: number;
+  raio?: number;
+}
+
+/** Estabelecimentos do recorte, com registros e coordenadas, para a camada de pontos. */
+let mapCnesPontos: PontoCnes[] = [];
+let mapCnesAssinatura = '';
+let mapCnesResumo = '';
+
+async function carregarPontosCnes(): Promise<void> {
+  const campo = campoCnesDoArquivo();
+  if (!campo || !mapCnesCheck.checked) return;
+  const assinatura = JSON.stringify([mapInputSignature(), campo]);
+  if (assinatura === mapCnesAssinatura) return;
+  mapCnesAssinatura = assinatura;
+  mapCnesPontos = [];
+  mapCnesResumo = 'Lendo os estabelecimentos…';
+  try {
+    // Os mesmos filtros do mapa: os pontos mostram o mesmo recorte das áreas.
+    const plan = compilarPlano({
+      compatibilityProfile: currentCompatibilityProfile,
+      rows: { field: campo },
+      measure: { kind: 'count' as const },
+      filters: configuredFilters.map(cloneFilter),
+      ...(configuredCrossFieldRules.length ? { crossFieldRules: configuredCrossFieldRules.map(cloneCrossFieldRule) } : {}),
+      suppressZeroRows: true,
+      suppressZeroColumns: false,
+    });
+    const { result } = await askDataset<{ result: TabulationResult; cached: boolean }>(
+      { type: 'tabulate', plan, conversions: conversionsForPlan(plan) },
+      { label: 'Estabelecimentos do mapa' },
+    );
+    const cadastro = await carregarCnes(await ufsDosDados(), (prontas, total) => {
+      mapCnesResumo = `Baixando o cadastro do CNES: ${prontas} de ${total} UF(s)…`;
+      if (currentView === 'map') mapMessage.textContent = mapCnesResumo;
+    });
+    if (assinatura !== mapCnesAssinatura) return;
+    let semCadastro = 0;
+    let semCoordenada = 0;
+    const pontos: PontoCnes[] = [];
+    result.rows.forEach((row, indice) => {
+      const registros = result.cells[indice]?.[0] ?? 0;
+      const cnes = normalizarCnes(row.key);
+      const estabelecimento = cadastro.get(cnes);
+      if (!estabelecimento) { semCadastro += registros; return; }
+      if (estabelecimento.latitude === null || estabelecimento.longitude === null) { semCoordenada += registros; return; }
+      pontos.push({ cnes, nome: estabelecimento.nome, municipio: estabelecimento.municipio, registros, latitude: estabelecimento.latitude, longitude: estabelecimento.longitude });
+    });
+    // Os grandes primeiro: os pequenos ficam por cima e continuam visíveis.
+    mapCnesPontos = pontos.sort((a, b) => b.registros - a.registros);
+    const total = result.cells.reduce((soma, linha) => soma + (linha[0] ?? 0), 0);
+    const faltam = [
+      semCadastro ? `${integerFormat.format(semCadastro)} sem o CNES no cadastro` : '',
+      semCoordenada ? `${integerFormat.format(semCoordenada)} sem coordenada` : '',
+    ].filter(Boolean).join(', ');
+    mapCnesResumo = `${integerFormat.format(pontos.length)} estabelecimentos (${campo}) com ${integerFormat.format(total - semCadastro - semCoordenada)} de ${integerFormat.format(total)} registros${faltam ? `; ${faltam}` : ''}.`;
+  } catch (error) {
+    mapCnesAssinatura = '';
+    mapCnesResumo = `Os estabelecimentos não vieram: ${error instanceof Error ? error.message : String(error)}`;
+  }
+  if (activeMap && currentResult && currentView === 'map') renderMap();
+}
 
 function mapaPctSelecionado(): boolean {
   return mapValueColumn.value.startsWith(MAPA_PCT);
@@ -7556,6 +7662,9 @@ let mapDatePeriods: MapPeriodItem[] = [];
 function mapTimeScales(): Array<{ id: string; label: string }> {
   const escalas: Array<{ id: string; label: string }> = [];
   if (activeDatasetSources.length > 1) escalas.push({ id: 'arquivo', label: 'Arquivos abertos (um período por arquivo)' });
+  // Mês e semana já ocupam as colunas da leitura: com "Separar por" não cabem
+  // os dois, e o mapa de um mês pintaria contagem com o rótulo de porcentagem.
+  if (mapCrossField) return escalas;
   for (const eixo of eixosDeData) {
     if (!eixo.id.startsWith('data:ano:')) escalas.push({ id: eixo.id, label: eixo.label });
   }
@@ -8400,6 +8509,8 @@ async function ensureMap(): Promise<void> {
   }
   if (mapSource === 'proprio') mapLevel = mapGeoField?.level ?? null;
   renderMapCrossOptions();
+  mapCnesLabel.hidden = !campoCnesDoArquivo();
+  void carregarPontosCnes();
   // Estado isolado que a tabela nova não tem não pode ficar valendo.
   if (mapSource === 'tabela' && mapUfFilter && !currentResult.rows.some((row) => belongsToUf(row.key, mapUfFilter))) mapUfFilter = '';
 
@@ -11707,6 +11818,17 @@ function canvasPointer(event: PointerEvent | WheelEvent): { x: number; y: number
 function showMapTooltip(event: PointerEvent): void {
   if (mapDrag) return;
   const point = canvasPointer(event);
+  // Um estabelecimento sob o ponteiro vem antes da área: o ponto está por cima.
+  const estabelecimento = mapCnesCheck.checked
+    ? [...mapCnesPontos].reverse().find((ponto) => ponto.raio !== undefined && Math.hypot((ponto.x ?? 0) - point.x, (ponto.y ?? 0) - point.y) <= ponto.raio + 2)
+    : undefined;
+  if (estabelecimento) {
+    mapTooltip.textContent = `${estabelecimento.nome} · CNES ${estabelecimento.cnes} · ${integerFormat.format(estabelecimento.registros)} registro(s)`;
+    mapTooltip.style.left = `${Math.min(point.x + 12, mapCanvas.clientWidth - 240)}px`;
+    mapTooltip.style.top = `${Math.max(8, point.y - 34)}px`;
+    mapTooltip.hidden = false;
+    return;
+  }
   const object = objectAtCanvasPoint(point.x, point.y);
   if (!object) {
     mapTooltip.hidden = true;
@@ -12306,6 +12428,11 @@ mapGeoFieldSelect.addEventListener('change', () => {
   activeMap = null;
   geoSelection = { states: [], municipalities: [] };
   void ensureMap().then(() => refreshGeoFilter());
+});
+
+mapCnesCheck.addEventListener('change', () => {
+  if (!mapCnesCheck.checked) { if (activeMap && currentResult) renderMap(); return; }
+  void carregarPontosCnes();
 });
 
 mapCrossFieldSelect.addEventListener('change', () => {
@@ -12937,10 +13064,23 @@ abaMicrodados = criarAbaMicrodados({
       registros: result.cells[indice]?.[0] ?? 0,
     }));
   },
-  significados: (campo) => valoresDoDicionario(entradaDoDicionario(campo)?.entry.values),
+  significados: (campo) => {
+    if (!CAMPOS_DE_CNES.includes(campo)) return valoresDoDicionario(entradaDoDicionario(campo)?.entry.values);
+    return ufsDosDados().then((ufs) => carregarCnes(ufs)).then((cadastro) => {
+      // A chave com e sem os zeros da frente: o valor da lista vem como o arquivo grava.
+      const nomes = new Map<string, string>();
+      for (const [cnes, estabelecimento] of cadastro) {
+        nomes.set(cnes, estabelecimento.nome);
+        nomes.set(String(Number(cnes)), estabelecimento.nome);
+      }
+      return nomes;
+    });
+  },
   descricaoDoCampo: (campo) => {
     const achado = entradaDoDicionario(campo);
-    return achado ? `${achado.entry.label}: ${achado.entry.description} (${achado.source})` : '';
+    const texto = achado ? `${achado.entry.label}: ${achado.entry.description} (${achado.source})` : '';
+    if (!CAMPOS_DE_CNES.includes(campo)) return texto;
+    return `${texto}${texto ? ' ' : ''}Nomes dos estabelecimentos: Cadastro Nacional de Estabelecimentos de Saúde (CNES), OpenDataSUS.`;
   },
   valoresAceitos: (campo) => {
     const filtro = configuredFilters.find((filter) => filter.field === campo && filter.kind !== 'code-rules'
@@ -12965,6 +13105,21 @@ abaMicrodados = criarAbaMicrodados({
   },
   aviso: showToast,
 });
+
+/**
+ * As UFs que o arquivo tem, pelo campo de lugar (a mesma leitura do mapa e do
+ * painel "Onde"). Vazio quando não há campo de município: aí o cadastro do
+ * CNES vem inteiro.
+ */
+async function ufsDosDados(): Promise<string[]> {
+  const contagens = await geoCounts().catch(() => null);
+  const ufs = new Set<string>();
+  for (const codigo of contagens?.keys() ?? []) {
+    const uf = ufCodeOf(codigo);
+    if (uf) ufs.add(uf);
+  }
+  return [...ufs];
+}
 
 /** O dicionário oficial do campo, para o arquivo aberto (LTANBR23 → agravo LTAN do SINAN). */
 function entradaDoDicionario(campo: string): ReturnType<typeof datasusFieldEntry> {

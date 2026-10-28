@@ -543,8 +543,37 @@ de cada período numa linha, com o período do mapa em destaque — toque num po
 para ir até ele. O cartão do município traz a mesma linha, só daquele município.
 
 **Arrumação do mapa.** À mostra ficam o que se usa sempre — *Modo do mapa*,
-*Recorte*, o zoom e **Baixar imagem**; cores, número de classes, paleta, campo
-do lugar, sedes, camada de referência e GeoJSON ficam em **Opções do mapa**.
+*Recorte*, **Lugar**, **Separar por**, **Valor**, os estabelecimentos, o zoom
+e **Baixar imagem**; cores, número de classes, paleta, sedes, camada de
+referência e GeoJSON ficam em **Opções do mapa**.
+
+**Lugar.** Qual campo do arquivo define o lugar: residência, **local provável
+de infecção** (`COMUNINF`, no SINAN; é por ele que os cadernos de indicadores
+do Ministério contam casos de doenças como a leishmaniose tegumentar),
+notificação (`ID_MUNICIP`), ocorrência, estabelecimento (SIH e SIA),
+naturalidade. Escolher um lugar diferente das Linhas da tabela faz o mapa ler
+o arquivo por conta própria.
+
+**Separar por e Valor.** Em **Separar por**, escolha uma variável do arquivo
+(forma clínica, sexo, evolução…). Em **Valor**, o mapa pinta a contagem de um
+valor dela, o total, ou a **porcentagem** de um valor no total de cada lugar —
+por exemplo, *% 2 · Mucosa*: a proporção de casos mucosos em cada município,
+sem precisar de população. Os registros em branco contam no total. Somando
+por estado ou por região, a porcentagem é a soma dos casos sobre o total
+(nunca a média das porcentagens), e o gráfico de evolução mostra a
+porcentagem do recorte inteiro. Com Separar por ligado, a faixa Período passa
+por arquivo (ano), não por mês ou semana.
+
+**Estabelecimentos (CNES).** Em arquivos com o código do estabelecimento
+(`ID_UNIDADE` no SINAN, `CNES` no SIH, `CODESTAB` no SIM e no SINASC,
+`PA_CODUNI` no SIA), marque **Estabelecimentos (CNES)**: cada estabelecimento
+vira um ponto no lugar onde ele fica, do tamanho do número de registros dele,
+por cima das cores. Passe o mouse num ponto para ver o nome. A legenda diz
+quantos registros ficaram de fora (CNES fora do cadastro ou sem coordenada).
+Nome e coordenadas vêm do Cadastro Nacional de Estabelecimentos de Saúde
+(OpenDataSUS), baixado só para as UFs do arquivo e conferido pelo hash. Na
+aba **Microdados**, o mesmo cadastro dá o nome de cada estabelecimento ao
+lado do código, e a busca acha pelo nome.
 **Baixar imagem** salva o mapa com título, lugar, período, legenda e fonte.
 Dentro de um estado, **Pintar por** troca a cor de cada município pela da sua
 **região de saúde (CIR)** ou **macrorregião** (a soma da região, ou, em taxa,
