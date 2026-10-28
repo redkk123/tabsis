@@ -6,6 +6,28 @@ o padrão — porque um padrão invisível é uma armadilha, não uma conveniên
 
 ---
 
+## Sumário
+
+- [1. O que é, em uma página](#1-o-que-e-em-uma-pagina)
+- [2. Primeiro uso (e onde usar: site, app Android, TabSis Local)](#2-primeiro-uso)
+- [3. Buscar dados no DATASUS (e o TabSis Local)](#3-buscar-dados-no-datasus)
+- [4. Montar a tabela](#4-montar-a-tabela)
+- [5. Filtros e seleções](#5-filtros-e-selecoes)
+- [6. Limpeza assistida e qualidade](#6-limpeza-assistida-e-qualidade)
+- [7. Transformar dados](#7-transformar-dados)
+- [8. Fórmulas estilo Excel](#8-formulas-estilo-excel)
+- [9. As abas de resultado: Tabela, Gráfico, Mapa, Estatística, Comparar, Investigar, Consulta, Auditoria](#9-as-abas-de-resultado)
+- [10. Microdados: receita e recortes](#10-microdados-receita-e-recortes)
+- [11. Python, R e cadernos-modelo](#11-python-r-e-cadernos-modelo)
+- [12. Relatório e impressão](#12-relatorio-e-impressao)
+- [13. Salvar e reabrir](#13-salvar-e-reabrir)
+- [14. Editor de CNV e Inspetor de DEF](#14-editor-de-cnv-e-inspetor-de-def)
+- [15. O que o programa promete e o que não promete](#15-o-que-o-programa-promete-e-o-que-nao-promete)
+- [16. Problemas comuns](#16-problemas-comuns)
+- [17. Onde procurar mais](#17-onde-procurar-mais)
+
+---
+
 ## 1. O que é, em uma página
 
 O TabSis tabula microdados públicos do DATASUS no navegador, seguindo a
@@ -26,7 +48,7 @@ está aberto.
 ### Quando ele *não* é a ferramenta certa
 
 - Se você precisa de compatibilidade byte a byte com um recurso do TabWin 4.15
-  que ainda não foi verificado contra o programa real. A seção 12 explica como
+  que ainda não foi verificado contra o programa real. A seção 15 explica como
   saber quais são.
 - Se o arquivo é maior do que a memória do aparelho aguenta. **Tabular** lê em
   blocos e não tem essa parede; quem tem é **Extrair DBF original**, que
@@ -62,6 +84,18 @@ tabela sai em `.TAB` para abrir no TabWin.
 Em qualquer dos dois, os arquivos aparecem na barra lateral pelo **nome
 original** — é por ele que as pessoas se entendem — e, logo embaixo, o que cada
 um é: `DOINF23.dbc` → *Óbitos infantis · SIM · Brasil · 2023*.
+
+### Onde usar: site, app Android e TabSis Local
+
+| | O que é | Onde pegar |
+| --- | --- | --- |
+| **Site** | o TabSis inteiro no navegador, em `tabweb.me` | é só abrir |
+| **App Android** | o mesmo TabSis num app (Android 10 ou mais novo), que funciona sem internet para o que já está no celular e já traz o TabSis Local | botão **Baixar** no topo do site |
+| **TabSis Local** | app pequeno para Windows, Linux e macOS que baixa do DATASUS para uma pasta sua, em segundo plano (seção 3) | botão **Baixar** no topo do site |
+
+A página **Baixar** compara os três jeitos de baixar (navegador, TabSis Local no
+computador, app Android). As licenças das peças de terceiros estão em
+**Licenças**, no rodapé da janela *Sobre*.
 
 ---
 
@@ -167,24 +201,36 @@ com os dados, ele fica de fora — **com aviso, nomeando o arquivo e o tamanho**
 navegador. O resto do pacote abre normalmente. A consequência prática de ficar
 sem ele: algum rótulo pode aparecer pelo código em vez do nome.
 
-### Downloader local (opcional)
+### TabSis Local (computador e app Android)
 
-Quando o navegador não consegue concluir um download — instabilidade do
-servidor oficial, tempo esgotado, arquivo muito grande, conexão que cai no meio
-— existe um auxiliar que roda na **sua** máquina e termina o trabalho.
+O **TabSis Local** cuida dos downloads do DATASUS fora da aba do navegador:
+baixa direto do FTP oficial, **um arquivo de cada vez e em segundo plano**, e
+guarda tudo numa pasta comum (`Downloads/TabSis`), que TabWin, R, Python e
+Excel também abrem. Ele existe em dois lugares:
 
-Ele é opcional e **você** quem inicia: a página nunca executa nada sozinha, e
-nem sequer verifica se ele está rodando antes de você pedir. Depois de iniciar
-o auxiliar, cole em **Downloader local** o token que ele imprime e clique em
-**Verificar**. A partir daí, uma falha que ele plausivelmente resolva passa a
-oferecer "Baixar com o downloader local".
+- **No computador** (Windows, Linux e macOS; botão *Baixar* no topo do site):
+  abra o app e clique em **Abrir o TabSis conectado** — o site abre já ligado a
+  ele, sem colar nada. No computador ele também **continua de onde parou** se a
+  conexão cair. Funciona sozinho também: escolha sistema, tipo, anos e UF na
+  janela dele e clique em *Procurar e baixar*.
+- **No app Android:** já vem dentro do app e se liga sozinho. Os arquivos vão
+  para `Downloads/TabSis` do celular. Se o FTP não responder (tem rede que
+  bloqueia), o download tenta pelo caminho de sempre, pelo navegador.
 
-O arquivo vai para o **disco**, não para dentro da aba: uma página não lê
-arquivo do computador sem que você o escolha. O aplicativo diz onde ele caiu, e
-você o abre normalmente pela área "Abra seu arquivo".
+Com ele ligado, a busca no DATASUS ganha:
 
-Instalação, endereços que ele pode acessar e modelo de ameaça estão em
-`apps/tabwin-bridge/README.md`.
+- **Baixar pelo TabSis Local** (marcado): cada arquivo vem pela fila dele, é
+  guardado na pasta e aberto no site;
+- **Guardar uma cópia** de tudo o que você baixar pelo navegador;
+- **Enviar os guardados** deste navegador para a pasta;
+- **No computador** / **No aparelho:** o que está na pasta, para abrir de novo
+  sem baixar.
+
+A página nunca inicia programa nenhum. No computador, o TabSis Local só escuta
+o próprio computador (`127.0.0.1`), só aceita o site do TabSis e pede um código
+que muda a cada vez que ele abre; no Android, ele fala com o site pela ponte
+interna do app, sem abrir porta. Os dois só baixam os arquivos públicos do
+DATASUS.
 
 ---
 
@@ -457,6 +503,8 @@ Duas coisas importantes:
 
 ![Aba de auditoria com o registro de procedência e operações](./manual/12-auditoria.png "De onde vieram os dados e o que foi feito com eles — para reproduzir o resultado depois e explicar como foi obtido.")
 
+### Tabela
+
 **Tabela** — o resultado. Aqui também ficam as operações pós-tabela: totais,
 percentuais, renomear e mover colunas, ordenar, casas decimais, título e
 rodapé.
@@ -486,8 +534,12 @@ manual do curso TabWin de fev/2011):
 
 Valores negativos aparecem em vermelho, como no TabWin.
 
+### Gráfico
+
 **Gráfico** — barras, linhas, pizza e outros, com editor de cores, fontes e
 rótulos. Exporta SVG e PNG.
+
+### Mapa
 
 **Mapa** — mapas temáticos a partir de `.MAP` legado ou GeoJSON, com classes de
 corte, legenda, seleção espacial e fluxos origem–destino.
@@ -506,9 +558,11 @@ só** (ex.: `DENGBR19.dbc` a `DENGBR23.dbc`), ou escolha vários períodos em
 *Buscar no DATASUS*: eles são juntados num conjunto, e a tabela sai uma vez, com
 todos. Na barra lateral, **Arquivos de dados abertos** lista cada arquivo com o
 seu período; o **✕** tira um ano (os outros continuam abertos, nada é baixado de
-novo) e **+ Juntar outro ano ou arquivo** acrescenta mais um. Só se juntam
-arquivos com os mesmos campos (o mesmo sistema em anos ou estados diferentes);
-um que não combina fica de fora, com aviso, e os outros entram. O mapa ganha uma faixa **Período**: um seletor, um **controle
+novo) e **+ Juntar outro ano ou arquivo** acrescenta mais um. Juntam-se arquivos
+do mesmo sistema em anos ou estados diferentes. Campo que só existe em alguns
+anos entra e fica em branco nos outros; campo que mudou de tipo ou tamanho
+entre os anos (o LTANBR25, por exemplo, mudou quatro campos administrativos)
+entra como texto, e o aviso diz quais foram. O mapa ganha uma faixa **Período**: um seletor, um **controle
 deslizante** que passa de ano em ano, o botão **▶ Reproduzir** e uma **barra
 por ano** com o total — clique numa barra para ver aquele ano. A escala de
 cores é **a mesma para todos os anos**, então a cor de um ano se compara com a
@@ -546,6 +600,8 @@ para ir até ele. O cartão do município traz a mesma linha, só daquele munic�
 *Recorte*, **Lugar**, **Separar por**, **Valor**, os estabelecimentos, o zoom
 e **Baixar imagem**; cores, número de classes, paleta, sedes, camada de
 referência e GeoJSON ficam em **Opções do mapa**.
+
+![O mapa da leishmaniose em Goiás pelo município provável de infecção, com os estabelecimentos de saúde como pontos](./manual/20-mapa-variaveis.png "Lugar = local provável de infecção, Recorte = Goiás e os estabelecimentos (CNES) que notificaram, do tamanho dos registros. A legenda diz quantos registros ficaram fora dos pontos.")
 
 **Lugar.** Qual campo do arquivo define o lugar: residência, **local provável
 de infecção** (`COMUNINF`, no SINAN; é por ele que os cadernos de indicadores
@@ -627,6 +683,8 @@ está — e o código nunca se perde: fica entre parênteses (também nas tabela
 exportadas) e é por ele que filtros e mapa casam. Se o DEF já dá nome ao
 código (pela CNV), esse nome é o que vale.
 
+### Estatística, Comparar, Investigar, Consulta, Microdados e Auditoria
+
 **Estatística** — em **Operação** você escolhe: estatística descritiva,
 correlação de Pearson, regressão linear simples, histograma (com gaussiana
 ajustada quando cabe, e dizendo quando **não** cabe), e **Taxas e
@@ -659,6 +717,18 @@ quem conhece o dado.
 > população padrão como uma base e junta com `join`. Assim fica registrado
 > *qual* padrão você usou — o que muda o resultado e precisa constar do método.
 
+**Consulta** — SQL sobre os dados abertos, para o que a tabela não expressa:
+junções, percentis, funções de janela, faixas contínuas. Escolha os campos a
+carregar (num arquivo de 87 campos, carregar todos raramente é o que se quer),
+clique em **Carregar os dados abertos** e escreva `SELECT … FROM …`. O motor
+(DuckDB, cerca de 7 MB) só é baixado quando você carrega. O resultado exporta
+em CSV ou Parquet. Não é o motor da tabela: a tabela do TabWin continua saindo
+do executor de referência.
+
+**Microdados** — o laboratório de microdados sem código: a receita, ver e
+escolher pelos valores, a definição de caso por códigos e os cadernos em R.
+Tem capítulo próprio (seção 10).
+
 **Auditoria** — a procedência: arquivos abertos, hashes SHA-256, origem, hora
 de obtenção, e as etapas aplicadas. É o que você cola no método de um artigo.
 Traz também o histórico de tabulações da sessão, com comparação entre duas
@@ -667,38 +737,16 @@ histórico do TabWin 4.15.
 
 ---
 
-## 10. Salvar e reabrir
+## 10. Microdados: receita e recortes
 
-| Formato | O que guarda |
-| --- | --- |
-| `.twrecipe` (**Salvar análise**) | o plano inteiro: variáveis, filtros, conversões, **e o pipeline de transformação** |
-| `.twtable` (**Salvar tabela**) | o resultado calculado, para reabrir ou comparar |
-| `.DBF` (**Salvar seleção em DBF**) | os registros que passaram nos filtros |
-| CSV / JSON / XLSX / XML | exportação do resultado |
-| **Microdatasus filtrado CSV** | os registros aceitos, no formato que o pacote `microdatasus` do R espera |
-| **Extrair DBF original** | o DBF de dentro do DBC, sem alteração |
-| **Pacote para o Lab** | a tabela mais um `PROVENIENCIA.json` (origem, hash das fontes, filtros e transformações), para analisar no Tabwin Lab |
-| **Abrir no Python** | abre o Laboratório numa aba nova com os microdados da tabela em `/data` e um caderno pandas pronto (até 32 MB) |
-| **Abrir no R** | o mesmo, com um caderno em R base (webR); os dois conferem a tabela refeita com a do TabSis |
-| **Rodar no computador** | um `.zip` com os microdados, o caderno em `.py` e `.ipynb` e um arquivo de dois cliques para Windows, macOS e Linux |
+A aba **Microdados** é o laboratório de microdados **sem código**. Ela tem três partes, de cima para baixo: a
+**receita** (o caminho dos registros, etapa por etapa), **ver e escolher pelos valores** de um campo e a
+**definição de caso por códigos** (CID, faixas, prefixos). Tudo o que se aplica aqui vira uma Seleção comum:
+vale na tabela, no mapa, nas exportações, no relatório e nos cadernos.
 
-A receita carrega o pipeline junto. Sem isso ela reconstruiria uma tabela
-diferente enquanto afirma fidelidade à fonte — e uma receita que mente sobre
-isso é pior que nenhuma receita.
+### 10.1 A receita
 
-### Levar para o Tabwin Lab
-
-O **Pacote para o Lab** é um `.zip` com `dados.csv` e `PROVENIENCIA.json`.
-Existe em vez de um CSV solto por um motivo prático: um CSV sozinho é número
-sem origem — meses depois ninguém sabe qual arquivo do DATASUS o gerou, que
-filtros estavam ativos, nem se a coluna já vinha recodificada. A procedência
-responde isso por escrito, com o hash de cada fonte, para a análise poder ser
-citada.
-
-Célula vazia significa **ausente**. Nenhum zero é fabricado para preencher
-lacuna — nem na exportação, nem na leitura do outro lado.
-
-### Microdados: a receita
+![A receita da leishmaniose: arquivo aberto com 153.302 registros e quatro etapas — caso novo, sem mudança de diagnóstico, forma cutânea e DF e Entorno — até 1.246 registros](./manual/18-microdados-receita.png "Cada etapa diz quantos registros sobram e quantos saíram. As etapas prontas citam a fonte; os botões de cada cartão mostram a amostra, mudam a ordem, desligam e removem.")
 
 No alto da aba **Microdados**, a **receita** mostra o caminho dos registros:
 cada Seleção em vigor é um cartão, na ordem em que é aplicada, com quantos
@@ -722,7 +770,69 @@ Arquivos de anos diferentes às vezes trazem um campo com outro tipo ou
 tamanho (no LTANBR25 o DATASUS mudou quatro campos administrativos). Eles
 juntam assim mesmo: o campo entra como texto, e o aviso diz quais foram.
 
-### Roteiro: a análise da leishmaniose em 15 minutos
+### 10.2 Ver e escolher pelos valores
+
+![Os valores da forma clínica na leishmaniose tegumentar: 1 Cutânea, 2 Mucosa, 9 Ignorada e em branco, com registros e porcentagem; a cutânea marcada](./manual/19-microdados-valores.png "Cada código com o significado tirado do dicionário oficial do SINAN, quantos registros tem e a porcentagem. Marcar e aplicar vira uma Seleção.")
+
+A aba **Microdados** é o laboratório de microdados sem código. A primeira
+parte mostra o que existe dentro do arquivo:
+
+1. Escolha o **Campo**. Aparecem todos os valores que ele tem nos
+   microdados, com quantos registros e a porcentagem de cada um. Quando o
+   TabSis conhece o arquivo (pelo nome, como `LTANBR23.dbc`), cada código
+   vem com o **significado** tirado do dicionário de dados oficial, e o que
+   o campo é aparece logo abaixo da escolha.
+2. **Buscar valor** filtra a lista por código ou significado (num campo de
+   CID há milhares de valores; a lista mostra 300 de cada vez).
+3. **ver**, ao lado de um valor, mostra os primeiros registros do arquivo
+   com esse valor, com todos os campos, para conferir antes de decidir.
+4. Marque os valores que entram (tocar na linha também marca) e use
+   **Aplicar marcados como Seleção**. A tabela, o mapa e as exportações
+   passam a usar só esses registros. Aplicar de novo no mesmo campo troca a
+   Seleção; marcar todos tira o recorte do campo.
+
+Exemplo: na leishmaniose tegumentar (LTAN), a forma cutânea e a mucosa vêm
+no mesmo arquivo. A aba já abre no campo **Forma clínica** (`CLAS_FORMA`):
+1 = Cutânea, 2 = Mucosa, 9 = Ignorada e os registros em branco. Marcar só o
+1 deixa a análise só com a forma cutânea.
+
+### 10.3 Definição de caso por códigos
+
+A segunda parte da aba serve para quando a lista pronta junta coisas
+diferentes e os códigos são muitos. Por exemplo, a "Tripanossomíase" junta a
+doença de Chagas (B57) com a doença do sono (B56).
+
+1. Escolha o **Campo**, no alto da aba (CAUSABAS no SIM, DIAG_PRINC no SIH).
+2. Em **Incluir códigos**, escreva os que entram: `B57`. Um código sem fim
+   pega todos os que começam com ele (`B57` pega B570 a B575); `B570-B572` é
+   uma faixa; separe vários por vírgula. Pontos e minúsculas não importam.
+3. Em **Excluir códigos**, os que ficam de fora, mesmo que caiam no incluir
+   (opcional).
+4. **Ver prévia** mostra quantos registros cada código traz, o que a exclusão
+   tirou e avisa quando um código não aparece no arquivo (provável erro de
+   digitação ou campo errado).
+5. **Aplicar como Seleção** filtra a tabela, o mapa e as exportações. A
+   Seleção aparece como "Caso" na lista de Seleções. Cada campo tem a sua
+   regra: aplicar de novo no mesmo campo troca a anterior; em outro campo,
+   soma (a região no município de residência e o CID na causa, por exemplo).
+
+A Seleção guarda a **regra**, não a lista de códigos que apareceram. Ao
+salvar a análise e reabrir com outros anos, entram também os códigos que só
+existem nesses anos.
+
+**Atalhos:**
+- **RIDE-DF (DF e Entorno):** os 34 municípios da Lei Complementar 163/2018,
+  no município de residência.
+- **Idade (SINAN):** monta a faixa no código de idade do SINAN
+  (`NU_IDADE_N`), em que o primeiro dígito é a unidade. "0 a 9 anos" inclui
+  as idades em horas, dias e meses.
+- **Uma UF:** os 2 primeiros dígitos do código do município (53 = DF,
+  52 = GO).
+
+**Guardar definição** guarda campo e códigos neste navegador, para usar de
+novo com outros anos ou estados.
+
+### 10.4 Roteiro: a análise da leishmaniose em 15 minutos
 
 Refaz, só com cliques, a análise do resumo de leishmaniose tegumentar
 (forma cutânea, DF e Entorno × Brasil, 2016–2025). Os números do fim conferem
@@ -759,12 +869,56 @@ com o script Python que fez o resumo.
 Conferência: Brasil 131.581; DF e Entorno 1.246; DF 265; Entorno 981
 (casos novos da forma cutânea, 2016–2025).
 
-### Cadernos em R
+---
+
+## 11. Python, R e cadernos-modelo
+
+Para quem programa — ou quer o código de uma análise para conferir, citar e refazer —, o TabSis leva os dados
+para o **Laboratório** (`tabweb.me/lab`, Python com Pyodide e R com webR, no próprio navegador) ou para o
+computador. Os botões ficam no grupo *Exportar* da barra lateral; os cadernos-modelo, na receita da aba Microdados.
+
+### 11.1 Abrir no Python, Abrir no R e Rodar no computador
+
+**Abrir no Python** e **Abrir no R** levam os registros da tabela atual (com
+Seleções e transformações aplicadas) para o Laboratório, num caderno que já
+carrega os dados (pandas ou R base) e refaz a tabela. Vão junto:
+
+- **a conferência:** a tabela da tela vai como `tabela-tabsis.csv`, e uma
+  célula refaz a contagem a partir dos microdados e diz **CONFERE** (todas as
+  linhas batem) ou **DIVERGE**, com as linhas diferentes. Aparece quando a
+  tabela é uma contagem de registros sem operação por cima;
+- **a receita em código:** as Seleções em pandas ou em R, comentadas (elas já
+  valem nos dados enviados), para aplicar aos microdados inteiros de outros
+  anos ou estados.
+
+Daí em diante o código é seu: edite e rode. O caderno que estava aberto no Lab
+fica em "Recuperar versão anterior". O limite é o do Lab no navegador, 32 MB
+por arquivo; acima disso, recorte com Seleções ou use **Rodar no computador**.
+
+**Rodar no computador** baixa o mesmo caderno para rodar fora do navegador,
+sem esse limite e sem instalar nada além do Python:
+
+1. Descompacte o `.zip`.
+2. Dê dois cliques em `Rodar no Windows.bat`, `Rodar no Mac.command` ou
+   `rodar-linux.sh`.
+3. Na primeira vez ele prepara um Python só daquela pasta e instala o pandas
+   (precisa de internet nessa hora). Se não houver Python no computador, ele
+   avisa e mostra onde baixar.
+
+O resultado aparece na janela e fica salvo em `resultado-tabela.csv`. Para
+mexer, edite `analise.py` (ou abra `analise.ipynb` no Jupyter, VS Code ou
+Colab) e rode de novo. Pacotes extras entram em `requirements.txt`. O mesmo
+caderno em R vem em `analise.R`: abra no RStudio, escolha *Session → Set
+Working Directory → To Source File Location* e rode.
+
+### 11.2 Cadernos-modelo em R
 
 Na receita, escolha o modelo em **Caderno em R** e toque em **Abrir caderno
 em R**: o Laboratório abre com o caderno pronto e os dados em `/data`. Só R
 base, então roda também no RStudio (troque `/data/` pela pasta dos CSV).
 Clique em **Executar tudo**; na primeira vez o R (webR) é baixado.
+
+![A tendência no caderno em R: Brasil decrescente (Prais-Winsten −5,0%) e DF e Entorno estacionária](./manual/22-caderno-r.png "A célula da tendência do caderno de série e perfil, rodada no Laboratório com a leishmaniose 2016–2025: os mesmos números do resumo.")
 
 **Série temporal e perfil**, sobre os arquivos abertos (um por ano, com o
 nome do DATASUS):
@@ -803,99 +957,65 @@ conglomerados Alto-Alto, Baixo-Baixo e os discrepantes. Na leishmaniose do DF
 e Entorno, 2016–2025: Moran 0,70 (p = 0,001) e conglomerado Alto-Alto em Alto
 Paraíso de Goiás, Cavalcante, Niquelândia e São João d'Aliança.
 
-### Microdados: ver e escolher os registros
+### 11.3 Pacote para o Lab
 
-A aba **Microdados** é o laboratório de microdados sem código. A primeira
-parte mostra o que existe dentro do arquivo:
+O **Pacote para o Lab** é um `.zip` com `dados.csv` e `PROVENIENCIA.json`.
+Existe em vez de um CSV solto por um motivo prático: um CSV sozinho é número
+sem origem — meses depois ninguém sabe qual arquivo do DATASUS o gerou, que
+filtros estavam ativos, nem se a coluna já vinha recodificada. A procedência
+responde isso por escrito, com o hash de cada fonte, para a análise poder ser
+citada.
 
-1. Escolha o **Campo**. Aparecem todos os valores que ele tem nos
-   microdados, com quantos registros e a porcentagem de cada um. Quando o
-   TabSis conhece o arquivo (pelo nome, como `LTANBR23.dbc`), cada código
-   vem com o **significado** tirado do dicionário de dados oficial, e o que
-   o campo é aparece logo abaixo da escolha.
-2. **Buscar valor** filtra a lista por código ou significado (num campo de
-   CID há milhares de valores; a lista mostra 300 de cada vez).
-3. **ver**, ao lado de um valor, mostra os primeiros registros do arquivo
-   com esse valor, com todos os campos, para conferir antes de decidir.
-4. Marque os valores que entram (tocar na linha também marca) e use
-   **Aplicar marcados como Seleção**. A tabela, o mapa e as exportações
-   passam a usar só esses registros. Aplicar de novo no mesmo campo troca a
-   Seleção; marcar todos tira o recorte do campo.
+Célula vazia significa **ausente**. Nenhum zero é fabricado para preencher
+lacuna — nem na exportação, nem na leitura do outro lado.
 
-Exemplo: na leishmaniose tegumentar (LTAN), a forma cutânea e a mucosa vêm
-no mesmo arquivo. A aba já abre no campo **Forma clínica** (`CLAS_FORMA`):
-1 = Cutânea, 2 = Mucosa, 9 = Ignorada e os registros em branco. Marcar só o
-1 deixa a análise só com a forma cutânea.
+---
 
-### Microdados: definição de caso por códigos
+## 12. Relatório e impressão
 
-A segunda parte da aba serve para quando a lista pronta junta coisas
-diferentes e os códigos são muitos. Por exemplo, a "Tripanossomíase" junta a
-doença de Chagas (B57) com a doença do sono (B56).
+![A janela do relatório: título, tabela, gráfico, mapa, um mapa por período e o foco dos mapas](./manual/21-relatorio.png "O que entra no relatório. O foco dos mapas vale só para ele: o mapa da tela continua como estava.")
 
-1. Escolha o **Campo**, no alto da aba (CAUSABAS no SIM, DIAG_PRINC no SIH).
-2. Em **Incluir códigos**, escreva os que entram: `B57`. Um código sem fim
-   pega todos os que começam com ele (`B57` pega B570 a B575); `B570-B572` é
-   uma faixa; separe vários por vírgula. Pontos e minúsculas não importam.
-3. Em **Excluir códigos**, os que ficam de fora, mesmo que caiam no incluir
-   (opcional).
-4. **Ver prévia** mostra quantos registros cada código traz, o que a exclusão
-   tirou e avisa quando um código não aparece no arquivo (provável erro de
-   digitação ou campo errado).
-5. **Aplicar como Seleção** filtra a tabela, o mapa e as exportações. A
-   Seleção aparece como "Caso" na lista de Seleções. Cada campo tem a sua
-   regra: aplicar de novo no mesmo campo troca a anterior; em outro campo,
-   soma (a região no município de residência e o CID na causa, por exemplo).
+**Relatório** (o botão azul ao lado de *Baixar a tabela como*) monta uma página
+pronta para **imprimir ou salvar em PDF** — na janela de impressão, escolha
+*Salvar como PDF*. Escolha o que entra:
 
-A Seleção guarda a **regra**, não a lista de códigos que apareceram. Ao
-salvar a análise e reabrir com outros anos, entram também os códigos que só
-existem nesses anos.
+- **Título** (já vem o da tabela);
+- **Tabela**, como está na tela (com operações, formatação e notas), inteira;
+- **Gráfico** (o da aba Gráfico, se houver);
+- **Mapa**, com título, lugar, período e legenda;
+- **Um mapa por período** (ano, mês…), lado a lado e **na mesma escala de
+  cor**, para comparar os anos;
+- **Foco dos mapas:** *como está no mapa agora*, *Brasil, por estado* ou um
+  estado (por município) — só para o relatório; o mapa da tela volta ao que era.
 
-**Atalhos:**
-- **RIDE-DF (DF e Entorno):** os 34 municípios da Lei Complementar 163/2018,
-  no município de residência.
-- **Idade (SINAN):** monta a faixa no código de idade do SINAN
-  (`NU_IDADE_N`), em que o primeiro dígito é a unidade. "0 a 9 anos" inclui
-  as idades em horas, dias e meses.
-- **Uma UF:** os 2 primeiros dígitos do código do município (53 = DF,
-  52 = GO).
+No fim vai a **procedência**: os arquivos e a data. Na tela nada muda: a página
+do relatório só existe na impressão. No app Android, a impressão abre a tela do
+Android, que também salva em PDF.
 
-**Guardar definição** guarda campo e códigos neste navegador, para usar de
-novo com outros anos ou estados.
+Outras impressões: **Imprimir** na aba Tabela (a tabela inteira, mesmo a parte
+que a rolagem esconde), **Imprimir** no Gráfico e **Baixar imagem** no Mapa (PNG
+com título, lugar, período, legenda e fonte).
 
-### Python e R com os microdados: no navegador ou no computador
+---
 
-**Abrir no Python** e **Abrir no R** levam os registros da tabela atual (com
-Seleções e transformações aplicadas) para o Laboratório, num caderno que já
-carrega os dados (pandas ou R base) e refaz a tabela. Vão junto:
+## 13. Salvar e reabrir
 
-- **a conferência:** a tabela da tela vai como `tabela-tabsis.csv`, e uma
-  célula refaz a contagem a partir dos microdados e diz **CONFERE** (todas as
-  linhas batem) ou **DIVERGE**, com as linhas diferentes. Aparece quando a
-  tabela é uma contagem de registros sem operação por cima;
-- **a receita em código:** as Seleções em pandas ou em R, comentadas (elas já
-  valem nos dados enviados), para aplicar aos microdados inteiros de outros
-  anos ou estados.
+| Formato | O que guarda |
+| --- | --- |
+| `.twrecipe` (**Salvar análise**) | o plano inteiro: variáveis, filtros, conversões, **e o pipeline de transformação** |
+| `.twtable` (**Salvar tabela**) | o resultado calculado, para reabrir ou comparar |
+| `.DBF` (**Salvar seleção em DBF**) | os registros que passaram nos filtros |
+| CSV / JSON / XLSX / XML | exportação do resultado |
+| **Microdatasus filtrado CSV** | os registros aceitos, no formato que o pacote `microdatasus` do R espera |
+| **Extrair DBF original** | o DBF de dentro do DBC, sem alteração |
+| **Pacote para o Lab** | a tabela mais um `PROVENIENCIA.json` (origem, hash das fontes, filtros e transformações), para analisar no Tabwin Lab |
+| **Abrir no Python** | abre o Laboratório numa aba nova com os microdados da tabela em `/data` e um caderno pandas pronto (até 32 MB) |
+| **Abrir no R** | o mesmo, com um caderno em R base (webR); os dois conferem a tabela refeita com a do TabSis |
+| **Rodar no computador** | um `.zip` com os microdados, o caderno em `.py` e `.ipynb` e um arquivo de dois cliques para Windows, macOS e Linux |
 
-Daí em diante o código é seu: edite e rode. O caderno que estava aberto no Lab
-fica em "Recuperar versão anterior". O limite é o do Lab no navegador, 32 MB
-por arquivo; acima disso, recorte com Seleções ou use **Rodar no computador**.
-
-**Rodar no computador** baixa o mesmo caderno para rodar fora do navegador,
-sem esse limite e sem instalar nada além do Python:
-
-1. Descompacte o `.zip`.
-2. Dê dois cliques em `Rodar no Windows.bat`, `Rodar no Mac.command` ou
-   `rodar-linux.sh`.
-3. Na primeira vez ele prepara um Python só daquela pasta e instala o pandas
-   (precisa de internet nessa hora). Se não houver Python no computador, ele
-   avisa e mostra onde baixar.
-
-O resultado aparece na janela e fica salvo em `resultado-tabela.csv`. Para
-mexer, edite `analise.py` (ou abra `analise.ipynb` no Jupyter, VS Code ou
-Colab) e rode de novo. Pacotes extras entram em `requirements.txt`. O mesmo
-caderno em R vem em `analise.R`: abra no RStudio, escolha *Session → Set
-Working Directory → To Source File Location* e rode.
+A receita carrega o pipeline junto. Sem isso ela reconstruiria uma tabela
+diferente enquanto afirma fidelidade à fonte — e uma receita que mente sobre
+isso é pior que nenhuma receita.
 
 ### Abrir um `.TAB` do TabWin 4.15
 
@@ -919,13 +1039,15 @@ suficientes para provar quais campos são estáveis.
 
 ---
 
-## 10.1 Onde ficam as ações secundárias
+## 13.1 Onde ficam as ações secundárias
 
 Para a barra lateral não ser uma pilha de botões de peso igual, as ações que
 não fazem parte do fluxo principal ficam em seções recolhíveis:
 
 - **Baixar os dados abertos** — extrair o DBF original, salvar a seleção em
   DBF, CSV para o `microdatasus`;
+- **Exportar** — Pacote para o Lab, Abrir no Python, Abrir no R e Rodar no
+  computador;
 - **Definições e conversões** — Editor de CNV, Inspetor de DEF e Gerar DEF;
 - **Análises e tabelas salvas** — abrir e salvar receitas e tabelas.
 
@@ -933,7 +1055,7 @@ Nada foi removido; tudo está a um clique no cabeçalho da seção.
 
 ---
 
-## 11. Editor de CNV e Inspetor de DEF
+## 14. Editor de CNV e Inspetor de DEF
 
 **Editor de CNV** cria e edita conversões com validação: categoria sem regra,
 sequência duplicada, alvo de subtotal inexistente e faixa sem limite superior
@@ -945,7 +1067,7 @@ incrementos, seleções, e quais conversões cada opção usa.
 
 ---
 
-## 12. O que o programa promete e o que não promete
+## 15. O que o programa promete e o que não promete
 
 O projeto separa três coisas, e a interface também:
 
@@ -974,7 +1096,7 @@ ele cai.
 
 ---
 
-## 13. Problemas comuns
+## 16. Problemas comuns
 
 **"arquivo expandido grande demais"** — um arquivo dentro do pacote não cabe na
 memória da aba. O resto do pacote abre normalmente; use **Baixar arquivo** para
@@ -996,9 +1118,26 @@ aceitos, logo acima da tabela, mostra quantos sobreviveram aos filtros.
 **Aba travando com arquivo grande** — use os filtros para reduzir antes de
 tabular, ou trabalhe por período.
 
+**O Laboratório demorou na primeira vez** — o Python (Pyodide) e o R (webR)
+são baixados na primeira execução; depois ficam guardados no navegador.
+
+**"passam de 32 MB" ao abrir no Python ou no R** — é o limite do Laboratório
+no navegador. Recorte com Seleções (um ano, um estado) ou use **Rodar no
+computador**, que não tem esse limite.
+
+**A conferência do caderno disse DIVERGE** — a tabela da tela mudou depois que
+o caderno foi aberto (outra Seleção, outro campo), ou há uma operação sobre a
+tabela. Abra o caderno de novo a partir da tabela atual.
+
+**Os nomes dos estabelecimentos (CNES) não aparecem** — o cadastro vem pela
+internet, só das UFs do arquivo; sem internet, a lista mostra só os códigos.
+
+**O app Android não mostra uma função do site** — o app traz o site da versão
+dele: atualize pelo botão **Baixar** (a versão nova instala por cima).
+
 ---
 
-## 14. Onde procurar mais
+## 17. Onde procurar mais
 
 - **Auditoria** — a procedência completa da análise que está na tela.
 - `docs/testing/` — os protocolos de captura e o corpus de goldens.

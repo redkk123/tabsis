@@ -245,6 +245,92 @@ if (!auxiliares.length) {
     async () => pagina.locator('#file-list'));
 }
 
+// As telas novas (receita, valores, mapa, relatório, caderno em R) com a
+// leishmaniose tegumentar 2016–2025, o exemplo do roteiro do manual. Sem a
+// pasta com os LTANBR*.dbf, ficam de fora (com aviso).
+const PASTA_LTA = process.argv[4] ?? path.resolve('../resumo-leishmaniose/dados/dbf');
+const arquivosLta = fs.existsSync(PASTA_LTA)
+  ? fs.readdirSync(PASTA_LTA).filter((nome) => /^LTANBR\d{2}\.dbf$/i.test(nome)).sort().map((nome) => path.join(PASTA_LTA, nome))
+  : [];
+if (!arquivosLta.length) {
+  falhas.push(`leishmaniose: sem LTANBR*.dbf em ${PASTA_LTA} (figuras 18–22 não refeitas)`);
+} else {
+  const contexto = pagina.context();
+  // O cadastro do CNES vem do espelho, que não responde a 127.0.0.1: entrega a cópia local, se houver.
+  const ESPELHO_CNES = path.resolve('.cache/cnes-espelho');
+  if (fs.existsSync(ESPELHO_CNES)) {
+    const { gunzipSync } = await import('node:zlib');
+    await contexto.route(/r2\.dev\/cnes\/\d+\.json/, (rota) => {
+      const uf = /cnes\/(\d+)\.json/.exec(rota.request().url())[1];
+      const arquivo = path.join(ESPELHO_CNES, `${uf}.json.gz`);
+      return fs.existsSync(arquivo)
+        ? rota.fulfill({ contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: gunzipSync(fs.readFileSync(arquivo)) })
+        : rota.fulfill({ status: 404 });
+    });
+  }
+  await pagina.goto(`${BASE}/index.html`, { waitUntil: 'networkidle' });
+  await pagina.addStyleTag({ content: '.topbar { position: static !important; } #toast { display: none !important; }' });
+  await pagina.locator('#file-input').setInputFiles(arquivosLta);
+  await pagina.locator('#dataset-files-summary').filter({ hasText: `${arquivosLta.length} juntos` }).waitFor({ timeout: 300_000 });
+  await pagina.locator('#analysis-form').evaluate((form) => form.requestSubmit());
+  await pagina.locator('#result-table tbody tr').first().waitFor({ timeout: 300_000 });
+  await pagina.locator('.view-tabs button[data-view="microdata"]').click();
+  const prontas = pagina.locator('#receita-prontas');
+  await prontas.getByRole('button', { name: /Caso novo \(LTA\)/ }).click();
+  await prontas.getByRole('button', { name: /Forma cutânea/ }).click();
+  await prontas.getByRole('button', { name: /DF e Entorno/ }).click();
+  await pagina.locator('#receita-status').filter({ hasText: 'Depois das 4' }).waitFor({ timeout: 300_000 });
+
+  await capturar('18-microdados-receita', 'a receita da leishmaniose: cada etapa com o que sobra', async () => pagina.locator('.receita'));
+
+  await capturar('19-microdados-valores', 'os valores da forma clínica, com o significado e a cutânea marcada', async () => {
+    await pagina.locator('#case-field').selectOption('CLAS_FORMA');
+    await pagina.locator('#values-table tbody tr').nth(1).waitFor({ timeout: 120_000 });
+    await pagina.waitForTimeout(400);
+    await pagina.locator('#values-table').scrollIntoViewIfNeeded();
+    return pagina.locator('#values-table').locator('xpath=ancestor::div[contains(@class,"values-scroll")]');
+  });
+
+  await capturar('20-mapa-variaveis', 'o mapa por local provável de infecção, em Goiás, com os estabelecimentos', async () => {
+    await pagina.locator('.view-tabs button[data-view="map"]').click();
+    await pagina.locator('#map-legend').waitFor({ timeout: 120_000 });
+    await pagina.locator('#map-geo-field').selectOption('COMUNINF');
+    await pagina.waitForTimeout(1500);
+    await pagina.locator('#map-uf').selectOption('52');
+    await pagina.waitForTimeout(2500);
+    if (await pagina.locator('#map-cnes-label').isVisible()) {
+      await pagina.locator('#map-cnes-check').check();
+      await pagina.locator('#map-message').filter({ hasText: 'estabelecimentos' }).waitFor({ timeout: 120_000 }).catch(() => {});
+    }
+    await pagina.waitForTimeout(800);
+    return pagina.locator('#map-view');
+  });
+
+  await capturar('21-relatorio', 'a janela do relatório para imprimir', async () => {
+    await pagina.locator('#report-button').click();
+    await pagina.locator('#report-focus option').nth(2).waitFor({ state: 'attached', timeout: 60_000 }).catch(() => {});
+    await pagina.waitForTimeout(400);
+    return pagina.locator('#report-dialog');
+  });
+  await pagina.keyboard.press('Escape');
+
+  await capturar('22-caderno-r', 'o caderno em R de série e perfil, rodado no Laboratório', async () => {
+    await pagina.locator('.view-tabs button[data-view="microdata"]').click();
+    await pagina.locator('#receita-caderno-modelo').selectOption('serie');
+    const aba = contexto.waitForEvent('page');
+    await pagina.locator('#receita-caderno-r').click();
+    const lab = await aba;
+    await lab.setViewportSize({ width: 1180, height: 940 });
+    await lab.locator('#save-status').filter({ hasText: 'Dados do TabSis' }).waitFor({ timeout: 300_000 });
+    await lab.locator('#run-all').click();
+    await lab.waitForTimeout(3000);
+    await lab.waitForFunction(() => !/Executando|Preparando/.test([...document.querySelectorAll('.cell-status')].map((e) => e.textContent).join(' ')), null, { timeout: 600_000 });
+    const saida = lab.locator('.cell-output').nth(2);
+    await saida.scrollIntoViewIfNeeded();
+    return saida;
+  });
+}
+
 await navegador.close();
 servidor.close();
 
