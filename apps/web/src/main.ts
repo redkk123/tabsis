@@ -7251,9 +7251,9 @@ interface PontoCnes {
   longitude: number;
   latitude: number;
   /** Onde foi desenhado (px do canvas), para a dica achar o ponto. */
-  x?: number;
-  y?: number;
-  raio?: number;
+  x?: number | undefined;
+  y?: number | undefined;
+  raio?: number | undefined;
 }
 
 /** Estabelecimentos do recorte, com registros e coordenadas, para a camada de pontos. */
