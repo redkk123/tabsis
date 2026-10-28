@@ -116,6 +116,7 @@ import {
 } from '../../../packages/analysis/src/geographic-fields.ts';
 import { criarAbaConsulta, type AbaConsulta } from './aba-consulta.ts';
 import { criarAbaMicrodados, type AbaMicrodados } from './aba-microdados.ts';
+import { CAMPOS_DE_CNES, carregarCnes, normalizarCnes } from './cnes.ts';
 import { descreverDefinicao, lerDefinicao } from '../../../packages/core/src/definicao-caso.ts';
 import {
   tabulationToTabwinPrn,
@@ -604,6 +605,10 @@ const mapClassification = element<HTMLSelectElement>('#map-classification');
 const mapUfSelect = element<HTMLSelectElement>('#map-uf');
 const mapValueColumn = element<HTMLSelectElement>('#map-value-column');
 const mapGeoFieldSelect = element<HTMLSelectElement>('#map-geo-field');
+const mapCrossFieldSelect = element<HTMLSelectElement>('#map-cross-field');
+const mapCrossLabel = element<HTMLElement>('#map-cross-label');
+const mapCnesCheck = element<HTMLInputElement>('#map-cnes-check');
+const mapCnesLabel = element<HTMLElement>('#map-cnes-label');
 const geoFilter = element<HTMLDetailsElement>('#geo-filter');
 const geoFilterCount = element<HTMLElement>('#geo-filter-count');
 const geoFilterInfo = element<HTMLElement>('#geo-filter-info');
@@ -6648,13 +6653,14 @@ function boundsForDrawnArea(): { west: number; east: number; south: number; nort
  * Some quando há uma coluna só: oferecer uma escolha com uma opção é ruído, e
  * some também quando o mapa usa a tabulação própria dele, que sempre tem uma.
  */
-function renderMapColumnOptions(result: TabulationResult, escolhido: number): void {
+function renderMapColumnOptions(result: TabulationResult, escolhido: string): void {
   const varias = result.columns.length > 1;
   mapValueColumn.hidden = !varias;
   const rotulo = mapValueColumn.closest('label');
   if (rotulo) (rotulo as HTMLElement).hidden = !varias;
   if (!varias) {
     mapValueColumn.replaceChildren();
+    mapValueColumn.dataset.chaves = '';
     return;
   }
   const chaves = result.columns.map((coluna) => coluna.key).join('|');
@@ -6662,15 +6668,18 @@ function renderMapColumnOptions(result: TabulationResult, escolhido: number): vo
   // do teclado no meio de uma escolha.
   if (mapValueColumn.dataset.chaves !== chaves) {
     mapValueColumn.dataset.chaves = chaves;
-    mapValueColumn.replaceChildren();
-    for (const coluna of result.columns) {
-      const opcao = document.createElement('option');
-      opcao.value = coluna.key;
-      opcao.textContent = coluna.label;
-      mapValueColumn.append(opcao);
-    }
+    const contagens = document.createElement('optgroup');
+    contagens.label = 'Contagem';
+    contagens.append(...result.columns.map((coluna) => new Option(coluna.label, coluna.key)), new Option('Total (todas as colunas)', MAPA_TOTAL));
+    // A porcentagem de cada coluna no total do lugar: comparar lugares de
+    // tamanhos diferentes sem precisar de população.
+    const porcentagens = document.createElement('optgroup');
+    porcentagens.label = 'Porcentagem no total do lugar';
+    porcentagens.append(...result.columns.map((coluna) => new Option(`% ${coluna.label}`, `${MAPA_PCT}${coluna.key}`)));
+    mapValueColumn.replaceChildren(contagens, porcentagens);
   }
-  mapValueColumn.value = result.columns[escolhido]?.key ?? '';
+  mapValueColumn.value = escolhido;
+  if (mapValueColumn.value !== escolhido) mapValueColumn.value = result.columns[0]?.key ?? '';
 }
 
 function renderMap(): void {
@@ -6715,7 +6724,9 @@ function renderMap(): void {
   // acontecia aqui — pintava `casos + população + taxa` numa tabela de
   // densidade: um número sem significado nenhum, e sem aviso.
   const escolha = chooseMapColumn(desenhavel.columns.map((c) => c.key), mapValueColumn.value || undefined);
-  renderMapColumnOptions(desenhavel, escolha.index);
+  // As opções do Valor saem das colunas lidas, antes do total ou da porcentagem.
+  const colunasLidas = mapDrawableResultBruto() ?? desenhavel;
+  renderMapColumnOptions(colunasLidas, mapValueColumn.value || colunasLidas.columns[escolha.index]?.key || '');
   const values = new Map<string, number>();
   desenhavel.rows.forEach((row, index) => {
     const value = desenhavel.cells[index]?.[escolha.index] ?? 0;
@@ -6941,6 +6952,31 @@ function renderMap(): void {
     context.restore();
   }
 
+  // Estabelecimentos (CNES): um ponto por estabelecimento, área proporcional
+  // aos registros. No estado em foco, só os dele.
+  if (mapCnesCheck.checked && mapCnesPontos.length) {
+    const doRecorte = mapUfFilter && mapLevel === 'municipality' && !mapClassic
+      ? mapCnesPontos.filter((ponto) => ponto.municipio.startsWith(mapUfFilter))
+      : mapCnesPontos;
+    const maior = Math.max(1, ...doRecorte.map((ponto) => ponto.registros));
+    context.save();
+    context.fillStyle = 'rgba(196, 55, 38, .55)';
+    context.strokeStyle = 'rgba(255, 255, 255, .95)';
+    context.lineWidth = 1;
+    for (const ponto of mapCnesPontos) ponto.raio = undefined;
+    for (const ponto of doRecorte) {
+      const lugar = project(ponto.longitude, ponto.latitude);
+      ponto.x = lugar.x;
+      ponto.y = lugar.y;
+      ponto.raio = 2.5 + 11 * Math.sqrt(ponto.registros / maior);
+      context.beginPath();
+      context.arc(lugar.x, lugar.y, ponto.raio, 0, Math.PI * 2);
+      context.fill();
+      context.stroke();
+    }
+    context.restore();
+  }
+
   // O mapa deixou de seguir a tabela, então ele precisa dizer o que mostra.
   // Sem isto a pessoa vê um mapa de óbitos por município ao lado de uma tabela
   // por sexo e não tem como saber que são recortes diferentes do mesmo
@@ -6962,13 +6998,14 @@ function renderMap(): void {
     const campoDaTabela = currentPlan?.spec.rows.field ?? '';
     mapMessage.textContent = mapSource === 'tabela' && campoDaTabela
       ? `Mapa da tabela: ${currentRowLabel || friendlyFieldLabel(campoDaTabela)} (${campoDaTabela})${recorteDito}`
-        + ` · ${integerFormat.format(matched)} áreas com dado${colunaDita}. Para mapear outro campo (residência, notificação, hospital), mude as Linhas.`
+        + ` · ${integerFormat.format(matched)} áreas com dado${colunaDita}. Para mapear outro lugar (residência, infecção, notificação, hospital), escolha em Lugar.`
       : mapGeoField
         ? `Mapa por ${mapGeoField.reason} (${mapGeoField.field})${recorteDito}`
           + ` · ${integerFormat.format(matched)} áreas com dado${colunaDita}. A tabela continua como você a montou.`
         : colunaDita
           ? `${integerFormat.format(matched)} áreas com dado${colunaDita}.`
           : '';
+    if (mapCnesCheck.checked && mapCnesResumo) mapMessage.textContent = `${mapMessage.textContent} Pontos: ${mapCnesResumo}`.trim();
     mapMessage.hidden = !mapMessage.textContent;
     // Com o mapa desenhado o texto é legenda, no topo: no meio ele cobria o
     // mapa e engolia o clique e o tooltip.
@@ -6985,7 +7022,7 @@ function renderMap(): void {
   const title = document.createElement('strong');
   title.textContent = variacao
     ? `Variação${mapValueSuffix} · ${integerFormat.format(matched)} áreas`
-    : `${mapTaxaAtiva() ? 'Por 100 mil hab. · ' : ''}${mapAreaCnv() ? `${mapAreaLevelSelect.selectedOptions[0]?.textContent ?? 'Região'} · ` : ''}${integerFormat.format(matched)} áreas associadas`;
+    : `${mapTaxaAtiva() ? 'Por 100 mil hab. · ' : ''}${mapaPctSelecionado() ? `${desenhavel.columns[0]?.label ?? '%'} no total do lugar · ` : ''}${mapAreaCnv() ? `${mapAreaLevelSelect.selectedOptions[0]?.textContent ?? 'Região'} · ` : ''}${integerFormat.format(matched)} áreas associadas`;
   const gradient = document.createElement('div');
   gradient.className = 'legend-gradient';
   gradient.style.background = variacao
@@ -7070,7 +7107,7 @@ function mapInputSignature(): string {
   // Os arquivos abertos também são condição: juntar mais um arquivo depois de o
   // mapa (ou o painel "Onde") ter lido o primeiro deixava o mapa com os números
   // do primeiro, e a tabela ao lado com os de todos.
-  return JSON.stringify([configuredFilters, configuredCrossFieldRules, activeDatasetSources.map((source) => source.name)]);
+  return JSON.stringify([configuredFilters, configuredCrossFieldRules, activeDatasetSources.map((source) => source.name), mapCrossField]);
 }
 /** UF isolada no mapa. Vazio quer dizer o Brasil inteiro, por estado. */
 let mapUfFilter = '';
@@ -7191,6 +7228,135 @@ function applyGeoFilter(): void {
 let mapGeoFieldChoice = '';
 
 /**
+ * "Separar por": uma variável do arquivo que vira as colunas do mapa próprio.
+ * Com ela, o Valor oferece a contagem de cada valor, o total e a porcentagem
+ * de um valor no total do lugar (LTA: % de forma mucosa por município).
+ */
+let mapCrossField = '';
+/** Valor que pinta o total do lugar, somando as colunas. */
+const MAPA_TOTAL = '__total__';
+/** Prefixo do Valor que pinta a porcentagem de uma coluna no total do lugar. */
+const MAPA_PCT = 'pct:';
+
+/** Campo de CNES do arquivo aberto, se houver. */
+function campoCnesDoArquivo(): string | undefined {
+  return CAMPOS_DE_CNES.find((nome) => dbfHeader?.fields.some((field) => field.name === nome));
+}
+
+interface PontoCnes {
+  cnes: string;
+  nome: string;
+  municipio: string;
+  registros: number;
+  longitude: number;
+  latitude: number;
+  /** Onde foi desenhado (px do canvas), para a dica achar o ponto. */
+  x?: number;
+  y?: number;
+  raio?: number;
+}
+
+/** Estabelecimentos do recorte, com registros e coordenadas, para a camada de pontos. */
+let mapCnesPontos: PontoCnes[] = [];
+let mapCnesAssinatura = '';
+let mapCnesResumo = '';
+
+async function carregarPontosCnes(): Promise<void> {
+  const campo = campoCnesDoArquivo();
+  if (!campo || !mapCnesCheck.checked) return;
+  const assinatura = JSON.stringify([mapInputSignature(), campo]);
+  if (assinatura === mapCnesAssinatura) return;
+  mapCnesAssinatura = assinatura;
+  mapCnesPontos = [];
+  mapCnesResumo = 'Lendo os estabelecimentos…';
+  try {
+    // Os mesmos filtros do mapa: os pontos mostram o mesmo recorte das áreas.
+    const plan = compilarPlano({
+      compatibilityProfile: currentCompatibilityProfile,
+      rows: { field: campo },
+      measure: { kind: 'count' as const },
+      filters: configuredFilters.map(cloneFilter),
+      ...(configuredCrossFieldRules.length ? { crossFieldRules: configuredCrossFieldRules.map(cloneCrossFieldRule) } : {}),
+      suppressZeroRows: true,
+      suppressZeroColumns: false,
+    });
+    const { result } = await askDataset<{ result: TabulationResult; cached: boolean }>(
+      { type: 'tabulate', plan, conversions: conversionsForPlan(plan) },
+      { label: 'Estabelecimentos do mapa' },
+    );
+    const cadastro = await carregarCnes(await ufsDosDados(), (prontas, total) => {
+      mapCnesResumo = `Baixando o cadastro do CNES: ${prontas} de ${total} UF(s)…`;
+      if (currentView === 'map') mapMessage.textContent = mapCnesResumo;
+    });
+    if (assinatura !== mapCnesAssinatura) return;
+    let semCadastro = 0;
+    let semCoordenada = 0;
+    const pontos: PontoCnes[] = [];
+    result.rows.forEach((row, indice) => {
+      const registros = result.cells[indice]?.[0] ?? 0;
+      const cnes = normalizarCnes(row.key);
+      const estabelecimento = cadastro.get(cnes);
+      if (!estabelecimento) { semCadastro += registros; return; }
+      if (estabelecimento.latitude === null || estabelecimento.longitude === null) { semCoordenada += registros; return; }
+      pontos.push({ cnes, nome: estabelecimento.nome, municipio: estabelecimento.municipio, registros, latitude: estabelecimento.latitude, longitude: estabelecimento.longitude });
+    });
+    // Os grandes primeiro: os pequenos ficam por cima e continuam visíveis.
+    mapCnesPontos = pontos.sort((a, b) => b.registros - a.registros);
+    const total = result.cells.reduce((soma, linha) => soma + (linha[0] ?? 0), 0);
+    const faltam = [
+      semCadastro ? `${integerFormat.format(semCadastro)} sem o CNES no cadastro` : '',
+      semCoordenada ? `${integerFormat.format(semCoordenada)} sem coordenada` : '',
+    ].filter(Boolean).join(', ');
+    mapCnesResumo = `${integerFormat.format(pontos.length)} estabelecimentos (${campo}) com ${integerFormat.format(total - semCadastro - semCoordenada)} de ${integerFormat.format(total)} registros${faltam ? `; ${faltam}` : ''}.`;
+  } catch (error) {
+    mapCnesAssinatura = '';
+    mapCnesResumo = `Os estabelecimentos não vieram: ${error instanceof Error ? error.message : String(error)}`;
+  }
+  if (activeMap && currentResult && currentView === 'map') renderMap();
+}
+
+function mapaPctSelecionado(): boolean {
+  return mapValueColumn.value.startsWith(MAPA_PCT);
+}
+
+/**
+ * Troca as colunas pelo total ou pela porcentagem escolhida no Valor. Vem
+ * DEPOIS de somar por UF ou por região: a porcentagem de um estado é a soma
+ * dos casos dele sobre o total dele, e não a média das porcentagens.
+ */
+function aplicarColunaDerivada(resultado: TabulationResult): TabulationResult {
+  const pedido = mapValueColumn.value;
+  const total = pedido === MAPA_TOTAL;
+  const indice = pedido.startsWith(MAPA_PCT) ? resultado.columns.findIndex((coluna) => coluna.key === pedido.slice(MAPA_PCT.length)) : -1;
+  if (resultado.columns.length < 2 || (!total && indice < 0)) return resultado;
+  return {
+    ...resultado,
+    columns: [{ key: pedido, label: total ? 'Total' : `% ${resultado.columns[indice]!.label}`, source: 'derived' as const }],
+    cells: resultado.rows.map((_, linha) => {
+      const valores = resultado.cells[linha] ?? [];
+      const soma = valores.reduce((acumulado, valor) => acumulado + valor, 0);
+      if (total) return [soma];
+      return [soma ? (valores[indice] ?? 0) / soma * 100 : Number.NaN];
+    }),
+  };
+}
+
+/** As opções de "Separar por": os campos do arquivo, menos os de lugar. */
+function renderMapCrossOptions(): void {
+  mapCrossLabel.hidden = !dbfHeader;
+  if (!dbfHeader) return;
+  const lugares = new Set(findGeographicFields(dbfHeader.fields).map((candidato) => candidato.field));
+  const campos = dbfHeader.fields.map((field) => field.name).filter((nome) => !lugares.has(nome));
+  const chaves = campos.join('|');
+  if (mapCrossFieldSelect.dataset.chaves !== chaves) {
+    mapCrossFieldSelect.dataset.chaves = chaves;
+    mapCrossFieldSelect.replaceChildren(new Option('— só contar', ''), ...campos.map((nome) => new Option(fieldLabel(nome), nome)));
+  }
+  if (!campos.includes(mapCrossField)) mapCrossField = '';
+  mapCrossFieldSelect.value = mapCrossField;
+}
+
+/**
  * Oferece os campos geográficos do arquivo, com o que cada um significa.
  *
  * Some quando há um só: escolher entre uma opção é ruído. Aparece quando há
@@ -7224,7 +7390,7 @@ function renderGeoFieldOptions(candidatos: readonly GeographicCandidate[], escol
   mapGeoFieldSelect.value = escolhido;
 }
 
-async function tabulateForMap(sourceNames?: string[], columns?: { field: string; conversionId: string; startPosition: number }): Promise<TabulationResult | null> {
+async function tabulateForMap(sourceNames?: string[], columns?: { field: string; conversionId?: string; startPosition?: number; unclassifiedPolicy?: 'discriminate' }): Promise<TabulationResult | null> {
   if (!dbfHeader) return null;
   const candidatos = findGeographicFields(dbfHeader.fields);
   // O primeiro é o padrão — residência —, mas a pessoa manda. A diferença não
@@ -7235,6 +7401,10 @@ async function tabulateForMap(sourceNames?: string[], columns?: { field: string;
   const escolhido = candidatos.find((c) => c.field === mapGeoFieldChoice) ?? candidatos[0];
   if (!escolhido) return null;
   renderGeoFieldOptions(candidatos, escolhido.field);
+  // "Separar por" vira as colunas; o branco entra como coluna própria, para o
+  // total do lugar (e o denominador da porcentagem) ser o de todos os registros.
+  const separar = !columns && mapCrossField && dbfHeader.fields.some((field) => field.name === mapCrossField) ? mapCrossField : '';
+  if (separar) columns = { field: separar, unclassifiedPolicy: 'discriminate' };
 
   // Os filtros da pessoa continuam valendo: o mapa mostra o mesmo recorte da
   // análise, só que por geografia. Ignorá-los daria um mapa que contradiz a
@@ -7269,7 +7439,21 @@ async function tabulateForMap(sourceNames?: string[], columns?: { field: string;
     },
   );
   mapGeoField = escolhido;
-  return result;
+  if (!separar) return result;
+  // O significado de cada código, quando o dicionário diz: "2 · Mucosa".
+  const significados = valoresDoDicionario(entradaDoDicionario(separar)?.entry.values);
+  // O branco vai para o fim da lista do Valor, depois dos códigos.
+  const ordem = result.columns.map((_, indice) => indice)
+    .sort((a, b) => Number(result.columns[a]!.key === UNCLASSIFIED_KEY) - Number(result.columns[b]!.key === UNCLASSIFIED_KEY) || a - b);
+  return {
+    ...result,
+    cells: result.cells.map((linha) => ordem.map((indice) => linha[indice] ?? 0)),
+    columns: ordem.map((indice) => result.columns[indice]!).map((coluna) => {
+      if (coluna.key === UNCLASSIFIED_KEY) return { ...coluna, label: 'Em branco' };
+      const sentido = significados.get(coluna.key) ?? (/^\d+$/.test(coluna.key) ? significados.get(String(Number(coluna.key))) : undefined);
+      return sentido ? { ...coluna, label: `${coluna.label} · ${sentido}` } : coluna;
+    }),
+  };
 }
 
 /**
@@ -7478,6 +7662,9 @@ let mapDatePeriods: MapPeriodItem[] = [];
 function mapTimeScales(): Array<{ id: string; label: string }> {
   const escalas: Array<{ id: string; label: string }> = [];
   if (activeDatasetSources.length > 1) escalas.push({ id: 'arquivo', label: 'Arquivos abertos (um período por arquivo)' });
+  // Mês e semana já ocupam as colunas da leitura: com "Separar por" não cabem
+  // os dois, e o mapa de um mês pintaria contagem com o rótulo de porcentagem.
+  if (mapCrossField) return escalas;
   for (const eixo of eixosDeData) {
     if (!eixo.id.startsWith('data:ano:')) escalas.push({ id: eixo.id, label: eixo.label });
   }
@@ -7593,9 +7780,13 @@ function renderMapPeriodBar(): void {
   const totais = periodos.map((periodo) => {
     const resultado = mapPeriodResults.has(periodo.name) ? mapDrawableResultBruto(periodo.name) : null;
     if (!resultado) return undefined;
-    const indiceColuna = chooseMapColumn(resultado.columns.map((c) => c.key), coluna).index;
-    const casos = resultado.cells.reduce((soma, linha) => soma + (linha[indiceColuna] ?? 0), 0);
-    if (!mapTaxaAtiva()) return casos;
+    // O recorte inteiro numa linha só, e só então o total ou a porcentagem:
+    // somar as porcentagens de cada lugar não dá porcentagem nenhuma.
+    const somas = resultado.columns.map((_, indice) => resultado.cells.reduce((soma, linha) => soma + (linha[indice] ?? 0), 0));
+    const recorte = aplicarColunaDerivada({ ...resultado, rows: [{ key: 'recorte', label: 'recorte', source: 'derived' as const }], cells: [somas] });
+    const indiceColuna = chooseMapColumn(recorte.columns.map((c) => c.key), coluna).index;
+    const casos = recorte.cells[0]?.[indiceColuna] ?? 0;
+    if (!mapTaxaAtiva()) return Number.isFinite(casos) ? casos : undefined;
     // A taxa do recorte inteiro: todos os casos sobre toda a população (somar
     // as taxas de cada lugar não dá taxa nenhuma).
     const habitantes = resultado.rows.reduce((soma, row) => soma + (populationFor(populacao!, row.key, periodo.label) ?? 0), 0);
@@ -7973,8 +8164,9 @@ let mapCompareArmed = false;
 /** O valor de uma área num período (ou no atual), lido da tabulação inteira, sem o recorte do estado. */
 function mapAreaValue(geocode: string, periodName?: string): number | undefined {
   const periodo = periodName ?? mapPeriod;
-  const base = periodo ? mapPeriodResults.get(periodo) : (mapSource === 'tabela' ? currentResult : mapResult);
-  if (!base) return undefined;
+  const lido = periodo ? mapPeriodResults.get(periodo) : (mapSource === 'tabela' ? currentResult : mapResult);
+  if (!lido) return undefined;
+  const base = aplicarColunaDerivada(lido);
   const coluna = chooseMapColumn(base.columns.map((c) => c.key), mapValueColumn.value || undefined).index;
   const chave = geocode.toLowerCase();
   const linha = base.rows.findIndex((row) => row.key.trim().toLowerCase() === chave);
@@ -8177,8 +8369,9 @@ function signedFormat(value: number, unit: string): string {
  * período. Lugar sem população conhecida fica sem valor (cinza), não zero.
  */
 function mapDrawableResult(periodOverride?: string): TabulationResult | null {
-  const bruto = mapDrawableResultBruto(periodOverride);
-  if (bruto && mapAreaCnv()) return regionalizar(bruto, periodOverride ?? mapPeriod);
+  const cru = mapDrawableResultBruto(periodOverride);
+  if (cru && mapAreaCnv()) return aplicarColunaDerivada(regionalizar(cru, periodOverride ?? mapPeriod));
+  const bruto = cru && aplicarColunaDerivada(cru);
   if (!bruto || !mapTaxaAtiva()) return bruto;
   const periodo = periodOverride ?? mapPeriod;
   const rotulo = mapPeriodList().find((item) => item.name === periodo)?.label ?? '';
@@ -8199,6 +8392,8 @@ function mapDrawableResult(periodOverride?: string): TabulationResult | null {
  */
 function mapAreaCnv(): CnvDefinition | undefined {
   const nome = mapAreaLevelSelect.value;
+  // Região de saúde soma casos; a porcentagem por região exigiria somar o
+  // numerador e o total de cada uma, o que a soma das colunas já faz abaixo.
   if (!nome || !mapUfFilter || mapLevel !== 'municipality' || mapClassic) return undefined;
   return cnvByName.get(nome);
 }
@@ -8240,7 +8435,8 @@ function regionalizar(bruto: TabulationResult, periodo: string): TabulationResul
 }
 
 function mapTaxaAtiva(): boolean {
-  return Boolean(populacao) && mapTaxaCheck.checked;
+  // Porcentagem não se divide pela população: já é uma proporção.
+  return Boolean(populacao) && mapTaxaCheck.checked && !mapaPctSelecionado();
 }
 
 function mapDrawableResultBruto(periodOverride?: string): TabulationResult | null {
@@ -8257,7 +8453,8 @@ function mapDrawableResultBruto(periodOverride?: string): TabulationResult | nul
   const base = doPeriodo ?? mapResult;
   if (!base) return currentResult;
   if (mapLevel === 'uf' || mapClassic) return base;
-  return mapUfFilter ? onlyUf(base, mapUfFilter) : aggregateToUf(base);
+  // Com "Separar por", cada coluna é somada por UF (aggregateToUf juntaria todas).
+  return mapUfFilter ? onlyUf(base, mapUfFilter) : base.columns.length > 1 ? aggregateColumnsToUf(base) : aggregateToUf(base);
 }
 
 async function ensureMap(): Promise<void> {
@@ -8271,8 +8468,16 @@ async function ensureMap(): Promise<void> {
   // não tem "MUNIC" no nome. Se as linhas não são lugares, o mapa vai atrás do
   // campo geográfico sozinho.
   const nivelDaTabela = inferMapLevel(currentResult);
-  mapSource = nivelDaTabela ? 'tabela' : 'proprio';
-  if (nivelDaTabela) {
+  // Pedir outro Lugar ou "Separar por" é pedir outra leitura: a tabela da tela
+  // responde pelo campo e pelas colunas dela.
+  const campoDaTabela = currentPlan?.spec.rows.field ?? '';
+  const outroLugar = Boolean(mapGeoFieldChoice) && mapGeoFieldChoice !== campoDaTabela;
+  mapSource = nivelDaTabela && !mapCrossField && !outroLugar ? 'tabela' : 'proprio';
+  if (mapSource === 'tabela' && dbfHeader) {
+    const candidatos = findGeographicFields(dbfHeader.fields);
+    if (candidatos.some((candidato) => candidato.field === campoDaTabela)) renderGeoFieldOptions(candidatos, campoDaTabela);
+  }
+  if (mapSource === 'tabela' && nivelDaTabela) {
     // Não zera `mapResult`: ele é o que alimenta a contagem do painel de
     // recorte, e refazê-lo custaria outra passada pelo arquivo.
     mapLevel = nivelDaTabela;
@@ -8303,6 +8508,9 @@ async function ensureMap(): Promise<void> {
     }
   }
   if (mapSource === 'proprio') mapLevel = mapGeoField?.level ?? null;
+  renderMapCrossOptions();
+  mapCnesLabel.hidden = !campoCnesDoArquivo();
+  void carregarPontosCnes();
   // Estado isolado que a tabela nova não tem não pode ficar valendo.
   if (mapSource === 'tabela' && mapUfFilter && !currentResult.rows.some((row) => belongsToUf(row.key, mapUfFilter))) mapUfFilter = '';
 
@@ -11610,6 +11818,17 @@ function canvasPointer(event: PointerEvent | WheelEvent): { x: number; y: number
 function showMapTooltip(event: PointerEvent): void {
   if (mapDrag) return;
   const point = canvasPointer(event);
+  // Um estabelecimento sob o ponteiro vem antes da área: o ponto está por cima.
+  const estabelecimento = mapCnesCheck.checked
+    ? [...mapCnesPontos].reverse().find((ponto) => ponto.raio !== undefined && Math.hypot((ponto.x ?? 0) - point.x, (ponto.y ?? 0) - point.y) <= ponto.raio + 2)
+    : undefined;
+  if (estabelecimento) {
+    mapTooltip.textContent = `${estabelecimento.nome} · CNES ${estabelecimento.cnes} · ${integerFormat.format(estabelecimento.registros)} registro(s)`;
+    mapTooltip.style.left = `${Math.min(point.x + 12, mapCanvas.clientWidth - 240)}px`;
+    mapTooltip.style.top = `${Math.max(8, point.y - 34)}px`;
+    mapTooltip.hidden = false;
+    return;
+  }
   const object = objectAtCanvasPoint(point.x, point.y);
   if (!object) {
     mapTooltip.hidden = true;
@@ -12211,9 +12430,24 @@ mapGeoFieldSelect.addEventListener('change', () => {
   void ensureMap().then(() => refreshGeoFilter());
 });
 
+mapCnesCheck.addEventListener('change', () => {
+  if (!mapCnesCheck.checked) { if (activeMap && currentResult) renderMap(); return; }
+  void carregarPontosCnes();
+});
+
+mapCrossFieldSelect.addEventListener('change', () => {
+  mapCrossField = mapCrossFieldSelect.value;
+  // Colunas novas: a escolha de Valor anterior falava de outra variável.
+  mapValueColumn.value = '';
+  mapValueColumn.dataset.chaves = '';
+  activeMap = null;
+  void ensureMap();
+});
+
 mapValueColumn.addEventListener('change', () => {
-  // Trocar de coluna não troca de mapa nem de dado: só repinta.
-  if (activeMap && currentResult) renderMap();
+  // Trocar de coluna não troca de mapa nem de dado: só repinta (e a evolução,
+  // que mostra o total do que o mapa pinta).
+  if (activeMap && currentResult) { renderMapPeriodBar(); renderMap(); }
 });
 
 mapUfSelect.addEventListener('change', () => setMapFocus(mapUfSelect.value));
@@ -12830,10 +13064,23 @@ abaMicrodados = criarAbaMicrodados({
       registros: result.cells[indice]?.[0] ?? 0,
     }));
   },
-  significados: (campo) => valoresDoDicionario(entradaDoDicionario(campo)?.entry.values),
+  significados: (campo) => {
+    if (!CAMPOS_DE_CNES.includes(campo)) return valoresDoDicionario(entradaDoDicionario(campo)?.entry.values);
+    return ufsDosDados().then((ufs) => carregarCnes(ufs)).then((cadastro) => {
+      // A chave com e sem os zeros da frente: o valor da lista vem como o arquivo grava.
+      const nomes = new Map<string, string>();
+      for (const [cnes, estabelecimento] of cadastro) {
+        nomes.set(cnes, estabelecimento.nome);
+        nomes.set(String(Number(cnes)), estabelecimento.nome);
+      }
+      return nomes;
+    });
+  },
   descricaoDoCampo: (campo) => {
     const achado = entradaDoDicionario(campo);
-    return achado ? `${achado.entry.label}: ${achado.entry.description} (${achado.source})` : '';
+    const texto = achado ? `${achado.entry.label}: ${achado.entry.description} (${achado.source})` : '';
+    if (!CAMPOS_DE_CNES.includes(campo)) return texto;
+    return `${texto}${texto ? ' ' : ''}Nomes dos estabelecimentos: Cadastro Nacional de Estabelecimentos de Saúde (CNES), OpenDataSUS.`;
   },
   valoresAceitos: (campo) => {
     const filtro = configuredFilters.find((filter) => filter.field === campo && filter.kind !== 'code-rules'
@@ -12858,6 +13105,21 @@ abaMicrodados = criarAbaMicrodados({
   },
   aviso: showToast,
 });
+
+/**
+ * As UFs que o arquivo tem, pelo campo de lugar (a mesma leitura do mapa e do
+ * painel "Onde"). Vazio quando não há campo de município: aí o cadastro do
+ * CNES vem inteiro.
+ */
+async function ufsDosDados(): Promise<string[]> {
+  const contagens = await geoCounts().catch(() => null);
+  const ufs = new Set<string>();
+  for (const codigo of contagens?.keys() ?? []) {
+    const uf = ufCodeOf(codigo);
+    if (uf) ufs.add(uf);
+  }
+  return [...ufs];
+}
 
 /** O dicionário oficial do campo, para o arquivo aberto (LTANBR23 → agravo LTAN do SINAN). */
 function entradaDoDicionario(campo: string): ReturnType<typeof datasusFieldEntry> {

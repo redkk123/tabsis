@@ -46,8 +46,12 @@ export interface AbaMicrodadosDeps {
    * todos os valores, e o que já estava escolhido vem marcado.
    */
   contarValores(campo: string): Promise<Array<{ valor: string; registros: number }>>;
-  /** Código → significado, pelo dicionário oficial do arquivo aberto; vazio se não houver. */
-  significados(campo: string): Map<string, string>;
+  /**
+   * Código → significado, pelo dicionário oficial do arquivo aberto; vazio se
+   * não houver. Num campo de CNES, os nomes vêm do cadastro, pela internet:
+   * aí chega uma promessa, e a lista aparece antes, só com os códigos.
+   */
+  significados(campo: string): Map<string, string> | Promise<Map<string, string>>;
   /** O que o dicionário diz do campo, numa frase; vazio se não diz. */
   descricaoDoCampo(campo: string): string;
   /** Valores aceitos pela Seleção de valores que já recorta este campo, se houver. */
@@ -256,11 +260,22 @@ export function criarAbaMicrodados(deps: AbaMicrodadosDeps): AbaMicrodados {
       const contagens = await deps.contarValores(nome);
       if (meu !== pedidoValores || nome !== campo.value) return;
       valores = [...contagens].sort((a, b) => b.registros - a.registros || a.valor.localeCompare(b.valor, 'pt-BR', { numeric: true }));
-      significados = deps.significados(nome);
+      const pedidoDeSignificados = deps.significados(nome);
+      significados = pedidoDeSignificados instanceof Map ? pedidoDeSignificados : new Map();
       marcados = new Set(deps.valoresAceitos(nome) ?? []);
       campoDosValores = nome;
       exemplos.hidden = true;
       renderValores();
+      if (!(pedidoDeSignificados instanceof Map)) {
+        estadoValores.textContent = `${estadoValores.textContent} Buscando os nomes no cadastro do CNES…`;
+        pedidoDeSignificados.then((mapa) => {
+          if (meu !== pedidoValores) return;
+          significados = mapa;
+          renderValores();
+        }).catch((error: unknown) => {
+          if (meu === pedidoValores) estadoValores.textContent = `${resumoDosMarcados()} Os nomes não vieram: ${error instanceof Error ? error.message : String(error)}`;
+        });
+      }
     } catch (error) {
       if (meu === pedidoValores) estadoValores.textContent = error instanceof Error ? error.message : String(error);
     }

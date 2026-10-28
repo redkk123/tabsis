@@ -875,9 +875,18 @@
                   <option value="BR_MACSAUD.CNV">Macrorregião de saúde</option>
                 </select>
               </label>
-              <label class="map-uf-label" for="map-value-column">Valor
-                <select id="map-value-column" title="Qual coluna da tabela o mapa pinta"></select>
+              <label class="map-uf-label" for="map-geo-field">Lugar
+                <select id="map-geo-field" title="Qual campo do arquivo define o lugar: residência, local provável de infecção, notificação, ocorrência…"></select>
               </label>
+              <label class="map-uf-label" id="map-cross-label" for="map-cross-field">Separar por
+                <select id="map-cross-field" title="Uma variável do arquivo: o mapa pode pintar a contagem ou a porcentagem de cada valor dela (por exemplo, % de forma mucosa)">
+                  <option value="">— só contar</option>
+                </select>
+              </label>
+              <label class="map-uf-label" for="map-value-column">Valor
+                <select id="map-value-column" title="O que o mapa pinta: uma coluna da tabela, o total ou a porcentagem de um valor"></select>
+              </label>
+              <label class="check-label map-cnes-toggle" id="map-cnes-label" hidden title="Cada estabelecimento de saúde como um ponto, do tamanho do número de registros dele (nome e coordenadas do cadastro do CNES)"><input id="map-cnes-check" type="checkbox"><span>Estabelecimentos (CNES)</span></label>
               <div class="panel-actions map-zoom-actions">
                 <button class="secondary-button" id="map-zoom-out" type="button" title="Afastar">−</button>
                 <button class="secondary-button" id="map-zoom-reset" type="button" title="Voltar ao enquadramento inteiro">Ajustar</button>
@@ -888,9 +897,6 @@
             <details class="map-opcoes" id="map-opcoes">
               <summary>Opções do mapa <span>cores, classes, campo do lugar, camadas</span></summary>
               <div class="map-opcoes-grade">
-                <label class="map-uf-label" for="map-geo-field">Campo do lugar
-                  <select id="map-geo-field" title="Qual campo do arquivo define o lugar (residência, ocorrência…)"></select>
-                </label>
                 <label title="Como os valores viram cores">Cores por<select id="map-classification">
                   <option value="continuous">Escala contínua</option>
                   <option value="equal-interval">Intervalos iguais</option>

@@ -37,14 +37,26 @@ export interface GeographicCandidate {
  */
 const MUNICIPIO: readonly { padrao: RegExp; motivo: string }[] = [
   { padrao: /^(CODMUNRES|MUNIC_RES|ID_MN_RESI|MUNIC_RESID)$/i, motivo: 'município de residência' },
+  // SIA: município de residência do paciente.
+  { padrao: /^(PA_MUNPCN)$/i, motivo: 'município de residência do paciente' },
   { padrao: /^(CODMUNNASC)$/i, motivo: 'município de nascimento' },
-  { padrao: /^(CODMUNOCOR|MUNIC_MOV|ID_MUNICIP|MUNIC_OCOR)$/i, motivo: 'município de ocorrência' },
+  // SINAN: onde a pessoa provavelmente se infectou. É por ele que os cadernos
+  // de indicadores do Ministério contam casos e taxa de várias doenças (LTA).
+  { padrao: /^(COMUNINF)$/i, motivo: 'município provável de infecção' },
+  { padrao: /^(CODMUNOCOR|MUNIC_OCOR)$/i, motivo: 'município de ocorrência' },
+  // SINAN: a unidade que notificou, não onde a pessoa mora nem onde se infectou.
+  { padrao: /^(ID_MUNICIP)$/i, motivo: 'município de notificação' },
+  // SIH e SIA: onde fica o estabelecimento que atendeu.
+  { padrao: /^(MUNIC_MOV|PA_UFMUN)$/i, motivo: 'município do estabelecimento' },
+  { padrao: /^(CODMUNNATU)$/i, motivo: 'município de naturalidade' },
   { padrao: /^(CODUFMUN|CODMUN|MUNICIPIO|MUNIC)$/i, motivo: 'município' },
 ];
 
 const UNIDADE_FEDERACAO: readonly { padrao: RegExp; motivo: string }[] = [
   { padrao: /^(UFRES|SG_UF_RES|UF_RESID)$/i, motivo: 'UF de residência' },
-  { padrao: /^(UF|UF_ZI|SG_UF|SG_UF_NOT|CODUF|ESTADO)$/i, motivo: 'unidade da federação' },
+  { padrao: /^(COUFINF)$/i, motivo: 'UF provável de infecção' },
+  { padrao: /^(SG_UF_NOT)$/i, motivo: 'UF de notificação' },
+  { padrao: /^(UF|UF_ZI|SG_UF|CODUF|ESTADO)$/i, motivo: 'unidade da federação' },
 ];
 
 /**
