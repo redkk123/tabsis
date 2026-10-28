@@ -116,10 +116,23 @@ Transformar a lista de etapas atual numa receita visual.
   - juntar anos com campos diferentes (já resolvido no conjunto aberto).
 - A receita salva em `.twrecipe` (o formato já existe) e reabre com outros anos.
 - **Medida de sucesso:** refazer, só com cliques, a análise do resumo de LTA
-  (casos novos 2016–2025, DF e Entorno × Brasil, sexo, faixa etária,
-  raça/cor, forma clínica). Ela deve dar os mesmos números que o script
-  Python de `resumo-leishmaniose` (139.171; 1.391; 326; 1.065). Uma pessoa de
-  fora do projeto refaz em até 15 minutos com o manual.
+  (casos novos da forma cutânea 2016–2025, DF e Entorno × Brasil, sexo, faixa
+  etária, raça/cor). Ela deve dar os mesmos números que o script Python de
+  `resumo-leishmaniose` (131.581 no Brasil; 1.246 no DF e Entorno; 265 no DF;
+  981 no Entorno). Uma pessoa de fora do projeto refaz em até 15 minutos com o
+  manual.
+- **Andamento (2026-10-28):** primeira parte feita. A aba Microdados abre com
+  a **receita**: cada Seleção vira um cartão em português, com quantos
+  registros sobram depois dele, e dá para desligar (sem perder), reordenar e
+  remover. Etapas prontas com a fonte citada: *Caso novo (LTA)* (Caderno de
+  Indicadores LT/LV, MS 2018, indicador 1), *Forma cutânea/mucosa*, *DF e
+  Entorno (RIDE-DF)*. Conferido com os 10 arquivos reais: 153.302 notificações
+  → 131.581 casos novos cutâneos → 1.246 no DF e Entorno, iguais ao script.
+  Para isso, juntar anos passou a aceitar campos que mudaram de tipo (o
+  LTANBR25 mudou quatro campos administrativos): entram como texto, com aviso.
+  Falta: amostra de registros por etapa, etapas de faixa etária e de datas
+  como cartões, arrastar para reordenar, receita salva com as etapas
+  desligadas, e o roteiro de 15 minutos no manual.
 
 ### Fase 2 — Ponte de verdade com o Laboratório
 

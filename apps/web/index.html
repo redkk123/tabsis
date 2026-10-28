@@ -1074,9 +1074,20 @@
             <div class="result-toolbar">
               <div>
                 <span class="eyebrow">Laboratório de microdados · sem código</span>
-                <h2>Ver e escolher os registros</h2>
+                <h2>Receita e recortes</h2>
               </div>
             </div>
+            <section class="receita" aria-labelledby="receita-titulo">
+              <h3 class="receita-titulo" id="receita-titulo">Receita: o caminho dos registros</h3>
+              <p class="compatibility-note">Cada Seleção é uma etapa, aplicada nesta ordem, e o cartão mostra quantos registros sobram depois dela.
+              Desligue uma etapa para ver o efeito sem perdê-la. As etapas prontas seguem a regra da fonte oficial (passe o mouse no botão para ver qual).</p>
+              <div class="receita-prontas" id="receita-prontas" hidden></div>
+              <ol class="receita-etapas" id="receita-etapas"></ol>
+              <p class="query-status" id="receita-status" aria-live="polite"></p>
+              <button class="secondary-button" id="receita-contar" type="button" disabled>Contar cada etapa</button>
+            </section>
+
+            <h3 class="case-subtitle">Ver e escolher pelos valores</h3>
             <p class="compatibility-note">Escolha um campo: aparecem todos os valores que existem nos microdados,
             quantos registros tem cada um e o que cada código quer dizer (pelo dicionário oficial, quando o TabSis
             conhece o arquivo). Marque os que entram e aplique: vira uma Seleção comum. Exemplo: na leishmaniose

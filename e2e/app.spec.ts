@@ -1768,6 +1768,44 @@ test('Microdados: ver os valores do campo com o significado e marcar os que entr
   await expect(page.locator('#result-table tfoot tr').first().locator('td').first()).toHaveText('3');
 });
 
+test('Microdados: receita visual com etapas prontas de LTA, contagem por etapa e etapa desligada', async ({ page }) => {
+  const { writeDbf } = await import('../dist/packages/export/src/dbf-writer.js');
+  const campo = (name: string, length: number) => ({ name, type: 'C', length, decimalCount: 0 });
+  const linhas = [
+    ['530010', '1', '1', '1'], ['520060', '1', '', '1'], ['520870', '1', '1', '1'],
+    ['530010', '2', '1', '1'], ['530010', '1', '6', '1'], ['520060', '1', '1', '2'],
+  ].map(([ID_MN_RESI, CLA_TIPO_N, EVOLUCAO, CLAS_FORMA]) => ({ ID_MN_RESI, CLA_TIPO_N, EVOLUCAO, CLAS_FORMA }));
+  const dbf = writeDbf(linhas, [campo('ID_MN_RESI', 6), campo('CLA_TIPO_N', 1), campo('EVOLUCAO', 1), campo('CLAS_FORMA', 1)]);
+  await page.goto('/');
+  await page.locator('#file-input').setInputFiles({ name: 'LTANBR23.dbf', mimeType: 'application/octet-stream', buffer: Buffer.from(dbf) });
+  await expect(page.locator('#run-button')).toBeEnabled();
+  await page.locator('#analysis-form').evaluate((form: HTMLFormElement) => form.requestSubmit());
+  await expect(page.locator('#result-table tbody')).toBeVisible();
+  await page.locator('[data-view="microdata"]').click();
+
+  // As etapas prontas citam a fonte; cada uma vira um cartão com o que sobra.
+  const prontas = page.locator('#receita-prontas');
+  await expect(prontas.getByRole('button', { name: /Caso novo \(LTA\)/ })).toHaveAttribute('title', /Caderno de Indicadores/);
+  await prontas.getByRole('button', { name: /Caso novo \(LTA\)/ }).click();
+  await prontas.getByRole('button', { name: /Forma cutânea/ }).click();
+  await prontas.getByRole('button', { name: /DF e Entorno/ }).click();
+  const etapas = page.locator('#receita-etapas li');
+  await expect(etapas).toHaveCount(5);
+  await expect(etapas.nth(0)).toContainText('6 registros');
+  await expect(etapas.nth(1)).toContainText('5 registros · saem 1');   // tipo de entrada: sai a recidiva
+  await expect(etapas.nth(2)).toContainText('4 registros · saem 1');   // evolução: sai a mudança de diagnóstico
+  await expect(etapas.nth(3)).toContainText('3 registros · saem 1');   // forma: sai a mucosa
+  await expect(etapas.nth(4)).toContainText('2 registros · saem 1');   // RIDE: sai Goiânia
+  await expect(page.locator('#receita-status')).toContainText('ficam 2 de 6 registros');
+
+  // Desligar a forma clínica: a etapa fica no cartão, fora da análise, e a mucosa volta.
+  await etapas.nth(3).getByRole('button', { name: /^Desligar/ }).click();
+  await expect(page.locator('#receita-etapas li.receita-desligada')).toContainText('fora da análise');
+  await expect(page.locator('#receita-status')).toContainText('ficam 3 de 6 registros');
+  await page.locator('[data-view="table"]').click();
+  await expect(page.locator('#result-table tfoot tr').first().locator('td').first()).toHaveText('3');
+});
+
 test('Microdados: atalhos de RIDE-DF e idade, com uma regra por campo', async ({ page }) => {
   // Residência em Brasília, Alto Paraíso (RIDE), Goiânia (fora) e Unaí (RIDE, MG).
   const csv = [
@@ -1936,10 +1974,14 @@ test('juntar anos com campos acrescentados: o campo novo entra e fica em branco 
   const corpo = page.locator('#result-table tbody');
   await expect(corpo.locator('tr', { hasText: 'L1' })).toContainText('2');
   await expect(corpo.locator('tr', { hasText: 'L2' })).toContainText('1');
-  // Campo em comum com tamanho diferente continua recusado, com o nome dele.
+  // Campo em comum que mudou de tamanho (o LTANBR25 do DATASUS mudou o tipo
+  // de quatro campos): o ano entra, o campo vira texto e a tela diz qual.
   await page.locator('#dataset-add-input').setInputFiles({ name: 'LEIVBR26.dbf', mimeType: 'application/octet-stream', buffer: Buffer.from(divergente) });
-  await expect(page.locator('.toast').last()).toContainText('CS_SEXO (C1 × C2)');
-  await expect(page.locator('#dataset-files-list li')).toHaveCount(2);
+  await expect(page.locator('.toast').last()).toContainText('CS_SEXO (C1 × C2');
+  await expect(page.locator('#dataset-files-list li')).toHaveCount(3);
+  await page.locator('#row-field').selectOption('CS_SEXO');
+  await page.locator('#analysis-form').evaluate((form: HTMLFormElement) => form.requestSubmit());
+  await expect(corpo.locator('tr', { hasText: 'MM' })).toContainText('1');
 });
 
 test('dentro do app Android, salvar vai pela ponte nativa (o WebView não baixa blob:) e imprimir também', async ({ page }) => {
