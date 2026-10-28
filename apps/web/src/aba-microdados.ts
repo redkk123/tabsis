@@ -31,7 +31,7 @@ export interface AbaMicrodadosDeps {
   rotuloDoCampo(campo: string): string;
   /**
    * Registros por valor do campo, como estão no arquivo (sem CNV), já com as
-   * Seleções em vigor, menos a definição que esta aba aplicou antes neste campo.
+   * Seleções em vigor, menos as que recortam este mesmo campo (aplicar troca todas elas).
    */
   contarPorValor(campo: string): Promise<Array<{ valor: string; registros: number }>>;
   /**

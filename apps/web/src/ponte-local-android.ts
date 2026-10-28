@@ -54,10 +54,12 @@ export function criarFetchDaPonte(ponte: PonteLocalAndroid): typeof fetch {
     }
     if (rota === '/guardados' && metodo === 'POST') {
       const nome = endereco.searchParams.get('nome') ?? '';
-      const bytes = new Uint8Array(await new Response(opcoes.body ?? null).arrayBuffer());
+      // Um pedaço de cada vez: o arquivo inteiro, mais o base64 dele, não cabe
+      // na memória do WebView quando o DBC tem centenas de MB.
+      const arquivo = opcoes.body instanceof Blob ? opcoes.body : await new Response(opcoes.body ?? null).blob();
       const id = ponte.iniciarArquivo();
       try {
-        for (let i = 0; i < bytes.length; i += PEDACO) ponte.escreverParte(id, base64(bytes.subarray(i, i + PEDACO)));
+        for (let i = 0; i < arquivo.size; i += PEDACO) ponte.escreverParte(id, base64(new Uint8Array(await arquivo.slice(i, i + PEDACO).arrayBuffer())));
       } catch (erro) {
         ponte.descartarArquivo(id);
         throw erro;

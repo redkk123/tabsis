@@ -54,9 +54,10 @@ const MUNICIPIO: readonly { padrao: RegExp; motivo: string }[] = [
 
 const UNIDADE_FEDERACAO: readonly { padrao: RegExp; motivo: string }[] = [
   { padrao: /^(UFRES|SG_UF_RES|UF_RESID)$/i, motivo: 'UF de residência' },
+  // SG_UF é a UF de residência no SINAN: vem antes da de infecção e da de notificação.
+  { padrao: /^(UF|UF_ZI|SG_UF|CODUF|ESTADO)$/i, motivo: 'unidade da federação' },
   { padrao: /^(COUFINF)$/i, motivo: 'UF provável de infecção' },
   { padrao: /^(SG_UF_NOT)$/i, motivo: 'UF de notificação' },
-  { padrao: /^(UF|UF_ZI|SG_UF|CODUF|ESTADO)$/i, motivo: 'unidade da federação' },
 ];
 
 /**

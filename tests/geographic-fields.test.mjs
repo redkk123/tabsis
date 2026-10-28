@@ -41,6 +41,8 @@ test('LTA: o local provável de infecção e o de notificação também viram ma
     ['COUFINF', 'UF provável de infecção'],
     ['SG_UF_NOT', 'UF de notificação'],
   ]);
+  // Sem município, a UF de residência do SINAN (SG_UF) continua sendo o padrão.
+  assert.equal(findGeographicFields(campos('COUFINF', 'SG_UF_NOT', 'SG_UF'))[0].field, 'SG_UF');
   // SIH e SIA: o município do estabelecimento é outro mapa, não a residência.
   assert.deepEqual(findGeographicFields(campos('MUNIC_MOV', 'MUNIC_RES')).map((a) => a.reason), ['município de residência', 'município do estabelecimento']);
 });

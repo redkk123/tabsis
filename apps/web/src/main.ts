@@ -9380,8 +9380,19 @@ async function downloadCatalogEntries(
       return zipSync(entradas);
     };
     let bytes: Uint8Array;
+    let peloLocal: Uint8Array | null = null;
     if (podeBaixarPeloComputador(files)) {
-      bytes = await baixarPeloComputador(files, signal, onActivity);
+      // Se o TabSis Local falhar (FTP bloqueado na rede, por exemplo), o
+      // caminho de sempre, pelo navegador, ainda tenta.
+      try {
+        peloLocal = await baixarPeloComputador(files, signal, onActivity);
+      } catch (error) {
+        if (signal?.aborted || (error instanceof DOMException && error.name === 'AbortError')) throw error;
+        showToast(`O TabSis Local não baixou (${error instanceof Error ? error.message : String(error)}); tentando pelo navegador.`, true);
+      }
+    }
+    if (peloLocal) {
+      bytes = peloLocal;
       attempts = 1;
     } else if (files.length && files.every((file) => file.ftpPath)) {
       bytes = await baixarPeloFtp();
@@ -11928,7 +11939,11 @@ async function montarRelatorio(): Promise<void> {
       // não só as linhas que a rolagem mostra.
       renderTableBody({ full: true });
       partes.push(bloco('h2', resultTitle.textContent?.trim() || 'Tabela'));
-      partes.push(element<HTMLTableElement>('#result-table').cloneNode(true) as HTMLTableElement);
+      const copia = element<HTMLTableElement>('#result-table').cloneNode(true) as HTMLTableElement;
+      // A cópia fica na página até a impressão acabar: sem ids repetidos.
+      copia.removeAttribute('id');
+      for (const comId of copia.querySelectorAll('[id]')) comId.removeAttribute('id');
+      partes.push(copia);
     }
     if (reportChart.checked && !reportChart.disabled) {
       const svg = element<HTMLElement>('#chart-view').querySelector('svg');
@@ -11948,55 +11963,60 @@ async function montarRelatorio(): Promise<void> {
       // Foco pedido para o relatório: o mapa da tela volta ao que era no fim.
       const foco = reportFocus.value;
       const trocarFoco = foco !== '__atual__' && foco !== mapUfFilter;
-      if (trocarFoco) {
-        setMapFocus(foco);
-        await ensureMap();
-        await esperarMapaPronto(15_000);
-      }
-      if (activeMap) {
-        renderMap();
-        const geral = comporImagemDoMapa();
-        if (geral) {
-          const secao = bloco('section', undefined, 'rel-quebra');
-          const imagem = bloco('img', undefined, 'rel-mapa');
-          imagem.src = geral.toDataURL('image/png');
-          imagem.alt = 'Mapa';
-          secao.append(bloco('h2', 'Mapa'), imagem);
-          partes.push(secao);
+      try {
+        if (trocarFoco) {
+          setMapFocus(foco);
+          await ensureMap();
+          await esperarMapaPronto(15_000);
         }
-        if (reportPeriods.checked && mapPeriodList().length > 1) {
-          await esperarPeriodosDoMapa(60_000);
-          const figuras: HTMLElement[] = [];
-          for (const periodo of mapPeriodList()) {
-            if (!mapPeriodResults.has(periodo.name)) continue;
-            mapPeriod = periodo.name;
-            renderMap();
-            const tela = comporImagemDoMapa();
-            if (!tela) continue;
-            const figura = bloco('figure');
-            const imagem = bloco('img');
-            imagem.src = tela.toDataURL('image/png');
-            imagem.alt = `Mapa de ${periodo.label}`;
-            figura.append(bloco('figcaption', periodo.label), imagem);
-            figuras.push(figura);
-          }
-          mapPeriod = periodoAnterior;
-          renderMapPeriodBar();
-          if (!trocarFoco) renderMap();
-          if (figuras.length) {
+        if (activeMap) {
+          renderMap();
+          const geral = comporImagemDoMapa();
+          if (geral) {
             const secao = bloco('section', undefined, 'rel-quebra');
-            const grade = bloco('div', undefined, 'rel-anos');
-            grade.append(...figuras);
-            secao.append(bloco('h2', `Um mapa por ${mapPeriodUnit(false)} (mesma escala de cor)`), grade);
+            const imagem = bloco('img', undefined, 'rel-mapa');
+            imagem.src = geral.toDataURL('image/png');
+            imagem.alt = 'Mapa';
+            secao.append(bloco('h2', 'Mapa'), imagem);
             partes.push(secao);
           }
+          if (reportPeriods.checked && mapPeriodList().length > 1) {
+            await esperarPeriodosDoMapa(60_000);
+            const figuras: HTMLElement[] = [];
+            for (const periodo of mapPeriodList()) {
+              if (!mapPeriodResults.has(periodo.name)) continue;
+              mapPeriod = periodo.name;
+              renderMap();
+              const tela = comporImagemDoMapa();
+              if (!tela) continue;
+              const figura = bloco('figure');
+              const imagem = bloco('img');
+              imagem.src = tela.toDataURL('image/png');
+              imagem.alt = `Mapa de ${periodo.label}`;
+              figura.append(bloco('figcaption', periodo.label), imagem);
+              figuras.push(figura);
+            }
+            if (figuras.length) {
+              const secao = bloco('section', undefined, 'rel-quebra');
+              const grade = bloco('div', undefined, 'rel-anos');
+              grade.append(...figuras);
+              secao.append(bloco('h2', `Um mapa por ${mapPeriodUnit(false)} (mesma escala de cor)`), grade);
+              partes.push(secao);
+            }
+          }
         }
+      } finally {
+        // O mapa da tela volta ao que era, mesmo se algo falhou no meio.
+        mapPeriod = periodoAnterior;
+        if (trocarFoco) {
+          setMapFocus(focoAnterior);
+          await ensureMap();
+        } else {
+          renderMapPeriodBar();
+          if (activeMap) renderMap();
+        }
+        showView(vistaAnterior);
       }
-      if (trocarFoco) {
-        setMapFocus(focoAnterior);
-        await ensureMap();
-      }
-      showView(vistaAnterior);
     }
 
     const procedencia = bloco('ul', undefined, 'rel-proc');
@@ -13249,7 +13269,7 @@ abaMicrodados = criarAbaMicrodados({
       compatibilityProfile: currentCompatibilityProfile,
       rows: { field: campo },
       measure: { kind: 'count' as const },
-      filters: configuredFilters.filter((filter) => !(filter.kind === 'code-rules' && filter.field === campo)).map(cloneFilter),
+      filters: configuredFilters.filter((filter) => filter.field !== campo).map(cloneFilter),
       ...(configuredCrossFieldRules.length ? { crossFieldRules: configuredCrossFieldRules.map(cloneCrossFieldRule) } : {}),
       suppressZeroRows: true,
       suppressZeroColumns: false,
@@ -13261,9 +13281,10 @@ abaMicrodados = criarAbaMicrodados({
     return result.rows.map((row, indice) => ({ valor: row.key, registros: result.cells[indice]?.[0] ?? 0 }));
   },
   aplicar: (campo, incluir, excluir) => {
-    // Uma definição por campo: aplicar de novo no mesmo campo troca a anterior;
-    // em outro campo, soma (região num campo, CID em outro).
-    configuredFilters = configuredFilters.filter((filter) => !(filter.kind === 'code-rules' && filter.field === campo));
+    // Uma definição por campo: aplicar de novo no mesmo campo troca a anterior
+    // (por códigos ou pelos valores marcados; os dois juntos se anulariam); em
+    // outro campo, soma (região num campo, CID em outro).
+    configuredFilters = configuredFilters.filter((filter) => filter.field !== campo);
     configuredFilters.push({ field: campo, mode: 'include', kind: 'code-rules', include: incluir, exclude: excluir });
     renderConfiguredFilters();
     void runAnalysis();
@@ -13342,6 +13363,10 @@ async function ufsDosDados(): Promise<string[]> {
   for (const codigo of contagens?.keys() ?? []) {
     const uf = ufCodeOf(codigo);
     if (uf) ufs.add(uf);
+  }
+  // Lugar no nível de UF: as linhas da leitura do mapa já são os códigos.
+  if (!ufs.size && mapGeoField?.level === 'uf' && mapResult) {
+    for (const row of mapResult.rows) if (/^\d{2}$/.test(row.key.trim())) ufs.add(row.key.trim());
   }
   return [...ufs];
 }

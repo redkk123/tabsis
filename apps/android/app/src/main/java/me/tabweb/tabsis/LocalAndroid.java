@@ -85,6 +85,8 @@ final class LocalAndroid {
         volatile Long velocidade;
         volatile String erro;
         volatile String caminho;
+        /** O nome com que o Android guardou (pode ganhar " (1)" se outro app tem um igual). */
+        volatile String salvoComo;
         volatile Long terminada;
         volatile boolean cancelar;
 
@@ -92,7 +94,7 @@ final class LocalAndroid {
 
         JSONObject json() throws JSONException {
             JSONObject o = new JSONObject();
-            o.put("id", id).put("url", url).put("filename", nome).put("status", status)
+            o.put("id", id).put("url", url).put("filename", salvoComo != null ? salvoComo : nome).put("status", status)
                     .put("receivedBytes", recebidos).put("totalBytes", total == null ? JSONObject.NULL : total)
                     .put("bytesPerSecond", velocidade == null ? JSONObject.NULL : velocidade).put("attempts", 1)
                     .put("startedAt", iso(iniciada)).put("finishedAt", terminada == null ? JSONObject.NULL : iso(terminada))
@@ -252,7 +254,6 @@ final class LocalAndroid {
         Uri destino = null;
         try {
             URI url = validarUrl(tarefa.url);
-            apagar(tarefa.nome, PASTA);  // baixar de novo substitui a cópia anterior
             ContentValues valores = new ContentValues();
             valores.put(MediaStore.Downloads.DISPLAY_NAME, tarefa.nome);
             valores.put(MediaStore.Downloads.MIME_TYPE, "application/octet-stream");
@@ -268,10 +269,16 @@ final class LocalAndroid {
             if (tarefa.total != null && tarefa.recebidos != tarefa.total) {
                 throw new IOException("veio " + tarefa.recebidos + " de " + tarefa.total + " bytes; tente de novo");
             }
+            // Só agora, com o arquivo novo inteiro, sai a cópia anterior: um
+            // download que falha não pode deixar a pessoa sem nenhuma das duas.
+            Uri anterior = achar(tarefa.nome, PASTA, destino);
+            if (anterior != null) resolver.delete(anterior, null, null);
             valores.clear();
             valores.put(MediaStore.Downloads.IS_PENDING, 0);
+            valores.put(MediaStore.Downloads.DISPLAY_NAME, tarefa.nome);
             resolver.update(destino, valores, null, null);
-            tarefa.caminho = "Downloads/TabSis/" + tarefa.nome;
+            tarefa.salvoComo = nomeGuardado(destino, tarefa.nome);
+            tarefa.caminho = "Downloads/TabSis/" + tarefa.salvoComo;
             tarefa.status = "done";
         } catch (CanceladoException e) {
             tarefa.status = "cancelled";
@@ -300,11 +307,25 @@ final class LocalAndroid {
     }
 
     private static void baixarHttps(URI url, Tarefa tarefa, OutputStream saida) throws IOException {
-        HttpURLConnection conexao = (HttpURLConnection) new URL(url.toString()).openConnection();
-        conexao.setConnectTimeout(60_000);
-        conexao.setReadTimeout(60_000);
-        conexao.setInstanceFollowRedirects(false);  // um redirecionamento sairia da lista do que é permitido
-        conexao.setRequestProperty("User-Agent", "TabSis-Android");
+        HttpURLConnection conexao = null;
+        // Redirecionamento só é seguido se o destino também estiver na lista do que é permitido.
+        for (int saltos = 0; ; saltos++) {
+            conexao = (HttpURLConnection) new URL(url.toString()).openConnection();
+            conexao.setConnectTimeout(60_000);
+            conexao.setReadTimeout(60_000);
+            conexao.setInstanceFollowRedirects(false);
+            conexao.setRequestProperty("User-Agent", "TabSis-Android");
+            int codigo = conexao.getResponseCode();
+            if (codigo / 100 != 3) break;
+            String destino = conexao.getHeaderField("Location");
+            conexao.disconnect();
+            if (destino == null || saltos >= 5) throw new IOException("o DATASUS redirecionou sem destino válido");
+            try {
+                url = validarUrl(url.resolve(destino).toString());
+            } catch (Recusado e) {
+                throw new IOException("o DATASUS redirecionou para um endereço fora da lista: " + destino);
+            }
+        }
         try {
             int codigo = conexao.getResponseCode();
             if (codigo != 200) throw new IOException("o DATASUS respondeu HTTP " + codigo);
@@ -395,17 +416,27 @@ final class LocalAndroid {
     // ------------------------------------------------------------ a pasta
 
     private Uri achar(String nome, String pasta) {
+        return achar(nome, pasta, null);
+    }
+
+    /** O arquivo com este nome na pasta, menos `exceto` (o que acabou de ser gravado). */
+    private Uri achar(String nome, String pasta, Uri exceto) {
         String[] colunas = { MediaStore.Downloads._ID };
+        long idExceto = exceto == null ? -1 : ContentUris.parseId(exceto);
         try (Cursor cursor = contexto.getContentResolver().query(MediaStore.Downloads.EXTERNAL_CONTENT_URI, colunas,
-                MediaStore.Downloads.DISPLAY_NAME + "=? AND " + MediaStore.Downloads.RELATIVE_PATH + "=?", new String[] { nome, pasta }, null)) {
+                MediaStore.Downloads.DISPLAY_NAME + "=? AND " + MediaStore.Downloads.RELATIVE_PATH + "=? AND " + MediaStore.Downloads._ID + "<>?",
+                new String[] { nome, pasta, String.valueOf(idExceto) }, null)) {
             if (cursor != null && cursor.moveToFirst()) return ContentUris.withAppendedId(MediaStore.Downloads.EXTERNAL_CONTENT_URI, cursor.getLong(0));
         }
         return null;
     }
 
-    private void apagar(String nome, String pasta) {
-        Uri existente = achar(nome, pasta);
-        if (existente != null) contexto.getContentResolver().delete(existente, null, null);
+    /** O nome que o Android de fato deu ao arquivo (ele acrescenta " (1)" quando outro app tem um igual). */
+    private String nomeGuardado(Uri uri, String pedido) {
+        try (Cursor cursor = contexto.getContentResolver().query(uri, new String[] { MediaStore.Downloads.DISPLAY_NAME }, null, null, null)) {
+            if (cursor != null && cursor.moveToFirst() && cursor.getString(0) != null) return cursor.getString(0);
+        }
+        return pedido;
     }
 
     /** Os arquivos de dados de Downloads/TabSis (e dos guardados), mais novos primeiro. */
@@ -444,7 +475,6 @@ final class LocalAndroid {
         long tamanho = temporario.length();
         if (tamanho <= 0 || tamanho > MAXIMO) throw new Recusado("tamanho inválido");
         ContentResolver resolver = contexto.getContentResolver();
-        apagar(limpo, PASTA_GUARDADOS);
         ContentValues valores = new ContentValues();
         valores.put(MediaStore.Downloads.DISPLAY_NAME, limpo);
         valores.put(MediaStore.Downloads.MIME_TYPE, "application/octet-stream");
@@ -469,9 +499,13 @@ final class LocalAndroid {
             resolver.delete(uri, null, null);
             throw e;
         }
+        Uri anterior = achar(limpo, PASTA_GUARDADOS, uri);
+        if (anterior != null) resolver.delete(anterior, null, null);
         valores.clear();
         valores.put(MediaStore.Downloads.IS_PENDING, 0);
+        valores.put(MediaStore.Downloads.DISPLAY_NAME, limpo);
         resolver.update(uri, valores, null, null);
+        limpo = nomeGuardado(uri, limpo);
         StringBuilder hex = new StringBuilder();
         for (byte b : resumo.digest()) hex.append(String.format(Locale.ROOT, "%02x", b));
         return new JSONObject().put("path", "Downloads/TabSis/Guardados do navegador/" + limpo).put("bytes", tamanho).put("sha256", hex.toString()).toString();
