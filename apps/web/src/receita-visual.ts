@@ -31,7 +31,17 @@ export interface ReceitaVisualDeps {
   registrosNoConjunto(): number;
   alternar(indice: number): void;
   mover(indice: number, para: -1 | 1): void;
+  /** Arrastar um cartão ligado para a posição de outro. */
+  moverPara(de: number, para: number): void;
   remover(indice: number): void;
+  /** Os primeiros registros que passam pelas `n` primeiras etapas ligadas, com o campo da etapa `n` em destaque. */
+  amostraAte(n: number, maximo: number): Promise<{ destaque: string; campos: string[]; registros: Array<Record<string, unknown>> }>;
+  /** O campo de idade que a etapa de faixa etária usa (NU_IDADE_N, IDADE do SIM, IDADEMAE); vazio se não há. */
+  campoDeIdade(): string;
+  aplicarIdade(minimo: number, maximo: number): void;
+  /** Datas do arquivo com o eixo "Ano de …": oferece a etapa de período. */
+  eixosDeAno(): Array<{ id: string; rotulo: string }>;
+  aplicarAnos(eixo: string, de: number, ate: number): void;
   /** As etapas prontas que fazem sentido para o arquivo aberto. */
   prontas(): EtapaPronta[];
   aplicarPronta(id: string): void;
@@ -59,6 +69,9 @@ export function criarReceitaVisual(deps: ReceitaVisualDeps): ReceitaVisual {
   const prontas = element<HTMLElement>('#receita-prontas');
   const contar = element<HTMLButtonElement>('#receita-contar');
   const painel = element<HTMLElement>('#microdata-view');
+  const configuraveis = element<HTMLElement>('#receita-configuraveis');
+  const amostra = element<HTMLElement>('#receita-amostra');
+  let arrastando: number | null = null;
 
   let pedido = 0;
   let contagens: number[] | null = null;
@@ -83,6 +96,91 @@ export function criarReceitaVisual(deps: ReceitaVisualDeps): ReceitaVisual {
         novo.title = pronta.fonte;
         return novo;
       }));
+  }
+
+  function campoNumero(rotulo: string, valor: string, minimo: number, maximo: number): HTMLInputElement {
+    const entrada = document.createElement('input');
+    entrada.type = 'number';
+    entrada.inputMode = 'numeric';
+    entrada.min = String(minimo);
+    entrada.max = String(maximo);
+    entrada.placeholder = valor;
+    entrada.setAttribute('aria-label', rotulo);
+    return entrada;
+  }
+
+  function renderConfiguraveis(): void {
+    const partes: HTMLElement[] = [];
+    const idade = deps.campoDeIdade();
+    if (idade) {
+      const linha = document.createElement('span');
+      linha.className = 'receita-config';
+      linha.title = `Pelo campo ${idade}`;
+      const de = campoNumero('Idade mínima', '0', 0, 999);
+      const ate = campoNumero('Idade máxima', '999', 0, 999);
+      linha.append('Idade de ', de, ' a ', ate, ' anos ', botao('acrescentar', 'Acrescentar a etapa de idade', () => {
+        deps.aplicarIdade(de.value.trim() === '' ? 0 : Number(de.value), ate.value.trim() === '' ? 999 : Number(ate.value));
+      }));
+      partes.push(linha);
+    }
+    const eixos = deps.eixosDeAno();
+    if (eixos.length) {
+      const linha = document.createElement('span');
+      linha.className = 'receita-config';
+      const qual = document.createElement('select');
+      qual.setAttribute('aria-label', 'Data usada no período');
+      qual.append(...eixos.map((eixo) => new Option(eixo.rotulo, eixo.id)));
+      const de = campoNumero('Primeiro ano', '2016', 1900, 2100);
+      const ate = campoNumero('Último ano', '2025', 1900, 2100);
+      linha.append(qual, ' de ', de, ' a ', ate, ' ', botao('acrescentar', 'Acrescentar a etapa de período', () => {
+        const inicio = Number(de.value || de.placeholder);
+        const fim = Number(ate.value || ate.placeholder);
+        deps.aplicarAnos(qual.value, Math.min(inicio, fim), Math.max(inicio, fim));
+      }));
+      partes.push(linha);
+    }
+    configuraveis.hidden = partes.length === 0;
+    configuraveis.replaceChildren(...partes);
+  }
+
+  async function mostrarAmostra(n: number, rotulo: string): Promise<void> {
+    amostra.hidden = false;
+    const titulo = Object.assign(document.createElement('strong'), { textContent: n ? `Registros depois da etapa ${n}: ${rotulo}` : 'Registros do arquivo' });
+    const nota = Object.assign(document.createElement('small'), { textContent: 'Lendo…' });
+    amostra.replaceChildren(titulo, nota);
+    try {
+      const { destaque, campos, registros } = await deps.amostraAte(n, 8);
+      nota.textContent = registros.length
+        ? `Os ${inteiro.format(registros.length)} primeiros que passam${n ? ' até aqui' : ''}, como estão gravados.`
+        : 'Nenhum registro passa até aqui.';
+      if (!registros.length) return;
+      const ordem = destaque && campos.includes(destaque) ? [destaque, ...campos.filter((campo) => campo !== destaque)] : campos;
+      const tabela = document.createElement('table');
+      tabela.className = 'values-examples-table';
+      const cabeca = tabela.createTHead().insertRow();
+      for (const campo of ordem) {
+        const th = document.createElement('th');
+        th.textContent = campo;
+        if (campo === destaque) th.className = 'values-chosen';
+        cabeca.append(th);
+      }
+      const corpo = tabela.createTBody();
+      for (const registro of registros) {
+        const linha = corpo.insertRow();
+        for (const campo of ordem) {
+          const celula = linha.insertCell();
+          const bruto = registro[campo];
+          celula.textContent = bruto === null || bruto === undefined ? ''
+            : bruto instanceof Date ? bruto.toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : String(bruto);
+          if (campo === destaque) celula.className = 'values-chosen';
+        }
+      }
+      const rolagem = Object.assign(document.createElement('div'), { className: 'values-examples-scroll' });
+      rolagem.append(tabela);
+      amostra.append(rolagem);
+    } catch (error) {
+      nota.textContent = error instanceof Error ? error.message : String(error);
+    }
   }
 
   function renderEtapas(): void {
@@ -122,7 +220,21 @@ export function criarReceitaVisual(deps: ReceitaVisualDeps): ReceitaVisual {
       texto.append(conta);
       const acoes = document.createElement('div');
       acoes.className = 'receita-acoes';
+      const ordemDestaEtapa = ordemLigada;
+      if (etapa.ligada) {
+        // Arrastar (com mouse) muda a ordem; no celular, as setas fazem o mesmo.
+        cartao.draggable = true;
+        cartao.addEventListener('dragstart', (evento) => { arrastando = indice; evento.dataTransfer?.setData('text/plain', String(indice)); cartao.classList.add('receita-arrastando'); });
+        cartao.addEventListener('dragend', () => { arrastando = null; cartao.classList.remove('receita-arrastando'); });
+        cartao.addEventListener('dragover', (evento) => { if (arrastando !== null && arrastando !== indice) evento.preventDefault(); });
+        cartao.addEventListener('drop', (evento) => {
+          evento.preventDefault();
+          if (arrastando !== null && arrastando !== indice) deps.moverPara(arrastando, indice);
+          arrastando = null;
+        });
+      }
       acoes.append(
+        ...(etapa.ligada ? [botao('ver registros', `Ver registros depois de: ${etapa.descricao}`, () => void mostrarAmostra(ordemDestaEtapa, etapa.descricao))] : []),
         botao('↑', `Aplicar antes: ${etapa.descricao}`, () => deps.mover(indice, -1), !etapa.ligada || ordemLigada === 1),
         botao('↓', `Aplicar depois: ${etapa.descricao}`, () => deps.mover(indice, 1), !etapa.ligada || ordemLigada === ligadas),
         botao(etapa.ligada ? 'desligar' : 'ligar', `${etapa.ligada ? 'Desligar' : 'Ligar'}: ${etapa.descricao}`, () => deps.alternar(indice)),
@@ -162,7 +274,9 @@ export function criarReceitaVisual(deps: ReceitaVisualDeps): ReceitaVisual {
   function atualizar(): void {
     pedido += 1;
     contagens = null;
+    amostra.hidden = true;
     renderProntas();
+    renderConfiguraveis();
     renderEtapas();
     contar.disabled = deps.registrosNoConjunto() === 0;
     if (painel.hidden || deps.registrosNoConjunto() === 0) return;

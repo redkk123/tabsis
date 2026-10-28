@@ -156,3 +156,24 @@ export function faixaEtariaSinan(minimo: number, maximo: number): string {
   const anos = minimo === maximo ? ano(minimo) : `${ano(minimo)}-${ano(maximo)}`;
   return minimo === 0 ? `1000-3999, ${anos}` : anos;
 }
+
+/**
+ * A mesma faixa no código de idade do SIM (IDADE, 3 dígitos): o primeiro é a
+ * unidade (1 a 3 = minutos, horas e meses, que entram em "0 ano"; 4 = anos;
+ * 5 = mais de 100 anos, com os dois seguintes contando a partir de 100).
+ * "60 a 999" → "460-499, 500-599".
+ */
+export function faixaEtariaSim(minimo: number, maximo: number): string {
+  if (!Number.isInteger(minimo) || !Number.isInteger(maximo) || minimo < 0 || maximo > 999 || minimo > maximo) {
+    throw new Error('Faixa etária inválida: use anos inteiros de 0 a 999, o início antes do fim.');
+  }
+  const partes: string[] = [];
+  const trecho = (unidade: number, de: number, ate: number): string => {
+    const codigo = (valor: number) => `${unidade}${String(valor).padStart(2, '0')}`;
+    return de === ate ? codigo(de) : `${codigo(de)}-${codigo(ate)}`;
+  };
+  if (minimo === 0) partes.push('100-399');
+  if (minimo <= 99) partes.push(trecho(4, minimo, Math.min(maximo, 99)));
+  if (maximo >= 100) partes.push(trecho(5, Math.max(minimo, 100) - 100, Math.min(maximo, 199) - 100));
+  return partes.join(', ');
+}

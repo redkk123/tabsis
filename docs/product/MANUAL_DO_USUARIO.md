@@ -721,6 +721,43 @@ Arquivos de anos diferentes às vezes trazem um campo com outro tipo ou
 tamanho (no LTANBR25 o DATASUS mudou quatro campos administrativos). Eles
 juntam assim mesmo: o campo entra como texto, e o aviso diz quais foram.
 
+### Roteiro: a análise da leishmaniose em 15 minutos
+
+Refaz, só com cliques, a análise do resumo de leishmaniose tegumentar
+(forma cutânea, DF e Entorno × Brasil, 2016–2025). Os números do fim conferem
+com o script Python que fez o resumo.
+
+1. **Baixar.** Em **Buscar no DATASUS**, escolha SINAN, *Leishmaniose
+   tegumentar* e os anos de 2016 a 2025. Abra os 10 arquivos juntos
+   (LTANBR16 a LTANBR25). O aviso diz "10 arquivos juntos: 153.302
+   registros" (e que, em 2025, quatro campos administrativos mudaram de tipo;
+   eles entram como texto e não afetam a análise).
+2. **Definir o caso.** Na aba **Microdados**, em *Etapas prontas*, toque em
+   **Caso novo (LTA)** e em **Forma cutânea**. A receita mostra o caminho:
+   153.302 notificações → 141.543 casos novos → 139.171 sem mudança de
+   diagnóstico → **131.581** casos novos da forma cutânea no Brasil.
+3. **Ano a ano.** Em *Linhas*, escolha **Ano (um por arquivo aberto)** e
+   execute: a tabela é a série do Brasil.
+4. **A região.** Volte à aba Microdados e toque em **DF e Entorno (RIDE-DF)**:
+   ficam **1.246** casos. A tabela por ano agora é a da região. Para comparar
+   com o Brasil, **desligue** a etapa da RIDE e ligue de novo: a tabela muda
+   na hora.
+5. **Municípios e mapa.** Em *Linhas*, escolha **Município de residência**.
+   Na aba **Mapa**, escolha Goiás (ou o DF) no *Recorte*, marque **Por 100 mil
+   habitantes** e use **Buscar no IBGE**. Para ver onde as pessoas se
+   infectaram, troque o **Lugar** para *município provável de infecção*.
+6. **Perfil.** Em *Linhas*, troque para Sexo, Raça/cor ou Faixa etária: cada
+   tabela é o perfil dos casos da região (a receita continua valendo).
+7. **Relatório.** Toque em **Relatório**, escolha o foco dos mapas e marque
+   *um mapa por período*: sai a página com a tabela, o mapa e um mapa por
+   ano, pronta para imprimir ou salvar em PDF.
+8. **Guardar.** Em *Análises e tabelas salvas*, **Salvar análise** grava a receita
+   (com as etapas desligadas). Reaberta com os arquivos de outro ano, ela
+   refaz tudo.
+
+Conferência: Brasil 131.581; DF e Entorno 1.246; DF 265; Entorno 981
+(casos novos da forma cutânea, 2016–2025).
+
 ### Microdados: ver e escolher os registros
 
 A aba **Microdados** é o laboratório de microdados sem código. A primeira
