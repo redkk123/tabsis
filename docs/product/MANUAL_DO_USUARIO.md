@@ -758,10 +758,15 @@ com o script Python que fez o resumo.
 Conferência: Brasil 131.581; DF e Entorno 1.246; DF 265; Entorno 981
 (casos novos da forma cutânea, 2016–2025).
 
-### Caderno em R: série e perfil
+### Cadernos em R
 
-Na receita, **Caderno em R: série e perfil** abre o Laboratório com um caderno
-pronto em R, sobre os arquivos abertos (um por ano, com o nome do DATASUS):
+Na receita, escolha o modelo em **Caderno em R** e toque em **Abrir caderno
+em R**: o Laboratório abre com o caderno pronto e os dados em `/data`. Só R
+base, então roda também no RStudio (troque `/data/` pela pasta dos CSV).
+Clique em **Executar tudo**; na primeira vez o R (webR) é baixado.
+
+**Série temporal e perfil**, sobre os arquivos abertos (um por ano, com o
+nome do DATASUS):
 
 - a receita é a **definição de caso**; a etapa de município de residência
   (por exemplo, *DF e Entorno*) vira a **região**, e o Brasil é contado sem ela;
@@ -775,10 +780,27 @@ pronto em R, sobre os arquivos abertos (um por ano, com o nome do DATASUS):
   do perfil, região × Brasil, com o qui-quadrado; e os parágrafos de
   **Metodologia** e **Resultados**, com os números.
 
-Clique em **Executar tudo** no Laboratório. Na primeira vez o R (webR) é
-baixado, o que leva alguns segundos. Conferido com a leishmaniose
-2016–2025: os números saem iguais aos do resumo (Brasil 131.581, 6,30 por
-100 mil; DF e Entorno 1.246, 2,70).
+Conferido com a leishmaniose 2016–2025: os números saem iguais aos do resumo
+(Brasil 131.581, 6,30 por 100 mil; DF e Entorno 1.246, 2,70).
+
+**Qualidade do dado:** o preenchimento de cada campo, ano a ano, dos registros
+que passam pela receita (`completude.csv`, contado numa passada pelo arquivo).
+Incompletude = em branco + código de "ignorado" (9, 99… ou I), classificada
+pela escala de Romero & Cunha (2006): excelente abaixo de 5%, bom 5–10%,
+regular 10–20%, ruim 20–50%, muito ruim a partir de 50%. Os campos sempre em
+branco (em geral, administrativos) saem da lista numa linha só; os campos
+essenciais da ficha ganham uma tabela ano a ano, com a tendência em pontos
+percentuais por ano; e há um parágrafo pronto para o trabalho.
+
+**Mapa e conglomerados:** os municípios da região da receita (ou do estado
+escolhido no Recorte do mapa) com casos e população do IBGE
+(`municipios.csv`) e os vizinhos por fronteira, tirados do mapa do Brasil
+(`vizinhos.csv`). O caderno calcula o coeficiente bruto e o suavizado por
+**Bayes empírico** global (que puxa para a média os municípios pequenos), o
+**Moran global** e o **LISA** (Moran local), com 999 permutações, e lista os
+conglomerados Alto-Alto, Baixo-Baixo e os discrepantes. Na leishmaniose do DF
+e Entorno, 2016–2025: Moran 0,70 (p = 0,001) e conglomerado Alto-Alto em Alto
+Paraíso de Goiás, Cavalcante, Niquelândia e São João d'Aliança.
 
 ### Microdados: ver e escolher os registros
 

@@ -120,7 +120,7 @@ import { CAMPOS_DE_CNES, carregarCnes, normalizarCnes } from './cnes.ts';
 import { BASE_DO_APARELHO, TOKEN_DO_APARELHO, criarFetchDaPonte, temPonteLocal } from './ponte-local-android.ts';
 import { RIDE_DF_LC_163_2018, casaDefinicao, descreverDefinicao, faixaEtariaSim, faixaEtariaSinan, lerDefinicao } from '../../../packages/core/src/definicao-caso.ts';
 import { criarReceitaVisual, type EtapaPronta, type ReceitaVisual } from './receita-visual.ts';
-import { cadernoSerieEPerfil } from '../../../packages/analysis/src/caderno-r.ts';
+import { cadernoConglomerados, cadernoQualidade, cadernoSerieEPerfil, type CelulaR } from '../../../packages/analysis/src/caderno-r.ts';
 import {
   tabulationToTabwinPrn,
   tabulationToTabwinSql,
@@ -12522,7 +12522,7 @@ reportButton.addEventListener('click', abrirRelatorio);
 element<HTMLButtonElement>('#receita-caderno-r').addEventListener('click', () => {
   const botao = element<HTMLButtonElement>('#receita-caderno-r');
   botao.disabled = true;
-  abrirCadernoR().catch((error: unknown) => showToast(error instanceof Error ? error.message : String(error), true))
+  abrirCadernoR(element<HTMLSelectElement>('#receita-caderno-modelo').value as ModeloDeCaderno).catch((error: unknown) => showToast(error instanceof Error ? error.message : String(error), true))
     .finally(() => { botao.disabled = !dbfHeader; });
 });
 element<HTMLButtonElement>('#report-close').addEventListener('click', () => reportDialog.close());
@@ -13413,18 +13413,12 @@ const VARIAVEIS_DO_PERFIL: ReadonlyArray<{ campo: string; rotulo: string }> = [
  * município de residência (RIDE-DF, por exemplo), se houver, vira a região, e
  * o Brasil é contado sem ela.
  */
-async function abrirCadernoR(): Promise<void> {
-  if (!dbfHeader) throw new Error('Abra os arquivos antes.');
-  const residencia = findGeographicFields(dbfHeader.fields).find((candidato) => candidato.level === 'municipality');
-  if (!residencia) throw new Error('O caderno precisa de um campo de município (residência).');
-  // O ano de cada arquivo: o período curto do nome do DATASUS ("2023" em LTANBR23).
-  const anoDe = new Map(activeDatasetSources.map((source) => [source.name, /^\d{4}$/.test(describeDatasusFile(source.name)?.periodShort ?? '') ? Number(describeDatasusFile(source.name)!.periodShort) : undefined]));
-  if ([...anoDe.values()].some((ano) => !ano)) throw new Error('O caderno conta um ano por arquivo: abra os arquivos com o nome do DATASUS (LTANBR16, LTANBR17…).');
-  const ehRegiao = (filtro: FilterSpec): boolean => filtro.field === residencia.field && filtro.mode !== 'exclude'
-    && (filtro.kind === 'code-rules' || (filtro.kind !== 'numeric-range' && !filtro.conversionId));
-  const filtroDaRegiao = configuredFilters.find(ehRegiao);
-  const definicao = configuredFilters.filter((filtro) => filtro !== filtroDaRegiao);
+type ModeloDeCaderno = 'serie' | 'qualidade' | 'conglomerados';
+type PacoteDoCaderno = { arquivos: Array<{ name: string; linhas: string[] }>; caderno: { title: string; cells: CelulaR[] } };
 
+/** Abre o Laboratório no clique (senão o navegador bloqueia a aba) e manda o caderno quando ele estiver pronto. */
+async function abrirCadernoR(modelo: ModeloDeCaderno): Promise<void> {
+  if (!dbfHeader) throw new Error('Abra os arquivos antes.');
   const lab = window.open('./lab/?origem=tabsis', '_blank');
   if (!lab) throw new Error('O navegador bloqueou a nova aba do Laboratório; permita janelas para este site.');
   let pronto = false;
@@ -13436,108 +13430,251 @@ async function abrirCadernoR(): Promise<void> {
   };
   window.addEventListener('message', ouvir);
   try {
-    const tabular = async (spec: { rows: { field: string; unclassifiedPolicy?: 'discriminate' }; filters: FilterSpec[] }, sourceNames?: string[]) => {
-      const plan = compilarPlano({
-        compatibilityProfile: currentCompatibilityProfile, rows: spec.rows, measure: { kind: 'count' as const },
-        filters: spec.filters.map(cloneFilter),
-        ...(configuredCrossFieldRules.length ? { crossFieldRules: configuredCrossFieldRules.map(cloneCrossFieldRule) } : {}),
-        suppressZeroRows: true, suppressZeroColumns: false,
-      });
-      const { result } = await askDataset<{ result: TabulationResult }>(
-        { type: 'tabulate', plan, conversions: conversionsForPlan(plan), ...(sourceNames ? { sourceNames } : {}) },
-        { label: 'Caderno em R' },
-      );
-      return result;
-    };
-    // 1. Casos por ano (um arquivo por ano) e município de residência.
-    const linhasCasos = ['ano;municipio;casos'];
-    for (const source of activeDatasetSources) {
-      showToast(`Caderno em R: contando ${source.name}…`);
-      const resultado = await tabular({ rows: { field: residencia.field, unclassifiedPolicy: 'discriminate' }, filters: definicao }, [source.name]);
-      // Caso sem município de residência válido (em branco, ignorado, exterior)
-      // conta no Brasil, com o município vazio: como no resumo.
-      let semMunicipio = 0;
-      resultado.rows.forEach((row, indice) => {
-        const codigo = row.key === UNCLASSIFIED_KEY ? '' : row.key.trim().slice(0, 6);
-        const casos = resultado.cells[indice]?.[0] ?? 0;
-        if (/^\d{6}$/.test(codigo)) linhasCasos.push(`${anoDe.get(source.name)};${codigo};${casos}`);
-        else semMunicipio += casos;
-      });
-      if (semMunicipio) linhasCasos.push(`${anoDe.get(source.name)};;${semMunicipio}`);
-    }
-    // 2. População do IBGE, por ano e município.
-    const anos = [...new Set([...anoDe.values()].map(String))].sort();
-    const { porAno } = await populacaoIbgePorAno(anos, (texto) => showToast(`Caderno em R: ${texto}`));
-    const linhasPopulacao = ['ano;municipio;populacao'];
-    for (const [ano, tabela] of porAno) for (const [codigo, habitantes] of tabela) linhasPopulacao.push(`${ano};${codigo};${habitantes}`);
-    // 3. A região: os municípios que a etapa de residência aceita.
-    const municipios = [...(porAno.values().next().value ?? new Map<string, number>()).keys()];
-    let regiao: string[] = [];
-    let nomeDaRegiao = 'Região';
-    if (filtroDaRegiao?.kind === 'code-rules') {
-      const regra = lerDefinicao(filtroDaRegiao.include, filtroDaRegiao.exclude);
-      regiao = municipios.filter((codigo) => casaDefinicao(regra, codigo));
-      nomeDaRegiao = filtroDaRegiao.include === RIDE_DF_LC_163_2018.join(', ') ? 'DF e Entorno' : `Região (${descreverDefinicao(regra).slice(0, 60)})`;
-    } else if (filtroDaRegiao && 'acceptedCategories' in filtroDaRegiao) {
-      const aceitos = new Set(filtroDaRegiao.acceptedCategories.map((codigo) => codigo.trim().slice(0, 6)));
-      regiao = municipios.filter((codigo) => aceitos.has(codigo));
-    }
-    // 4. Perfil: contagens por categoria, no Brasil e na região.
-    const linhasPerfil = ['variavel;codigo;rotulo;grupo;casos'];
-    const campos = new Set(dbfHeader.fields.map((field) => field.name));
-    const jaRecortados = new Set(definicao.map((filtro) => filtro.field));
-    const vistos = new Set<string>();
-    const variaveis = VARIAVEIS_DO_PERFIL.filter((variavel) => {
-      if (!campos.has(variavel.campo) || jaRecortados.has(variavel.campo) || vistos.has(variavel.rotulo)) return false;
-      vistos.add(variavel.rotulo);
-      return true;
-    });
-    const limpar = (texto: string) => texto.replace(/[;\r\n]/g, ' ');
-    for (const variavel of variaveis) {
-      const significados = valoresDoDicionario(entradaDoDicionario(variavel.campo)?.entry.values);
-      for (const [grupo, filtros] of [['brasil', definicao], ['regiao', filtroDaRegiao ? [...definicao, filtroDaRegiao] : null]] as const) {
-        if (!filtros) continue;
-        const resultado = await tabular({ rows: { field: variavel.campo, unclassifiedPolicy: 'discriminate' }, filters: filtros });
-        resultado.rows.forEach((row, indice) => {
-          const codigo = row.key === UNCLASSIFIED_KEY ? '' : row.key.trim();
-          const rotulo = codigo === '' ? '' : significados.get(codigo) ?? (/^\d+$/.test(codigo) ? significados.get(String(Number(codigo))) : undefined) ?? codigo;
-          linhasPerfil.push(`${variavel.campo};${limpar(codigo)};${limpar(rotulo)};${grupo};${resultado.cells[indice]?.[0] ?? 0}`);
-        });
-      }
-    }
-    // 5. O caderno, e o envio ao Laboratório.
-    const tipo = activeDatasetSources.map((source) => describeDatasusFile(source.name)).find(Boolean);
-    const novo = definicao.some((filtro) => filtro.field === 'CLA_TIPO_N' && 'acceptedCategories' in filtro && filtro.acceptedCategories.join() === '1');
-    const forma = definicao.find((filtro) => filtro.field === 'CLAS_FORMA' && 'acceptedCategories' in filtro && filtro.acceptedCategories.length === 1);
-    const nomeForma = forma && 'acceptedCategories' in forma ? valoresDoDicionario(entradaDoDicionario('CLAS_FORMA')?.entry.values).get(forma.acceptedCategories[0]!) : undefined;
-    const agravo = `casos ${novo ? 'novos ' : ''}de ${(tipo?.kind ?? datasetName).toLowerCase()}${nomeForma ? ` (forma ${nomeForma.toLowerCase()})` : ''}`;
-    const caderno = cadernoSerieEPerfil({
-      titulo: `${tipo?.kind ?? datasetName}: série e perfil${regiao.length ? `, ${nomeDaRegiao} × Brasil` : ''}`,
-      definicaoDeCaso: definicao.map((filtro) => describeFilter(filtro, filtro.mode === 'exclude' ? 'Excluir' : 'Incluir')),
-      agravo, regiao, nomeDaRegiao,
-      arquivos: activeDatasetSources.map((source) => source.name),
-      variaveisDoPerfil: variaveis,
-      geradoEm: new Date().toLocaleString('pt-BR'),
-    });
+    const pacote = modelo === 'qualidade' ? await montarCadernoQualidade()
+      : modelo === 'conglomerados' ? await montarCadernoConglomerados() : await montarCadernoSerie();
     const codificar = new TextEncoder();
-    const arquivos = [['casos.csv', linhasCasos], ['populacao.csv', linhasPopulacao], ['perfil.csv', linhasPerfil]]
-      .map(([name, linhas]) => ({ name: name as string, bytes: codificar.encode(`${(linhas as string[]).join('\n')}\n`).buffer as ArrayBuffer }));
+    const arquivos = pacote.arquivos.map(({ name, linhas }) => ({ name, bytes: codificar.encode(`${linhas.join('\n')}\n`).buffer as ArrayBuffer }));
     await new Promise<void>((resolve, reject) => {
       const prazo = window.setTimeout(() => reject(new Error('O Laboratório não respondeu em 60 segundos.')), 60_000);
       envio = () => {
         window.clearTimeout(prazo);
-        lab.postMessage({ tipo: 'tabsis:dados', arquivos, caderno }, window.location.origin, arquivos.map((arquivo) => arquivo.bytes));
+        lab.postMessage({ tipo: 'tabsis:dados', arquivos, caderno: pacote.caderno }, window.location.origin, arquivos.map((arquivo) => arquivo.bytes));
         resolve();
       };
       if (pronto) envio();
     });
-    showToast(`Caderno em R aberto no Laboratório: ${caderno.cells.length} células, com os casos, a população do IBGE e o perfil.`);
+    showToast(`Caderno em R aberto no Laboratório: ${pacote.caderno.cells.length} células. Clique em "Executar tudo".`);
   } catch (error) {
     lab.close();
     throw error;
   } finally {
     window.removeEventListener('message', ouvir);
   }
+}
+
+/** A região da receita: a etapa de município de residência (RIDE-DF, por exemplo), e o resto, que é a definição de caso. */
+function regiaoDaReceita(): { residencia: GeographicCandidate; filtroDaRegiao: FilterSpec | undefined; definicao: FilterSpec[] } {
+  const residencia = dbfHeader ? findGeographicFields(dbfHeader.fields).find((candidato) => candidato.level === 'municipality') : undefined;
+  if (!residencia) throw new Error('O caderno precisa de um campo de município (residência).');
+  const ehRegiao = (filtro: FilterSpec): boolean => filtro.field === residencia.field && filtro.mode !== 'exclude'
+    && (filtro.kind === 'code-rules' || (filtro.kind !== 'numeric-range' && !filtro.conversionId));
+  const filtroDaRegiao = configuredFilters.find(ehRegiao);
+  return { residencia, filtroDaRegiao, definicao: configuredFilters.filter((filtro) => filtro !== filtroDaRegiao) };
+}
+
+/** Os municípios (do IBGE) que a etapa de residência aceita, e um nome para eles. */
+function municipiosDaRegiao(filtro: FilterSpec | undefined, municipios: readonly string[]): { codigos: string[]; nome: string } {
+  if (filtro?.kind === 'code-rules') {
+    const regra = lerDefinicao(filtro.include, filtro.exclude);
+    return {
+      codigos: municipios.filter((codigo) => casaDefinicao(regra, codigo)),
+      nome: filtro.include === RIDE_DF_LC_163_2018.join(', ') ? 'DF e Entorno' : `Região (${descreverDefinicao(regra).slice(0, 60)})`,
+    };
+  }
+  if (filtro && 'acceptedCategories' in filtro) {
+    const aceitos = new Set(filtro.acceptedCategories.map((codigo) => codigo.trim().slice(0, 6)));
+    return { codigos: municipios.filter((codigo) => aceitos.has(codigo)), nome: 'Região' };
+  }
+  return { codigos: [], nome: 'Região' };
+}
+
+/** O ano de cada arquivo: o período curto do nome do DATASUS ("2023" em LTANBR23). */
+function anosDosArquivos(): Map<string, number | undefined> {
+  return new Map(activeDatasetSources.map((source) => {
+    const curto = describeDatasusFile(source.name)?.periodShort ?? '';
+    return [source.name, /^\d{4}$/.test(curto) ? Number(curto) : undefined];
+  }));
+}
+
+async function tabularParaCaderno(rows: { field: string; unclassifiedPolicy?: 'discriminate' }, filters: FilterSpec[], sourceNames?: string[]): Promise<TabulationResult> {
+  const plan = compilarPlano({
+    compatibilityProfile: currentCompatibilityProfile, rows, measure: { kind: 'count' as const },
+    filters: filters.map(cloneFilter),
+    ...(configuredCrossFieldRules.length ? { crossFieldRules: configuredCrossFieldRules.map(cloneCrossFieldRule) } : {}),
+    suppressZeroRows: true, suppressZeroColumns: false,
+  });
+  const { result } = await askDataset<{ result: TabulationResult }>(
+    { type: 'tabulate', plan, conversions: conversionsForPlan(plan), ...(sourceNames ? { sourceNames } : {}) },
+    { label: 'Caderno em R' },
+  );
+  return result;
+}
+
+/** Campos essenciais das fichas do SINAN, SIM e SINASC, destacados no caderno de qualidade. */
+const CAMPOS_ESSENCIAIS = ['CS_SEXO', 'SEXO', 'NU_IDADE_N', 'IDADE', 'CS_RACA', 'RACACOR', 'CS_ESCOL_N', 'ESC', 'ID_MN_RESI', 'CODMUNRES',
+  'ID_OCUPA_N', 'CLA_TIPO_N', 'CLAS_FORMA', 'CRITERIO', 'CLASSI_FIN', 'EVOLUCAO', 'TPAUTOCTO', 'COUFINF', 'COMUNINF', 'DT_ENCERRA', 'CAUSABAS'];
+
+async function montarCadernoQualidade(): Promise<PacoteDoCaderno> {
+  if (!dbfHeader) throw new Error('Abra os arquivos antes.');
+  const anoDe = anosDosArquivos();
+  const plan = compilarPlano({
+    compatibilityProfile: currentCompatibilityProfile, rows: { field: dbfHeader.fields[0]!.name }, measure: { kind: 'count' as const },
+    filters: configuredFilters.map(cloneFilter), suppressZeroRows: true, suppressZeroColumns: false,
+  });
+  showToast('Caderno em R: contando o preenchimento de cada campo…');
+  const resposta = await askDataset<{ campos: string[]; porFonte: Array<{ fonte: string; registros: number; brancos: Record<string, number>; ignorados: Record<string, number> }> }>(
+    { type: 'completude', filters: plan.spec.filters, conversions: conversionsForPlan(plan) },
+    { label: 'Qualidade do dado', progress: datasetProgress('Contando o preenchimento') },
+  );
+  const limpar = (texto: string) => texto.replace(/[;\r\n]/g, ' ');
+  const linhas = ['ano;campo;rotulo;registros;brancos;ignorados'];
+  resposta.porFonte.forEach((fonte, indice) => {
+    const ano = anoDe.get(fonte.fonte) ?? indice + 1;
+    for (const campo of resposta.campos) {
+      linhas.push(`${ano};${campo};${limpar(entradaDoDicionario(campo)?.entry.label ?? '')};${fonte.registros};${fonte.brancos[campo] ?? 0};${fonte.ignorados[campo] ?? 0}`);
+    }
+  });
+  const tipo = activeDatasetSources.map((source) => describeDatasusFile(source.name)).find(Boolean);
+  return {
+    arquivos: [{ name: 'completude.csv', linhas }],
+    caderno: cadernoQualidade({
+      titulo: `${tipo?.kind ?? datasetName}: qualidade do dado`,
+      definicaoDeCaso: configuredFilters.map((filtro) => describeFilter(filtro, filtro.mode === 'exclude' ? 'Excluir' : 'Incluir')),
+      arquivos: activeDatasetSources.map((source) => source.name),
+      essenciais: CAMPOS_ESSENCIAIS.filter((campo) => resposta.campos.includes(campo)),
+      geradoEm: new Date().toLocaleString('pt-BR'),
+    }),
+  };
+}
+
+/** Pares de municípios vizinhos por fronteira (dois ou mais vértices em comum no mapa do Brasil). */
+async function vizinhancaDosMunicipios(): Promise<{ nomes: Map<string, string>; pares: Array<[string, string]> }> {
+  const resposta = await fetch(new URL('maps/br_municip.MAP', document.baseURI));
+  if (!resposta.ok) throw new Error('Não deu para ler o mapa dos municípios.');
+  const mapa = parseTabwinMap(new Uint8Array(await resposta.arrayBuffer()));
+  const nomes = new Map<string, string>();
+  const donos = new Map<string, Set<string>>();
+  for (const objeto of mapa.objects) {
+    const codigo = objeto.geocode.trim().slice(0, 6);
+    nomes.set(codigo, objeto.name);
+    for (const parte of objeto.parts) for (const ponto of parte) {
+      const chave = `${ponto.x.toFixed(4)},${ponto.y.toFixed(4)}`;
+      let conjunto = donos.get(chave);
+      if (!conjunto) donos.set(chave, conjunto = new Set());
+      conjunto.add(codigo);
+    }
+  }
+  const comuns = new Map<string, number>();
+  for (const conjunto of donos.values()) {
+    if (conjunto.size < 2) continue;
+    const lista = [...conjunto];
+    for (const a of lista) for (const b of lista) if (a < b) comuns.set(`${a}|${b}`, (comuns.get(`${a}|${b}`) ?? 0) + 1);
+  }
+  const pares: Array<[string, string]> = [];
+  for (const [par, quantos] of comuns) if (quantos >= 2) pares.push(par.split('|') as [string, string]);
+  return { nomes, pares };
+}
+
+async function montarCadernoConglomerados(): Promise<PacoteDoCaderno> {
+  const { residencia, filtroDaRegiao, definicao } = regiaoDaReceita();
+  const anoDe = anosDosArquivos();
+  const anos = [...new Set([...anoDe.values()].filter((ano): ano is number => ano !== undefined).map(String))].sort();
+  if (!anos.length) throw new Error('O caderno usa a população de cada ano: abra os arquivos com o nome do DATASUS (LTANBR16…).');
+  showToast('Caderno em R: buscando a população no IBGE…');
+  const { porAno } = await populacaoIbgePorAno(anos);
+  const todos = [...(porAno.values().next().value ?? new Map<string, number>()).keys()];
+  let { codigos: area, nome } = municipiosDaRegiao(filtroDaRegiao, todos);
+  if (!area.length && mapUfFilter) {
+    area = todos.filter((codigo) => codigo.startsWith(mapUfFilter));
+    nome = ufNameForCode(mapUfFilter);
+  }
+  if (!area.length) throw new Error('Escolha onde procurar conglomerados: acrescente uma etapa de região na receita (DF e Entorno, por exemplo) ou escolha um estado no Recorte do mapa.');
+  if (area.length > 1500) throw new Error(`São ${area.length} municípios: escolha uma região menor ou um estado (o cálculo roda no navegador).`);
+  showToast('Caderno em R: contando os casos por município…');
+  const resultado = await tabularParaCaderno({ field: residencia.field }, definicao);
+  const casos = new Map<string, number>();
+  resultado.rows.forEach((row, indice) => {
+    const codigo = row.key.trim().slice(0, 6);
+    casos.set(codigo, (casos.get(codigo) ?? 0) + (resultado.cells[indice]?.[0] ?? 0));
+  });
+  const { nomes, pares } = await vizinhancaDosMunicipios();
+  const naArea = new Set(area);
+  const limpar = (texto: string) => texto.replace(/[;\r\n]/g, ' ');
+  const municipios = ['municipio;nome;casos;populacao', ...area.map((codigo) => {
+    const populacao = [...porAno.values()].reduce((soma, tabela) => soma + (tabela.get(codigo) ?? 0), 0);
+    return `${codigo};${limpar(nomes.get(codigo) ?? codigo)};${casos.get(codigo) ?? 0};${populacao}`;
+  })];
+  const vizinhos = ['municipio;vizinho', ...pares.filter(([a, b]) => naArea.has(a) && naArea.has(b)).flatMap(([a, b]) => [`${a};${b}`, `${b};${a}`])];
+  const tipo = activeDatasetSources.map((source) => describeDatasusFile(source.name)).find(Boolean);
+  return {
+    arquivos: [{ name: 'municipios.csv', linhas: municipios }, { name: 'vizinhos.csv', linhas: vizinhos }],
+    caderno: cadernoConglomerados({
+      titulo: `${tipo?.kind ?? datasetName}: mapa e conglomerados, ${nome}`,
+      definicaoDeCaso: definicao.map((filtro) => describeFilter(filtro, filtro.mode === 'exclude' ? 'Excluir' : 'Incluir')),
+      arquivos: activeDatasetSources.map((source) => source.name),
+      nomeDaArea: nome, anos: anos.length, geradoEm: new Date().toLocaleString('pt-BR'),
+    }),
+  };
+}
+
+async function montarCadernoSerie(): Promise<PacoteDoCaderno> {
+  if (!dbfHeader) throw new Error('Abra os arquivos antes.');
+  const { residencia, filtroDaRegiao, definicao } = regiaoDaReceita();
+  const anoDe = anosDosArquivos();
+  if ([...anoDe.values()].some((ano) => !ano)) throw new Error('O caderno conta um ano por arquivo: abra os arquivos com o nome do DATASUS (LTANBR16, LTANBR17…).');
+  // 1. Casos por ano (um arquivo por ano) e município de residência. Caso sem
+  // município válido (em branco, ignorado, exterior) conta no Brasil, com o
+  // município vazio: como no resumo.
+  const linhasCasos = ['ano;municipio;casos'];
+  for (const source of activeDatasetSources) {
+    showToast(`Caderno em R: contando ${source.name}…`);
+    const resultado = await tabularParaCaderno({ field: residencia.field, unclassifiedPolicy: 'discriminate' }, definicao, [source.name]);
+    let semMunicipio = 0;
+    resultado.rows.forEach((row, indice) => {
+      const codigo = row.key === UNCLASSIFIED_KEY ? '' : row.key.trim().slice(0, 6);
+      const casos = resultado.cells[indice]?.[0] ?? 0;
+      if (/^\d{6}$/.test(codigo)) linhasCasos.push(`${anoDe.get(source.name)};${codigo};${casos}`);
+      else semMunicipio += casos;
+    });
+    if (semMunicipio) linhasCasos.push(`${anoDe.get(source.name)};;${semMunicipio}`);
+  }
+  // 2. População do IBGE, por ano e município.
+  const anos = [...new Set([...anoDe.values()].map(String))].sort();
+  const { porAno } = await populacaoIbgePorAno(anos, (texto) => showToast(`Caderno em R: ${texto}`));
+  const linhasPopulacao = ['ano;municipio;populacao'];
+  for (const [ano, tabela] of porAno) for (const [codigo, habitantes] of tabela) linhasPopulacao.push(`${ano};${codigo};${habitantes}`);
+  // 3. A região: os municípios que a etapa de residência aceita.
+  const { codigos: regiao, nome: nomeDaRegiao } = municipiosDaRegiao(filtroDaRegiao, [...(porAno.values().next().value ?? new Map<string, number>()).keys()]);
+  // 4. Perfil: contagens por categoria, no Brasil e na região.
+  const linhasPerfil = ['variavel;codigo;rotulo;grupo;casos'];
+  const campos = new Set(dbfHeader.fields.map((field) => field.name));
+  const jaRecortados = new Set(definicao.map((filtro) => filtro.field));
+  const vistos = new Set<string>();
+  const variaveis = VARIAVEIS_DO_PERFIL.filter((variavel) => {
+    if (!campos.has(variavel.campo) || jaRecortados.has(variavel.campo) || vistos.has(variavel.rotulo)) return false;
+    vistos.add(variavel.rotulo);
+    return true;
+  });
+  const limpar = (texto: string) => texto.replace(/[;\r\n]/g, ' ');
+  for (const variavel of variaveis) {
+    const significados = valoresDoDicionario(entradaDoDicionario(variavel.campo)?.entry.values);
+    for (const [grupo, filtros] of [['brasil', definicao], ['regiao', filtroDaRegiao ? [...definicao, filtroDaRegiao] : null]] as const) {
+      if (!filtros) continue;
+      const resultado = await tabularParaCaderno({ field: variavel.campo, unclassifiedPolicy: 'discriminate' }, filtros);
+      resultado.rows.forEach((row, indice) => {
+        const codigo = row.key === UNCLASSIFIED_KEY ? '' : row.key.trim();
+        const rotulo = codigo === '' ? '' : significados.get(codigo) ?? (/^\d+$/.test(codigo) ? significados.get(String(Number(codigo))) : undefined) ?? codigo;
+        linhasPerfil.push(`${variavel.campo};${limpar(codigo)};${limpar(rotulo)};${grupo};${resultado.cells[indice]?.[0] ?? 0}`);
+      });
+    }
+  }
+  // 5. O caderno.
+  const tipo = activeDatasetSources.map((source) => describeDatasusFile(source.name)).find(Boolean);
+  const novo = definicao.some((filtro) => filtro.field === 'CLA_TIPO_N' && 'acceptedCategories' in filtro && filtro.acceptedCategories.join() === '1');
+  const forma = definicao.find((filtro) => filtro.field === 'CLAS_FORMA' && 'acceptedCategories' in filtro && filtro.acceptedCategories.length === 1);
+  const nomeForma = forma && 'acceptedCategories' in forma ? valoresDoDicionario(entradaDoDicionario('CLAS_FORMA')?.entry.values).get(forma.acceptedCategories[0]!) : undefined;
+  const agravo = `casos ${novo ? 'novos ' : ''}de ${(tipo?.kind ?? datasetName).toLowerCase()}${nomeForma ? ` (forma ${nomeForma.toLowerCase()})` : ''}`;
+  return {
+    arquivos: [{ name: 'casos.csv', linhas: linhasCasos }, { name: 'populacao.csv', linhas: linhasPopulacao }, { name: 'perfil.csv', linhas: linhasPerfil }],
+    caderno: cadernoSerieEPerfil({
+      titulo: `${tipo?.kind ?? datasetName}: série e perfil${regiao.length ? `, ${nomeDaRegiao} × Brasil` : ''}`,
+      definicaoDeCaso: definicao.map((filtro) => describeFilter(filtro, filtro.mode === 'exclude' ? 'Excluir' : 'Incluir')),
+      agravo, regiao, nomeDaRegiao,
+      arquivos: activeDatasetSources.map((source) => source.name),
+      variaveisDoPerfil: variaveis,
+      geradoEm: new Date().toLocaleString('pt-BR'),
+    }),
+  };
 }
 
 /** O campo de idade que a receita sabe ler: SINAN, SIM (pelo nome do arquivo) ou a idade da mãe (SINASC). */

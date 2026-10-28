@@ -1087,7 +1087,12 @@
               <p class="query-status" id="receita-status" aria-live="polite"></p>
               <div class="query-actions">
                 <button class="secondary-button" id="receita-contar" type="button" disabled>Contar cada etapa</button>
-                <button class="primary-button" id="receita-caderno-r" type="button" disabled title="Abre no Laboratório um caderno em R com a série por ano, a tendência (Prais-Winsten) e o perfil dos casos, região × Brasil, com o texto da Metodologia. A etapa de município de residência (RIDE-DF, por exemplo) vira a região."><span>Caderno em R: série e perfil</span></button>
+                <label class="receita-modelo"><span>Caderno em R</span><select id="receita-caderno-modelo" title="Cadernos-modelo prontos, só com R base: rodam no Laboratório (webR) e no RStudio">
+                  <option value="serie">Série temporal e perfil (região × Brasil)</option>
+                  <option value="qualidade">Qualidade do dado (preenchimento por campo e ano)</option>
+                  <option value="conglomerados">Mapa e conglomerados (Bayes empírico, Moran)</option>
+                </select></label>
+                <button class="primary-button" id="receita-caderno-r" type="button" disabled title="Abre no Laboratório o caderno escolhido, com os dados já prontos em /data. A receita é a definição de caso; a etapa de município de residência (RIDE-DF, por exemplo) vira a região."><span>Abrir caderno em R</span></button>
               </div>
               <div class="values-examples" id="receita-amostra" hidden></div>
             </section>

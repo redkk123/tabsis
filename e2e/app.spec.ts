@@ -1904,6 +1904,24 @@ test('Caderno em R: a receita vira definição de caso e região, e o Laboratór
   const primeira = await lab.locator('.cell textarea, .cell .cell-code').first().inputValue().catch(async () => lab.locator('.cell').first().innerText());
   expect(primeira).toContain('NOME_REGIAO <- "DF e Entorno"');
   expect(primeira).toContain('"530010", "520060"');
+  await lab.close();
+
+  // Qualidade do dado: o preenchimento de cada campo, ano a ano.
+  await page.locator('#receita-caderno-modelo').selectOption('qualidade');
+  const popupQualidade = context.waitForEvent('page');
+  await page.locator('#receita-caderno-r').click();
+  const labQualidade = await popupQualidade;
+  await expect(labQualidade.locator('#save-status')).toContainText('Dados do TabSis em /data: completude.csv', { timeout: 30000 });
+  await expect(labQualidade.locator('.cell-runtime')).toHaveCount(4);
+  await labQualidade.close();
+
+  // Mapa e conglomerados: os municípios da região e os vizinhos por fronteira, do mapa do Brasil.
+  await page.locator('#receita-caderno-modelo').selectOption('conglomerados');
+  const popupMapa = context.waitForEvent('page');
+  await page.locator('#receita-caderno-r').click();
+  const labMapa = await popupMapa;
+  await expect(labMapa.locator('#save-status')).toContainText('municipios.csv, vizinhos.csv', { timeout: 30000 });
+  await expect(labMapa.locator('.cell-runtime')).toHaveCount(5);
 });
 
 test('Microdados: atalhos de RIDE-DF e idade, com uma regra por campo', async ({ page }) => {

@@ -34,3 +34,22 @@ test('sem região, o caderno roda só com o Brasil', () => {
   assert.match(cells[0].code, /REGIAO <- character\(0\)/);
   assert.match(cells[1].code, /regiao <- if \(length\(REGIAO\)\) serie\(REGIAO\) else NULL/);
 });
+
+test('caderno de qualidade: lê completude.csv, classifica pela escala de Romero & Cunha e destaca os essenciais', async () => {
+  const { cadernoQualidade } = await import('../dist/packages/analysis/src/caderno-r.js');
+  const { cells } = cadernoQualidade({ titulo: 'LTA: qualidade', definicaoDeCaso: [], arquivos: ['LTANBR23.dbf'], essenciais: ['CS_SEXO', 'EVOLUCAO'], geradoEm: 'hoje' });
+  const codigo = cells.map((cell) => cell.code).join('\n');
+  assert.ok(cells.every((cell) => cell.runtime === 'r'));
+  assert.match(codigo, /\/data\/completude\.csv/);
+  assert.match(codigo, /c\(-Inf, 5, 10, 20, 50, Inf\)/);
+  assert.match(codigo, /ESSENCIAIS <- c\(\n {2}"CS_SEXO", "EVOLUCAO"\n\)/);
+  assert.match(codigo, /Sempre em branco/);
+});
+
+test('caderno de conglomerados: Bayes empírico, Moran global e LISA sobre municipios.csv e vizinhos.csv', async () => {
+  const { cadernoConglomerados } = await import('../dist/packages/analysis/src/caderno-r.js');
+  const { cells } = cadernoConglomerados({ titulo: 'LTA: mapa', definicaoDeCaso: [], arquivos: ['LTANBR23.dbf'], nomeDaArea: 'DF e Entorno', anos: 10, geradoEm: 'hoje' });
+  const codigo = cells.map((cell) => cell.code).join('\n');
+  for (const trecho of ['/data/municipios.csv', '/data/vizinhos.csv', 'set.seed(2026)', 'coef_bayes', 'replicate(999', 'Alto-Alto']) assert.ok(codigo.includes(trecho), trecho);
+  assert.match(codigo, /AREA <- "DF e Entorno"/);
+});
