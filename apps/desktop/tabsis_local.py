@@ -40,7 +40,7 @@ from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-VERSAO = '1.0.7'
+VERSAO = '1.0.8'
 PROTOCOLO = 1
 PORTA_PADRAO = 8787
 SITE = 'https://tabweb.me/'

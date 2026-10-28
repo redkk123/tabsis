@@ -280,6 +280,7 @@ export function criarReceitaVisual(deps: ReceitaVisualDeps): ReceitaVisual {
     renderEtapas();
     contar.disabled = deps.registrosNoConjunto() === 0;
     element<HTMLButtonElement>('#receita-caderno-r').disabled = deps.registrosNoConjunto() === 0;
+    element<HTMLButtonElement>('#receita-relatorio').disabled = deps.registrosNoConjunto() === 0;
     if (painel.hidden || deps.registrosNoConjunto() === 0) return;
     if (deps.registrosNoConjunto() <= CONTAR_SOZINHO_ATE) void contarTudo();
     else estado.textContent = 'Arquivo grande: use "Contar cada etapa" para ver quantos registros sobram em cada uma.';

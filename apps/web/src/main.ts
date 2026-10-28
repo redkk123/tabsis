@@ -121,6 +121,7 @@ import { BASE_DO_APARELHO, TOKEN_DO_APARELHO, criarFetchDaPonte, temPonteLocal }
 import { RIDE_DF_LC_163_2018, casaDefinicao, descreverDefinicao, faixaEtariaSim, faixaEtariaSinan, lerDefinicao } from '../../../packages/core/src/definicao-caso.ts';
 import { criarReceitaVisual, type EtapaPronta, type ReceitaVisual } from './receita-visual.ts';
 import { cadernoConglomerados, cadernoQualidade, cadernoSerieEPerfil, type CelulaR } from '../../../packages/analysis/src/caderno-r.ts';
+import { relatorioEpidemiologico, type GrupoDoRelatorio, type MunicipioDoRelatorio, type PerfilDoRelatorio } from '../../../packages/analysis/src/relatorio-epidemiologico.ts';
 import {
   tabulationToTabwinPrn,
   tabulationToTabwinSql,
@@ -12635,6 +12636,12 @@ element<HTMLButtonElement>('#receita-caderno-r').addEventListener('click', () =>
   abrirCadernoR(element<HTMLSelectElement>('#receita-caderno-modelo').value as ModeloDeCaderno).catch((error: unknown) => showToast(error instanceof Error ? error.message : String(error), true))
     .finally(() => { botao.disabled = !dbfHeader; });
 });
+element<HTMLButtonElement>('#receita-relatorio').addEventListener('click', () => {
+  const botao = element<HTMLButtonElement>('#receita-relatorio');
+  botao.disabled = true;
+  baixarRelatorioEpidemiologico().catch((error: unknown) => showToast(error instanceof Error ? error.message : String(error), true))
+    .finally(() => { botao.disabled = !dbfHeader; });
+});
 element<HTMLButtonElement>('#report-close').addEventListener('click', () => reportDialog.close());
 reportForm.addEventListener('submit', (event) => { event.preventDefault(); void montarRelatorio(); });
 tableEditColumn.addEventListener('change', updateColumnEditButtons);
@@ -13770,10 +13777,7 @@ async function montarCadernoSerie(): Promise<PacoteDoCaderno> {
   }
   // 5. O caderno.
   const tipo = activeDatasetSources.map((source) => describeDatasusFile(source.name)).find(Boolean);
-  const novo = definicao.some((filtro) => filtro.field === 'CLA_TIPO_N' && 'acceptedCategories' in filtro && filtro.acceptedCategories.join() === '1');
-  const forma = definicao.find((filtro) => filtro.field === 'CLAS_FORMA' && 'acceptedCategories' in filtro && filtro.acceptedCategories.length === 1);
-  const nomeForma = forma && 'acceptedCategories' in forma ? valoresDoDicionario(entradaDoDicionario('CLAS_FORMA')?.entry.values).get(forma.acceptedCategories[0]!) : undefined;
-  const agravo = `casos ${novo ? 'novos ' : ''}de ${(tipo?.kind ?? datasetName).toLowerCase()}${nomeForma ? ` (forma ${nomeForma.toLowerCase()})` : ''}`;
+  const agravo = agravoDaReceita(definicao);
   return {
     arquivos: [{ name: 'casos.csv', linhas: linhasCasos }, { name: 'populacao.csv', linhas: linhasPopulacao }, { name: 'perfil.csv', linhas: linhasPerfil }],
     caderno: cadernoSerieEPerfil({
@@ -13785,6 +13789,200 @@ async function montarCadernoSerie(): Promise<PacoteDoCaderno> {
       geradoEm: new Date().toLocaleString('pt-BR'),
     }),
   };
+}
+
+/** "casos novos de leishmaniose tegumentar americana (forma cutânea)": o que a receita conta, numa frase. */
+function agravoDaReceita(definicao: FilterSpec[]): string {
+  const tipo = activeDatasetSources.map((source) => describeDatasusFile(source.name)).find(Boolean);
+  const novo = definicao.some((filtro) => filtro.field === 'CLA_TIPO_N' && 'acceptedCategories' in filtro && filtro.acceptedCategories.join() === '1');
+  const forma = definicao.find((filtro) => filtro.field === 'CLAS_FORMA' && 'acceptedCategories' in filtro && filtro.acceptedCategories.length === 1);
+  const nomeForma = forma && 'acceptedCategories' in forma ? valoresDoDicionario(entradaDoDicionario('CLAS_FORMA')?.entry.values).get(forma.acceptedCategories[0]!) : undefined;
+  return `casos ${novo ? 'novos ' : ''}de ${(tipo?.kind ?? datasetName).toLowerCase()}${nomeForma ? ` (forma ${nomeForma.toLowerCase()})` : ''}`;
+}
+
+/** "Tipo de entrada (CLA_TIPO_N) = 1 (Caso novo)": a etapa com os valores e o significado, para quem lê o relatório. */
+function descreverComValores(filtro: FilterSpec): string {
+  if (filtro.kind !== 'categories') return describeFilter(filtro, filtro.mode === 'exclude' ? 'Excluir' : 'Incluir');
+  const significados = filtro.conversionId ? new Map<string, string>() : valoresDoDicionario(entradaDoDicionario(filtro.field)?.entry.values);
+  const valores = filtro.acceptedCategories.map((valor) => {
+    const significado = significados.get(valor) ?? (/^\d+$/.test(valor) ? significados.get(String(Number(valor))) : undefined);
+    return significado ? `${valor} (${significado})` : valor;
+  });
+  if (filtro.includeUnclassified) valores.push('em branco');
+  const lista = valores.length > 8 ? `${valores.slice(0, 8).join(', ')} e mais ${valores.length - 8}` : valores.join(', ');
+  return `${selectionLabel(filtro.field)} ${filtro.mode === 'exclude' ? 'diferente de' : '='} ${lista}`;
+}
+
+/** Idade do SINAN (NU_IDADE_N) ou do SIM (IDADE) na faixa do perfil. */
+const FAIXAS_DO_PERFIL = ['0–9', '10–19', '20–39', '40–59', '60 ou mais', 'Ignorada'];
+function faixaDoPerfil(campo: string, codigo: string): string {
+  const unidade = codigo.charAt(0);
+  const valor = Number(codigo.slice(1));
+  let anos: number | undefined;
+  if (campo === 'NU_IDADE_N' && /^\d{4}$/.test(codigo)) anos = unidade === '4' ? valor : '123'.includes(unidade) ? 0 : undefined;
+  else if (campo === 'IDADE' && /^\d{3}$/.test(codigo)) anos = unidade === '4' ? valor : unidade === '5' ? 100 + valor : '123'.includes(unidade) ? 0 : undefined;
+  if (anos === undefined) return 'Ignorada';
+  return anos < 10 ? '0–9' : anos < 20 ? '10–19' : anos < 40 ? '20–39' : anos < 60 ? '40–59' : '60 ou mais';
+}
+
+/**
+ * Relatório epidemiológico: o HTML único do resumo da leishmaniose, para
+ * qualquer agravo. A receita é a definição de caso; a etapa de município de
+ * residência vira a região (com DF e Entorno separados na RIDE-DF); sem ela,
+ * o estado do Recorte do mapa.
+ */
+async function baixarRelatorioEpidemiologico(): Promise<void> {
+  if (!dbfHeader) throw new Error('Abra os arquivos antes.');
+  const { residencia, filtroDaRegiao, definicao } = regiaoDaReceita();
+  const anoDe = anosDosArquivos();
+  if ([...anoDe.values()].some((ano) => !ano)) throw new Error('O relatório conta um ano por arquivo: abra os arquivos com o nome do DATASUS (LTANBR16, LTANBR17…).');
+  const avisar = (texto: string) => showToast(`Relatório: ${texto}`);
+  const anos = [...new Set([...anoDe.values()] as number[])].sort((a, b) => a - b);
+  // 1. Casos por ano e município de residência (sem município válido: só no Brasil).
+  const casosPorAno = new Map<number, Map<string, number>>();
+  const casosBrasil = new Map<number, number>();
+  for (const source of activeDatasetSources) {
+    avisar(`contando ${source.name}…`);
+    const ano = anoDe.get(source.name)!;
+    const resultado = await tabularParaCaderno({ field: residencia.field, unclassifiedPolicy: 'discriminate' }, definicao, [source.name]);
+    const tabela = casosPorAno.get(ano) ?? new Map<string, number>();
+    casosPorAno.set(ano, tabela);
+    resultado.rows.forEach((row, indice) => {
+      const casos = resultado.cells[indice]?.[0] ?? 0;
+      casosBrasil.set(ano, (casosBrasil.get(ano) ?? 0) + casos);
+      const codigo = row.key === UNCLASSIFIED_KEY ? '' : row.key.trim().slice(0, 6);
+      if (/^\d{6}$/.test(codigo)) tabela.set(codigo, (tabela.get(codigo) ?? 0) + casos);
+    });
+  }
+  // 2. População do IBGE.
+  const { porAno, usadas } = await populacaoIbgePorAno(anos.map(String), avisar);
+  const populacaoDe = (ano: number, codigos?: readonly string[]): number => {
+    const tabela = porAno.get(String(ano)) ?? new Map<string, number>();
+    return codigos ? codigos.reduce((soma, codigo) => soma + (tabela.get(codigo) ?? 0), 0) : [...tabela.values()].reduce((soma, v) => soma + v, 0);
+  };
+  const todos = [...(porAno.values().next().value ?? new Map<string, number>()).keys()];
+  // 3. A região e os grupos.
+  let { codigos: regiao, nome: nomeDaRegiao } = municipiosDaRegiao(filtroDaRegiao, todos);
+  let filtroRegiao = filtroDaRegiao;
+  if (!regiao.length && mapUfFilter) {
+    regiao = todos.filter((codigo) => codigo.startsWith(mapUfFilter));
+    nomeDaRegiao = ufNameForCode(mapUfFilter);
+    filtroRegiao = { field: residencia.field, kind: 'code-rules', mode: 'include', include: mapUfFilter, exclude: '' };
+  }
+  const ride = filtroDaRegiao?.kind === 'code-rules' && filtroDaRegiao.include === RIDE_DF_LC_163_2018.join(', ');
+  const somaCasos = (ano: number, codigos: readonly string[]) => codigos.reduce((soma, codigo) => soma + (casosPorAno.get(ano)?.get(codigo) ?? 0), 0);
+  const grupo = (id: string, nome: string, codigos?: string[]): GrupoDoRelatorio => ({
+    id, nome,
+    casos: anos.map((ano) => (codigos ? somaCasos(ano, codigos) : casosBrasil.get(ano) ?? 0)),
+    populacao: anos.map((ano) => populacaoDe(ano, codigos)),
+  });
+  const grupos: GrupoDoRelatorio[] = [grupo('BR', 'Brasil')];
+  const filtrosDoGrupo = new Map<string, FilterSpec[]>([['BR', definicao]]);
+  if (regiao.length && filtroRegiao) {
+    grupos.push(grupo('REG', nomeDaRegiao, regiao));
+    filtrosDoGrupo.set('REG', [...definicao, filtroRegiao]);
+    if (ride) {
+      grupos.push(grupo('NUC', 'DF', ['530010']), grupo('PER', 'Entorno', regiao.filter((codigo) => codigo !== '530010')));
+      filtrosDoGrupo.set('NUC', [...definicao, { field: residencia.field, kind: 'code-rules', mode: 'include', include: '530010', exclude: '' }]);
+      filtrosDoGrupo.set('PER', [...definicao, { field: residencia.field, kind: 'code-rules', mode: 'include', include: RIDE_DF_LC_163_2018.filter((c) => c !== '530010').join(', '), exclude: '' }]);
+    }
+  }
+  // 4. Onde a infecção aconteceu (município provável de infecção, de qualquer residência).
+  const campos = new Set(dbfHeader.fields.map((field) => field.name));
+  const infeccoes = new Map<string, number>();
+  if (regiao.length && campos.has('COMUNINF')) {
+    avisar('contando o local provável de infecção…');
+    const resultado = await tabularParaCaderno({ field: 'COMUNINF' }, definicao);
+    resultado.rows.forEach((row, indice) => {
+      const codigo = row.key.trim().slice(0, 6);
+      infeccoes.set(codigo, (infeccoes.get(codigo) ?? 0) + (resultado.cells[indice]?.[0] ?? 0));
+    });
+  }
+  // 5. Perfil, por grupo.
+  const jaRecortados = new Set(definicao.map((filtro) => filtro.field));
+  const vistos = new Set<string>();
+  const variaveis = VARIAVEIS_DO_PERFIL.filter((variavel) => {
+    if (!campos.has(variavel.campo) || jaRecortados.has(variavel.campo) || vistos.has(variavel.rotulo)) return false;
+    vistos.add(variavel.rotulo);
+    return true;
+  });
+  const perfil: PerfilDoRelatorio[] = [];
+  const autoctonia: Record<string, { autoctones: number; total: number }> = {};
+  for (const variavel of variaveis) {
+    avisar(`perfil: ${variavel.rotulo.toLowerCase()}…`);
+    const significados = valoresDoDicionario(entradaDoDicionario(variavel.campo)?.entry.values);
+    const ehIdade = variavel.campo === 'NU_IDADE_N' || variavel.campo === 'IDADE';
+    const linhas = new Map<string, Record<string, number>>();
+    for (const [id, filtros] of filtrosDoGrupo) {
+      const resultado = await tabularParaCaderno({ field: variavel.campo, unclassifiedPolicy: 'discriminate' }, filtros);
+      resultado.rows.forEach((row, indice) => {
+        const codigo = row.key === UNCLASSIFIED_KEY ? '' : row.key.trim();
+        const rotulo = ehIdade ? faixaDoPerfil(variavel.campo, codigo)
+          : codigo === '' ? 'Em branco' : significados.get(codigo) ?? (/^\d+$/.test(codigo) ? significados.get(String(Number(codigo))) : undefined) ?? codigo;
+        const linha = linhas.get(rotulo) ?? {};
+        linhas.set(rotulo, linha);
+        const casos = resultado.cells[indice]?.[0] ?? 0;
+        linha[id] = (linha[id] ?? 0) + casos;
+        if (variavel.campo === 'TPAUTOCTO') {
+          const a = autoctonia[id] ??= { autoctones: 0, total: 0 };
+          a.total += casos;
+          if (codigo === '1') a.autoctones += casos;
+        }
+      });
+    }
+    const ordem = ehIdade
+      ? (a: string, b: string) => FAIXAS_DO_PERFIL.indexOf(a) - FAIXAS_DO_PERFIL.indexOf(b)
+      : (a: string, b: string) => (linhas.get(b)!.BR ?? 0) - (linhas.get(a)!.BR ?? 0);
+    perfil.push({ titulo: variavel.rotulo, linhas: [...linhas.keys()].sort(ordem).map((rotulo) => ({ rotulo, porGrupo: linhas.get(rotulo)! })) });
+  }
+  // 6. Mapa: os municípios da região, os vizinhos de fundo e o contorno dos estados.
+  const municipios: MunicipioDoRelatorio[] = [];
+  const contexto: Array<Array<Array<[number, number]>>> = [];
+  const estados: Array<Array<Array<[number, number]>>> = [];
+  if (regiao.length) {
+    avisar('desenhando o mapa…');
+    const ler = async (nome: string) => {
+      const resposta = await fetch(new URL(`maps/${nome}`, document.baseURI));
+      if (!resposta.ok) throw new Error(`Não deu para ler o mapa ${nome}.`);
+      return parseTabwinMap(new Uint8Array(await resposta.arrayBuffer()));
+    };
+    const partes = (objeto: TabwinMapObject) => objeto.parts.map((parte) => parte.map((ponto): [number, number] => [ponto.x, ponto.y]));
+    const naRegiao = new Set(regiao);
+    for (const objeto of (await ler('br_municip.MAP')).objects) {
+      const codigo = objeto.geocode.trim().slice(0, 6);
+      if (!naRegiao.has(codigo)) { contexto.push(partes(objeto)); continue; }
+      municipios.push({
+        codigo, nome: objeto.name,
+        casos: anos.reduce((soma, ano) => soma + (casosPorAno.get(ano)?.get(codigo) ?? 0), 0),
+        populacaoSoma: anos.reduce((soma, ano) => soma + populacaoDe(ano, [codigo]), 0),
+        ...(campos.has('COMUNINF') ? { infeccoes: infeccoes.get(codigo) ?? 0 } : {}),
+        partes: partes(objeto),
+      });
+    }
+    for (const objeto of (await ler('br_ufsigla.MAP')).objects) estados.push(partes(objeto));
+  }
+  // 7. O HTML.
+  const tipo = activeDatasetSources.map((source) => describeDatasusFile(source.name)).find(Boolean);
+  const agravo = agravoDaReceita(definicao);
+  const periodo = `${anos[0]}–${anos.at(-1)}`;
+  const titulo = `${agravo.charAt(0).toUpperCase()}${agravo.slice(1)}${grupos.length > 1 ? ` em ${nomeDaRegiao}` : ' no Brasil'}, ${periodo}`;
+  const html = relatorioEpidemiologico({
+    titulo,
+    subtitulo: `Coeficiente de detecção (casos por 100 mil habitantes)${grupos.length > 1 ? ', comparado com o Brasil' : ''}. Fonte: ${tipo?.system ?? 'DATASUS'} e IBGE.`,
+    agravo, anos, fontePopulacao: usadas, grupos, municipios, contexto, estados,
+    gruposDoPerfil: grupos.map((g) => g.id), perfil,
+    ...(Object.keys(autoctonia).length ? { autoctonia } : {}),
+    definicaoDeCaso: definicao.map(descreverComValores),
+    ...(grupos.length > 1 ? { regiao: ride ? `${nomeDaRegiao}: os ${regiao.length} municípios da RIDE-DF (Lei Complementar nº 163/2018), pelo ${residencia.reason} (${residencia.field})` : `${nomeDaRegiao}: ${regiao.length} municípios, pelo ${residencia.reason} (${residencia.field})` } : {}),
+    arquivos: activeDatasetSources.map((source) => source.name),
+    geradoEm: new Date().toLocaleString('pt-BR'),
+  });
+  const nome = `relatorio_${(tipo?.prefix ?? 'tabsis').toLowerCase()}_${nomeDaRegiao && grupos.length > 1 ? nomeDaRegiao.normalize('NFD').replace(/[^\w]+/g, '_').replace(/^_|_$/g, '').toLowerCase() : 'brasil'}_${anos[0]}_${anos.at(-1)}.html`;
+  const blob = new Blob([html], { type: 'text/html' });
+  // No app, vai para Downloads/TabSis e abre no navegador do aparelho (o aviso é o da ponte).
+  if (ponteAndroid) return salvarNoAndroid(ponteAndroid, blob, nome, true);
+  downloadBlob(blob, nome);
+  showToast(`Relatório epidemiológico salvo: ${nome}. Abre em qualquer navegador, sem internet.`);
 }
 
 /** O campo de idade que a receita sabe ler: SINAN, SIM (pelo nome do arquivo) ou a idade da mãe (SINASC). */
