@@ -8972,6 +8972,8 @@ function conectarPeloLink(): void {
 conectarPeloLink();
 if (fetchDoAparelho) {
   // As frases do painel falam do aparelho, e a ligação é automática.
+  element<HTMLElement>('#catalog-intro').textContent = 'Escolha o conjunto e o período. O app baixa direto do FTP oficial do DATASUS para Downloads/TabSis, '
+    + 'em segundo plano (o progresso fica na notificação) e continuando de onde parou se a conexão cair. O DBC abre neste aparelho, sem baixar de novo da próxima vez.';
   element<HTMLElement>('#catalog-local .eyebrow').textContent = 'No aparelho · TabSis Local';
   element<HTMLElement>('#bridge-panel summary').firstChild!.textContent = 'TabSis Local do app ';
   element<HTMLElement>('#bridge-panel .filter-info').textContent = 'O TabSis Local já vem dentro deste app: o que você baixar pode ir direto do FTP do DATASUS para Downloads/TabSis, '
