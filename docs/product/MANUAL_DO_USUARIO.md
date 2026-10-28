@@ -758,6 +758,28 @@ com o script Python que fez o resumo.
 Conferência: Brasil 131.581; DF e Entorno 1.246; DF 265; Entorno 981
 (casos novos da forma cutânea, 2016–2025).
 
+### Caderno em R: série e perfil
+
+Na receita, **Caderno em R: série e perfil** abre o Laboratório com um caderno
+pronto em R, sobre os arquivos abertos (um por ano, com o nome do DATASUS):
+
+- a receita é a **definição de caso**; a etapa de município de residência
+  (por exemplo, *DF e Entorno*) vira a **região**, e o Brasil é contado sem ela;
+- vão três tabelas pequenas para `/data`: `casos.csv` (casos por ano e
+  município), `populacao.csv` (população do IBGE por ano e município) e
+  `perfil.csv` (contagens por categoria); os microdados não saem do TabSis;
+- as células, só com R base (rodam também no RStudio, trocando `/data/` pela
+  pasta dos CSV): coeficiente por ano e médio; variação percentual anual por
+  mínimos quadrados e por **Prais-Winsten**, com IC95% e a tendência
+  (crescente, decrescente ou estacionária); a série em texto; a **tabela 1**
+  do perfil, região × Brasil, com o qui-quadrado; e os parágrafos de
+  **Metodologia** e **Resultados**, com os números.
+
+Clique em **Executar tudo** no Laboratório. Na primeira vez o R (webR) é
+baixado, o que leva alguns segundos. Conferido com a leishmaniose
+2016–2025: os números saem iguais aos do resumo (Brasil 131.581, 6,30 por
+100 mil; DF e Entorno 1.246, 2,70).
+
 ### Microdados: ver e escolher os registros
 
 A aba **Microdados** é o laboratório de microdados sem código. A primeira

@@ -118,8 +118,9 @@ import { criarAbaConsulta, type AbaConsulta } from './aba-consulta.ts';
 import { criarAbaMicrodados, type AbaMicrodados } from './aba-microdados.ts';
 import { CAMPOS_DE_CNES, carregarCnes, normalizarCnes } from './cnes.ts';
 import { BASE_DO_APARELHO, TOKEN_DO_APARELHO, criarFetchDaPonte, temPonteLocal } from './ponte-local-android.ts';
-import { RIDE_DF_LC_163_2018, descreverDefinicao, faixaEtariaSim, faixaEtariaSinan, lerDefinicao } from '../../../packages/core/src/definicao-caso.ts';
+import { RIDE_DF_LC_163_2018, casaDefinicao, descreverDefinicao, faixaEtariaSim, faixaEtariaSinan, lerDefinicao } from '../../../packages/core/src/definicao-caso.ts';
 import { criarReceitaVisual, type EtapaPronta, type ReceitaVisual } from './receita-visual.ts';
+import { cadernoSerieEPerfil } from '../../../packages/analysis/src/caderno-r.ts';
 import {
   tabulationToTabwinPrn,
   tabulationToTabwinSql,
@@ -8143,32 +8144,40 @@ const populacaoIbgeGuardada = new Map<string, Map<string, number>>();
  * População de cada município pela API do IBGE, para os anos dos dados.
  * Só o ano e a tabela vão para o IBGE; nenhum dado aberto sai do aparelho.
  */
+/**
+ * População de cada município por ano, da API do IBGE (estimativas e Censo
+ * 2022; ano sem série usa a mais próxima). Guardada entre pedidos.
+ */
+async function populacaoIbgePorAno(anos: string[], avisar: (texto: string) => void = () => {}): Promise<{ porAno: Map<string, Map<string, number>>; usadas: string[] }> {
+  const pedir = async (url: string): Promise<unknown> => {
+    const resposta = await fetch(url, { headers: { Accept: 'application/json' } });
+    if (!resposta.ok) throw new Error(`O IBGE respondeu HTTP ${resposta.status}.`);
+    return resposta.json();
+  };
+  const series = ibgeSeriesDisponiveis(lerPeriodosIbge(await pedir(ibgePeriodosUrl())));
+  if (!anos.length) anos = [series.at(-1)!.ano];
+  const porAno = new Map<string, Map<string, number>>();
+  const usadas: string[] = [];
+  for (const ano of anos) {
+    const serie = ibgeSeriePara(ano, series)!;
+    const chave = `${serie.tabela}:${serie.ano}`;
+    let dados = populacaoIbgeGuardada.get(chave);
+    if (!dados) {
+      avisar(`Buscando no IBGE: ${serie.nome}…`);
+      dados = lerPopulacaoIbge(await pedir(ibgePopulacaoUrl(serie)), serie.ano);
+      populacaoIbgeGuardada.set(chave, dados);
+    }
+    porAno.set(ano, dados);
+    usadas.push(serie.ano === ano ? `${ano} (${serie.nome})` : `${ano} usa ${serie.nome}`);
+  }
+  return { porAno, usadas };
+}
+
 async function buscarPopulacaoIbge(): Promise<void> {
   mapPopulacaoIbge.disabled = true;
   mapPopulacaoStatus.textContent = 'Buscando a população no IBGE…';
   try {
-    const pedir = async (url: string): Promise<unknown> => {
-      const resposta = await fetch(url, { headers: { Accept: 'application/json' } });
-      if (!resposta.ok) throw new Error(`O IBGE respondeu HTTP ${resposta.status}.`);
-      return resposta.json();
-    };
-    const series = ibgeSeriesDisponiveis(lerPeriodosIbge(await pedir(ibgePeriodosUrl())));
-    const anos = anosDosDados();
-    if (!anos.length) anos.push(series.at(-1)!.ano);
-    const porAno = new Map<string, Map<string, number>>();
-    const usadas: string[] = [];
-    for (const ano of anos) {
-      const serie = ibgeSeriePara(ano, series)!;
-      const chave = `${serie.tabela}:${serie.ano}`;
-      let dados = populacaoIbgeGuardada.get(chave);
-      if (!dados) {
-        mapPopulacaoStatus.textContent = `Buscando no IBGE: ${serie.nome}…`;
-        dados = lerPopulacaoIbge(await pedir(ibgePopulacaoUrl(serie)), serie.ano);
-        populacaoIbgeGuardada.set(chave, dados);
-      }
-      porAno.set(ano, dados);
-      usadas.push(serie.ano === ano ? `${ano} (${serie.nome})` : `${ano} usa ${serie.nome}`);
-    }
+    const { porAno, usadas } = await populacaoIbgePorAno(anosDosDados(), (texto) => { mapPopulacaoStatus.textContent = texto; });
     populacao = tabelaDoIbge(porAno);
     const municipios = Math.max(...[...porAno.values()].map((tabela) => tabela.size));
     mapPopulacaoStatus.textContent = `População: API do IBGE · ${integerFormat.format(municipios)} municípios · ${usadas.join(' · ')}.`;
@@ -12510,6 +12519,12 @@ tableCopy.addEventListener('click', () => void copyPresentedTable().catch((error
   showToast(error instanceof Error ? error.message : String(error), true)));
 tablePrint.addEventListener('click', () => { limparRelatorio(); window.print(); });
 reportButton.addEventListener('click', abrirRelatorio);
+element<HTMLButtonElement>('#receita-caderno-r').addEventListener('click', () => {
+  const botao = element<HTMLButtonElement>('#receita-caderno-r');
+  botao.disabled = true;
+  abrirCadernoR().catch((error: unknown) => showToast(error instanceof Error ? error.message : String(error), true))
+    .finally(() => { botao.disabled = !dbfHeader; });
+});
 element<HTMLButtonElement>('#report-close').addEventListener('click', () => reportDialog.close());
 reportForm.addEventListener('submit', (event) => { event.preventDefault(); void montarRelatorio(); });
 tableEditColumn.addEventListener('change', updateColumnEditButtons);
@@ -13379,6 +13394,151 @@ abaMicrodados = criarAbaMicrodados({
   },
   aviso: showToast,
 });
+
+/** Variáveis do perfil (tabela 1) que o caderno em R procura, por sistema. */
+const VARIAVEIS_DO_PERFIL: ReadonlyArray<{ campo: string; rotulo: string }> = [
+  { campo: 'CS_SEXO', rotulo: 'Sexo' }, { campo: 'SEXO', rotulo: 'Sexo' },
+  { campo: 'NU_IDADE_N', rotulo: 'Faixa etária (anos)' },
+  { campo: 'CS_RACA', rotulo: 'Raça/cor' }, { campo: 'RACACOR', rotulo: 'Raça/cor' },
+  { campo: 'CS_ESCOL_N', rotulo: 'Escolaridade' },
+  { campo: 'CLAS_FORMA', rotulo: 'Forma clínica' },
+  { campo: 'CRITERIO', rotulo: 'Critério de confirmação' },
+  { campo: 'EVOLUCAO', rotulo: 'Evolução' },
+  { campo: 'TPAUTOCTO', rotulo: 'Autóctone do município de residência' },
+];
+
+/**
+ * "Caderno em R": a série com tendência (Prais-Winsten) e o perfil, região ×
+ * Brasil, no Laboratório (webR). A receita é a definição de caso; a etapa de
+ * município de residência (RIDE-DF, por exemplo), se houver, vira a região, e
+ * o Brasil é contado sem ela.
+ */
+async function abrirCadernoR(): Promise<void> {
+  if (!dbfHeader) throw new Error('Abra os arquivos antes.');
+  const residencia = findGeographicFields(dbfHeader.fields).find((candidato) => candidato.level === 'municipality');
+  if (!residencia) throw new Error('O caderno precisa de um campo de município (residência).');
+  // O ano de cada arquivo: o período curto do nome do DATASUS ("2023" em LTANBR23).
+  const anoDe = new Map(activeDatasetSources.map((source) => [source.name, /^\d{4}$/.test(describeDatasusFile(source.name)?.periodShort ?? '') ? Number(describeDatasusFile(source.name)!.periodShort) : undefined]));
+  if ([...anoDe.values()].some((ano) => !ano)) throw new Error('O caderno conta um ano por arquivo: abra os arquivos com o nome do DATASUS (LTANBR16, LTANBR17…).');
+  const ehRegiao = (filtro: FilterSpec): boolean => filtro.field === residencia.field && filtro.mode !== 'exclude'
+    && (filtro.kind === 'code-rules' || (filtro.kind !== 'numeric-range' && !filtro.conversionId));
+  const filtroDaRegiao = configuredFilters.find(ehRegiao);
+  const definicao = configuredFilters.filter((filtro) => filtro !== filtroDaRegiao);
+
+  const lab = window.open('./lab/?origem=tabsis', '_blank');
+  if (!lab) throw new Error('O navegador bloqueou a nova aba do Laboratório; permita janelas para este site.');
+  let pronto = false;
+  let envio: (() => void) | null = null;
+  const ouvir = (event: MessageEvent) => {
+    if (event.origin !== window.location.origin || event.source !== lab || (event.data as { tipo?: string })?.tipo !== 'tabsis:pronto') return;
+    pronto = true;
+    envio?.();
+  };
+  window.addEventListener('message', ouvir);
+  try {
+    const tabular = async (spec: { rows: { field: string; unclassifiedPolicy?: 'discriminate' }; filters: FilterSpec[] }, sourceNames?: string[]) => {
+      const plan = compilarPlano({
+        compatibilityProfile: currentCompatibilityProfile, rows: spec.rows, measure: { kind: 'count' as const },
+        filters: spec.filters.map(cloneFilter),
+        ...(configuredCrossFieldRules.length ? { crossFieldRules: configuredCrossFieldRules.map(cloneCrossFieldRule) } : {}),
+        suppressZeroRows: true, suppressZeroColumns: false,
+      });
+      const { result } = await askDataset<{ result: TabulationResult }>(
+        { type: 'tabulate', plan, conversions: conversionsForPlan(plan), ...(sourceNames ? { sourceNames } : {}) },
+        { label: 'Caderno em R' },
+      );
+      return result;
+    };
+    // 1. Casos por ano (um arquivo por ano) e município de residência.
+    const linhasCasos = ['ano;municipio;casos'];
+    for (const source of activeDatasetSources) {
+      showToast(`Caderno em R: contando ${source.name}…`);
+      const resultado = await tabular({ rows: { field: residencia.field, unclassifiedPolicy: 'discriminate' }, filters: definicao }, [source.name]);
+      // Caso sem município de residência válido (em branco, ignorado, exterior)
+      // conta no Brasil, com o município vazio: como no resumo.
+      let semMunicipio = 0;
+      resultado.rows.forEach((row, indice) => {
+        const codigo = row.key === UNCLASSIFIED_KEY ? '' : row.key.trim().slice(0, 6);
+        const casos = resultado.cells[indice]?.[0] ?? 0;
+        if (/^\d{6}$/.test(codigo)) linhasCasos.push(`${anoDe.get(source.name)};${codigo};${casos}`);
+        else semMunicipio += casos;
+      });
+      if (semMunicipio) linhasCasos.push(`${anoDe.get(source.name)};;${semMunicipio}`);
+    }
+    // 2. População do IBGE, por ano e município.
+    const anos = [...new Set([...anoDe.values()].map(String))].sort();
+    const { porAno } = await populacaoIbgePorAno(anos, (texto) => showToast(`Caderno em R: ${texto}`));
+    const linhasPopulacao = ['ano;municipio;populacao'];
+    for (const [ano, tabela] of porAno) for (const [codigo, habitantes] of tabela) linhasPopulacao.push(`${ano};${codigo};${habitantes}`);
+    // 3. A região: os municípios que a etapa de residência aceita.
+    const municipios = [...(porAno.values().next().value ?? new Map<string, number>()).keys()];
+    let regiao: string[] = [];
+    let nomeDaRegiao = 'Região';
+    if (filtroDaRegiao?.kind === 'code-rules') {
+      const regra = lerDefinicao(filtroDaRegiao.include, filtroDaRegiao.exclude);
+      regiao = municipios.filter((codigo) => casaDefinicao(regra, codigo));
+      nomeDaRegiao = filtroDaRegiao.include === RIDE_DF_LC_163_2018.join(', ') ? 'DF e Entorno' : `Região (${descreverDefinicao(regra).slice(0, 60)})`;
+    } else if (filtroDaRegiao && 'acceptedCategories' in filtroDaRegiao) {
+      const aceitos = new Set(filtroDaRegiao.acceptedCategories.map((codigo) => codigo.trim().slice(0, 6)));
+      regiao = municipios.filter((codigo) => aceitos.has(codigo));
+    }
+    // 4. Perfil: contagens por categoria, no Brasil e na região.
+    const linhasPerfil = ['variavel;codigo;rotulo;grupo;casos'];
+    const campos = new Set(dbfHeader.fields.map((field) => field.name));
+    const jaRecortados = new Set(definicao.map((filtro) => filtro.field));
+    const vistos = new Set<string>();
+    const variaveis = VARIAVEIS_DO_PERFIL.filter((variavel) => {
+      if (!campos.has(variavel.campo) || jaRecortados.has(variavel.campo) || vistos.has(variavel.rotulo)) return false;
+      vistos.add(variavel.rotulo);
+      return true;
+    });
+    const limpar = (texto: string) => texto.replace(/[;\r\n]/g, ' ');
+    for (const variavel of variaveis) {
+      const significados = valoresDoDicionario(entradaDoDicionario(variavel.campo)?.entry.values);
+      for (const [grupo, filtros] of [['brasil', definicao], ['regiao', filtroDaRegiao ? [...definicao, filtroDaRegiao] : null]] as const) {
+        if (!filtros) continue;
+        const resultado = await tabular({ rows: { field: variavel.campo, unclassifiedPolicy: 'discriminate' }, filters: filtros });
+        resultado.rows.forEach((row, indice) => {
+          const codigo = row.key === UNCLASSIFIED_KEY ? '' : row.key.trim();
+          const rotulo = codigo === '' ? '' : significados.get(codigo) ?? (/^\d+$/.test(codigo) ? significados.get(String(Number(codigo))) : undefined) ?? codigo;
+          linhasPerfil.push(`${variavel.campo};${limpar(codigo)};${limpar(rotulo)};${grupo};${resultado.cells[indice]?.[0] ?? 0}`);
+        });
+      }
+    }
+    // 5. O caderno, e o envio ao Laboratório.
+    const tipo = activeDatasetSources.map((source) => describeDatasusFile(source.name)).find(Boolean);
+    const novo = definicao.some((filtro) => filtro.field === 'CLA_TIPO_N' && 'acceptedCategories' in filtro && filtro.acceptedCategories.join() === '1');
+    const forma = definicao.find((filtro) => filtro.field === 'CLAS_FORMA' && 'acceptedCategories' in filtro && filtro.acceptedCategories.length === 1);
+    const nomeForma = forma && 'acceptedCategories' in forma ? valoresDoDicionario(entradaDoDicionario('CLAS_FORMA')?.entry.values).get(forma.acceptedCategories[0]!) : undefined;
+    const agravo = `casos ${novo ? 'novos ' : ''}de ${(tipo?.kind ?? datasetName).toLowerCase()}${nomeForma ? ` (forma ${nomeForma.toLowerCase()})` : ''}`;
+    const caderno = cadernoSerieEPerfil({
+      titulo: `${tipo?.kind ?? datasetName}: série e perfil${regiao.length ? `, ${nomeDaRegiao} × Brasil` : ''}`,
+      definicaoDeCaso: definicao.map((filtro) => describeFilter(filtro, filtro.mode === 'exclude' ? 'Excluir' : 'Incluir')),
+      agravo, regiao, nomeDaRegiao,
+      arquivos: activeDatasetSources.map((source) => source.name),
+      variaveisDoPerfil: variaveis,
+      geradoEm: new Date().toLocaleString('pt-BR'),
+    });
+    const codificar = new TextEncoder();
+    const arquivos = [['casos.csv', linhasCasos], ['populacao.csv', linhasPopulacao], ['perfil.csv', linhasPerfil]]
+      .map(([name, linhas]) => ({ name: name as string, bytes: codificar.encode(`${(linhas as string[]).join('\n')}\n`).buffer as ArrayBuffer }));
+    await new Promise<void>((resolve, reject) => {
+      const prazo = window.setTimeout(() => reject(new Error('O Laboratório não respondeu em 60 segundos.')), 60_000);
+      envio = () => {
+        window.clearTimeout(prazo);
+        lab.postMessage({ tipo: 'tabsis:dados', arquivos, caderno }, window.location.origin, arquivos.map((arquivo) => arquivo.bytes));
+        resolve();
+      };
+      if (pronto) envio();
+    });
+    showToast(`Caderno em R aberto no Laboratório: ${caderno.cells.length} células, com os casos, a população do IBGE e o perfil.`);
+  } catch (error) {
+    lab.close();
+    throw error;
+  } finally {
+    window.removeEventListener('message', ouvir);
+  }
+}
 
 /** O campo de idade que a receita sabe ler: SINAN, SIM (pelo nome do arquivo) ou a idade da mãe (SINASC). */
 function campoDeIdade(): string {

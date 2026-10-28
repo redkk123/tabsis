@@ -1860,6 +1860,52 @@ test('Microdados: receita com idade, período, amostra por etapa e etapa desliga
   await expect(page.locator('#receita-etapas li.receita-desligada')).toContainText('fora da análise');
 });
 
+test('Caderno em R: a receita vira definição de caso e região, e o Laboratório recebe os três CSV e as células em R', async ({ page, context }) => {
+  // IBGE simulado (mesmo formato da API real): dois municípios do DF e Entorno e um de fora.
+  await page.route('https://servicodados.ibge.gov.br/**', async (route) => {
+    const url = route.request().url();
+    const ano = /periodos\/(\d{4})\//.exec(url)?.[1] ?? '';
+    const corpo = url.endsWith('/6579/periodos') ? [{ id: '2023' }, { id: '2024' }]
+      : ano ? [{ id: '9324', resultados: [{ classificacoes: [], series: [
+        { localidade: { id: '5300108' }, serie: { [ano]: '3000000' } },
+        { localidade: { id: '5200605' }, serie: { [ano]: '10000' } },
+        { localidade: { id: '5208707' }, serie: { [ano]: '1500000' } },
+        // O leitor exige o país inteiro: o resto dos municípios, com 1.000 habitantes.
+        ...Array.from({ length: 5600 }, (_, i) => ({ localidade: { id: String(1100000 + i * 10 + 5) }, serie: { [ano]: '1000' } })),
+      ] }] }] : null;
+    await route.fulfill(corpo ? { json: corpo, headers: { 'Access-Control-Allow-Origin': '*' } } : { status: 404 });
+  });
+  const { writeDbf } = await import('../dist/packages/export/src/dbf-writer.js');
+  const campo = (name: string, length: number) => ({ name, type: 'C', length, decimalCount: 0 });
+  const arquivo = (linhas: string[][]) => Buffer.from(writeDbf(
+    linhas.map(([ID_MN_RESI, CS_SEXO]) => ({ ID_MN_RESI, CS_SEXO, CLA_TIPO_N: '1', EVOLUCAO: '1' })),
+    [campo('ID_MN_RESI', 6), campo('CS_SEXO', 1), campo('CLA_TIPO_N', 1), campo('EVOLUCAO', 1)],
+  ));
+  await page.goto('/');
+  await page.locator('#file-input').setInputFiles([
+    { name: 'LTANBR23.dbf', mimeType: 'application/octet-stream', buffer: arquivo([['530010', 'M'], ['520060', 'F'], ['520870', 'M']]) },
+    { name: 'LTANBR24.dbf', mimeType: 'application/octet-stream', buffer: arquivo([['530010', 'F'], ['', 'M']]) },
+  ]);
+  await expect(page.locator('#dataset-files-summary')).toContainText('2 juntos', { timeout: 20000 });
+  await page.locator('#analysis-form').evaluate((form: HTMLFormElement) => form.requestSubmit());
+  await expect(page.locator('#result-table tbody')).toBeVisible();
+  await page.locator('[data-view="microdata"]').click();
+  await page.locator('#receita-prontas').getByRole('button', { name: /Caso novo \(LTA\)/ }).click();
+  await page.locator('#receita-prontas').getByRole('button', { name: /DF e Entorno/ }).click();
+  await expect(page.locator('#receita-status')).toContainText('ficam 3 de 5 registros');
+
+  const popup = context.waitForEvent('page');
+  await page.locator('#receita-caderno-r').click();
+  const lab = await popup;
+  await expect(lab.locator('#save-status')).toContainText('Dados do TabSis em /data: casos.csv, populacao.csv, perfil.csv', { timeout: 30000 });
+  const runtimes = await lab.locator('.cell-runtime').evaluateAll((selects) => selects.map((select) => (select as HTMLSelectElement).value));
+  expect(runtimes).toEqual(['r', 'r', 'r', 'r', 'r', 'r']);
+  // A região é a etapa de residência; o caso sem município conta só no Brasil.
+  const primeira = await lab.locator('.cell textarea, .cell .cell-code').first().inputValue().catch(async () => lab.locator('.cell').first().innerText());
+  expect(primeira).toContain('NOME_REGIAO <- "DF e Entorno"');
+  expect(primeira).toContain('"530010", "520060"');
+});
+
 test('Microdados: atalhos de RIDE-DF e idade, com uma regra por campo', async ({ page }) => {
   // Residência em Brasília, Alto Paraíso (RIDE), Goiânia (fora) e Unaí (RIDE, MG).
   const csv = [

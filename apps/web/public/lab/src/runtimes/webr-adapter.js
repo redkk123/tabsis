@@ -188,8 +188,12 @@ async function capturedOutput(messages = []) {
   for (const message of Array.isArray(messages) ? messages : []) {
     const type = typeof message?.type === 'string' ? message.type : 'condition';
     const data = await conditionText(message?.data);
-    if (type === 'stdout') stdout.push(data);
-    else if (type === 'stderr') stderr.push(data);
+    // O captureR do webR entrega uma linha por mensagem, sem o "\n" do fim:
+    // sem devolvê-lo, a saída de um print() ou de um cat() de várias linhas
+    // chegava toda colada numa linha só.
+    const linha = data.endsWith('\n') ? data : `${data}\n`;
+    if (type === 'stdout') stdout.push(linha);
+    else if (type === 'stderr') stderr.push(linha);
     else conditions.push({ type, message: data });
   }
   return {

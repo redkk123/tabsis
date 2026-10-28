@@ -173,6 +173,21 @@ que hoje foi feito à mão no resumo do CONBRASP.
 
 - **Medida de sucesso:** o modelo "série temporal + perfil" refaz os números
   do resumo de LTA e gera um parágrafo de Metodologia equivalente ao entregue.
+- **Andamento (2026-10-28), em R (decisão do Red):** o primeiro modelo,
+  **série temporal + perfil**, está feito. Na aba Microdados, "Caderno em R:
+  série e perfil" manda ao Laboratório (webR) três CSV pequenos — casos por ano
+  e município, população do IBGE por ano e município, contagens do perfil — e
+  um caderno de 6 células só com R base (roda também no RStudio): coeficiente
+  por ano e médio, VPA por mínimos quadrados e por Prais-Winsten (IC95%),
+  série em texto, tabela 1 com qui-quadrado (região × restante do Brasil) e
+  os parágrafos de Metodologia e Resultados. A receita é a definição de caso;
+  a etapa de município de residência vira a região. **Medida de sucesso
+  batida** com os 10 arquivos reais: Brasil 131.581 (6,30), DF e Entorno 1.246
+  (2,70), VPA por mínimos quadrados −5,1% (−8,8 a −1,3) e 0,1% (−9,9 a 11,3),
+  iguais ao resumo; Prais-Winsten −5,0% (−9,0 a −0,8) e 0,1% (−10,9 a 12,5).
+  No caminho, corrigido no Lab (tabwin-lab#2): a saída do R perdia as quebras
+  de linha. Próximos modelos: qualidade do dado, mapa e conglomerados,
+  comparação de regiões.
 
 ### Fase 4 — Compartilhar e reproduzir
 
