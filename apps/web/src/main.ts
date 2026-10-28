@@ -604,6 +604,8 @@ const mapClassification = element<HTMLSelectElement>('#map-classification');
 const mapUfSelect = element<HTMLSelectElement>('#map-uf');
 const mapValueColumn = element<HTMLSelectElement>('#map-value-column');
 const mapGeoFieldSelect = element<HTMLSelectElement>('#map-geo-field');
+const mapCrossFieldSelect = element<HTMLSelectElement>('#map-cross-field');
+const mapCrossLabel = element<HTMLElement>('#map-cross-label');
 const geoFilter = element<HTMLDetailsElement>('#geo-filter');
 const geoFilterCount = element<HTMLElement>('#geo-filter-count');
 const geoFilterInfo = element<HTMLElement>('#geo-filter-info');
@@ -6648,13 +6650,14 @@ function boundsForDrawnArea(): { west: number; east: number; south: number; nort
  * Some quando há uma coluna só: oferecer uma escolha com uma opção é ruído, e
  * some também quando o mapa usa a tabulação própria dele, que sempre tem uma.
  */
-function renderMapColumnOptions(result: TabulationResult, escolhido: number): void {
+function renderMapColumnOptions(result: TabulationResult, escolhido: string): void {
   const varias = result.columns.length > 1;
   mapValueColumn.hidden = !varias;
   const rotulo = mapValueColumn.closest('label');
   if (rotulo) (rotulo as HTMLElement).hidden = !varias;
   if (!varias) {
     mapValueColumn.replaceChildren();
+    mapValueColumn.dataset.chaves = '';
     return;
   }
   const chaves = result.columns.map((coluna) => coluna.key).join('|');
@@ -6662,15 +6665,18 @@ function renderMapColumnOptions(result: TabulationResult, escolhido: number): vo
   // do teclado no meio de uma escolha.
   if (mapValueColumn.dataset.chaves !== chaves) {
     mapValueColumn.dataset.chaves = chaves;
-    mapValueColumn.replaceChildren();
-    for (const coluna of result.columns) {
-      const opcao = document.createElement('option');
-      opcao.value = coluna.key;
-      opcao.textContent = coluna.label;
-      mapValueColumn.append(opcao);
-    }
+    const contagens = document.createElement('optgroup');
+    contagens.label = 'Contagem';
+    contagens.append(...result.columns.map((coluna) => new Option(coluna.label, coluna.key)), new Option('Total (todas as colunas)', MAPA_TOTAL));
+    // A porcentagem de cada coluna no total do lugar: comparar lugares de
+    // tamanhos diferentes sem precisar de população.
+    const porcentagens = document.createElement('optgroup');
+    porcentagens.label = 'Porcentagem no total do lugar';
+    porcentagens.append(...result.columns.map((coluna) => new Option(`% ${coluna.label}`, `${MAPA_PCT}${coluna.key}`)));
+    mapValueColumn.replaceChildren(contagens, porcentagens);
   }
-  mapValueColumn.value = result.columns[escolhido]?.key ?? '';
+  mapValueColumn.value = escolhido;
+  if (mapValueColumn.value !== escolhido) mapValueColumn.value = result.columns[0]?.key ?? '';
 }
 
 function renderMap(): void {
@@ -6715,7 +6721,9 @@ function renderMap(): void {
   // acontecia aqui — pintava `casos + população + taxa` numa tabela de
   // densidade: um número sem significado nenhum, e sem aviso.
   const escolha = chooseMapColumn(desenhavel.columns.map((c) => c.key), mapValueColumn.value || undefined);
-  renderMapColumnOptions(desenhavel, escolha.index);
+  // As opções do Valor saem das colunas lidas, antes do total ou da porcentagem.
+  const colunasLidas = mapDrawableResultBruto() ?? desenhavel;
+  renderMapColumnOptions(colunasLidas, mapValueColumn.value || colunasLidas.columns[escolha.index]?.key || '');
   const values = new Map<string, number>();
   desenhavel.rows.forEach((row, index) => {
     const value = desenhavel.cells[index]?.[escolha.index] ?? 0;
@@ -6985,7 +6993,7 @@ function renderMap(): void {
   const title = document.createElement('strong');
   title.textContent = variacao
     ? `Variação${mapValueSuffix} · ${integerFormat.format(matched)} áreas`
-    : `${mapTaxaAtiva() ? 'Por 100 mil hab. · ' : ''}${mapAreaCnv() ? `${mapAreaLevelSelect.selectedOptions[0]?.textContent ?? 'Região'} · ` : ''}${integerFormat.format(matched)} áreas associadas`;
+    : `${mapTaxaAtiva() ? 'Por 100 mil hab. · ' : ''}${mapaPctSelecionado() ? `${desenhavel.columns[0]?.label ?? '%'} no total do lugar · ` : ''}${mapAreaCnv() ? `${mapAreaLevelSelect.selectedOptions[0]?.textContent ?? 'Região'} · ` : ''}${integerFormat.format(matched)} áreas associadas`;
   const gradient = document.createElement('div');
   gradient.className = 'legend-gradient';
   gradient.style.background = variacao
@@ -7070,7 +7078,7 @@ function mapInputSignature(): string {
   // Os arquivos abertos também são condição: juntar mais um arquivo depois de o
   // mapa (ou o painel "Onde") ter lido o primeiro deixava o mapa com os números
   // do primeiro, e a tabela ao lado com os de todos.
-  return JSON.stringify([configuredFilters, configuredCrossFieldRules, activeDatasetSources.map((source) => source.name)]);
+  return JSON.stringify([configuredFilters, configuredCrossFieldRules, activeDatasetSources.map((source) => source.name), mapCrossField]);
 }
 /** UF isolada no mapa. Vazio quer dizer o Brasil inteiro, por estado. */
 let mapUfFilter = '';
@@ -7191,6 +7199,58 @@ function applyGeoFilter(): void {
 let mapGeoFieldChoice = '';
 
 /**
+ * "Separar por": uma variável do arquivo que vira as colunas do mapa próprio.
+ * Com ela, o Valor oferece a contagem de cada valor, o total e a porcentagem
+ * de um valor no total do lugar (LTA: % de forma mucosa por município).
+ */
+let mapCrossField = '';
+/** Valor que pinta o total do lugar, somando as colunas. */
+const MAPA_TOTAL = '__total__';
+/** Prefixo do Valor que pinta a porcentagem de uma coluna no total do lugar. */
+const MAPA_PCT = 'pct:';
+
+function mapaPctSelecionado(): boolean {
+  return mapValueColumn.value.startsWith(MAPA_PCT);
+}
+
+/**
+ * Troca as colunas pelo total ou pela porcentagem escolhida no Valor. Vem
+ * DEPOIS de somar por UF ou por região: a porcentagem de um estado é a soma
+ * dos casos dele sobre o total dele, e não a média das porcentagens.
+ */
+function aplicarColunaDerivada(resultado: TabulationResult): TabulationResult {
+  const pedido = mapValueColumn.value;
+  const total = pedido === MAPA_TOTAL;
+  const indice = pedido.startsWith(MAPA_PCT) ? resultado.columns.findIndex((coluna) => coluna.key === pedido.slice(MAPA_PCT.length)) : -1;
+  if (resultado.columns.length < 2 || (!total && indice < 0)) return resultado;
+  return {
+    ...resultado,
+    columns: [{ key: pedido, label: total ? 'Total' : `% ${resultado.columns[indice]!.label}`, source: 'derived' as const }],
+    cells: resultado.rows.map((_, linha) => {
+      const valores = resultado.cells[linha] ?? [];
+      const soma = valores.reduce((acumulado, valor) => acumulado + valor, 0);
+      if (total) return [soma];
+      return [soma ? (valores[indice] ?? 0) / soma * 100 : Number.NaN];
+    }),
+  };
+}
+
+/** As opções de "Separar por": os campos do arquivo, menos os de lugar. */
+function renderMapCrossOptions(): void {
+  mapCrossLabel.hidden = !dbfHeader;
+  if (!dbfHeader) return;
+  const lugares = new Set(findGeographicFields(dbfHeader.fields).map((candidato) => candidato.field));
+  const campos = dbfHeader.fields.map((field) => field.name).filter((nome) => !lugares.has(nome));
+  const chaves = campos.join('|');
+  if (mapCrossFieldSelect.dataset.chaves !== chaves) {
+    mapCrossFieldSelect.dataset.chaves = chaves;
+    mapCrossFieldSelect.replaceChildren(new Option('— só contar', ''), ...campos.map((nome) => new Option(fieldLabel(nome), nome)));
+  }
+  if (!campos.includes(mapCrossField)) mapCrossField = '';
+  mapCrossFieldSelect.value = mapCrossField;
+}
+
+/**
  * Oferece os campos geográficos do arquivo, com o que cada um significa.
  *
  * Some quando há um só: escolher entre uma opção é ruído. Aparece quando há
@@ -7224,7 +7284,7 @@ function renderGeoFieldOptions(candidatos: readonly GeographicCandidate[], escol
   mapGeoFieldSelect.value = escolhido;
 }
 
-async function tabulateForMap(sourceNames?: string[], columns?: { field: string; conversionId: string; startPosition: number }): Promise<TabulationResult | null> {
+async function tabulateForMap(sourceNames?: string[], columns?: { field: string; conversionId?: string; startPosition?: number; unclassifiedPolicy?: 'discriminate' }): Promise<TabulationResult | null> {
   if (!dbfHeader) return null;
   const candidatos = findGeographicFields(dbfHeader.fields);
   // O primeiro é o padrão — residência —, mas a pessoa manda. A diferença não
@@ -7235,6 +7295,10 @@ async function tabulateForMap(sourceNames?: string[], columns?: { field: string;
   const escolhido = candidatos.find((c) => c.field === mapGeoFieldChoice) ?? candidatos[0];
   if (!escolhido) return null;
   renderGeoFieldOptions(candidatos, escolhido.field);
+  // "Separar por" vira as colunas; o branco entra como coluna própria, para o
+  // total do lugar (e o denominador da porcentagem) ser o de todos os registros.
+  const separar = !columns && mapCrossField && dbfHeader.fields.some((field) => field.name === mapCrossField) ? mapCrossField : '';
+  if (separar) columns = { field: separar, unclassifiedPolicy: 'discriminate' };
 
   // Os filtros da pessoa continuam valendo: o mapa mostra o mesmo recorte da
   // análise, só que por geografia. Ignorá-los daria um mapa que contradiz a
@@ -7269,7 +7333,21 @@ async function tabulateForMap(sourceNames?: string[], columns?: { field: string;
     },
   );
   mapGeoField = escolhido;
-  return result;
+  if (!separar) return result;
+  // O significado de cada código, quando o dicionário diz: "2 · Mucosa".
+  const significados = valoresDoDicionario(entradaDoDicionario(separar)?.entry.values);
+  // O branco vai para o fim da lista do Valor, depois dos códigos.
+  const ordem = result.columns.map((_, indice) => indice)
+    .sort((a, b) => Number(result.columns[a]!.key === UNCLASSIFIED_KEY) - Number(result.columns[b]!.key === UNCLASSIFIED_KEY) || a - b);
+  return {
+    ...result,
+    cells: result.cells.map((linha) => ordem.map((indice) => linha[indice] ?? 0)),
+    columns: ordem.map((indice) => result.columns[indice]!).map((coluna) => {
+      if (coluna.key === UNCLASSIFIED_KEY) return { ...coluna, label: 'Em branco' };
+      const sentido = significados.get(coluna.key) ?? (/^\d+$/.test(coluna.key) ? significados.get(String(Number(coluna.key))) : undefined);
+      return sentido ? { ...coluna, label: `${coluna.label} · ${sentido}` } : coluna;
+    }),
+  };
 }
 
 /**
@@ -7593,9 +7671,13 @@ function renderMapPeriodBar(): void {
   const totais = periodos.map((periodo) => {
     const resultado = mapPeriodResults.has(periodo.name) ? mapDrawableResultBruto(periodo.name) : null;
     if (!resultado) return undefined;
-    const indiceColuna = chooseMapColumn(resultado.columns.map((c) => c.key), coluna).index;
-    const casos = resultado.cells.reduce((soma, linha) => soma + (linha[indiceColuna] ?? 0), 0);
-    if (!mapTaxaAtiva()) return casos;
+    // O recorte inteiro numa linha só, e só então o total ou a porcentagem:
+    // somar as porcentagens de cada lugar não dá porcentagem nenhuma.
+    const somas = resultado.columns.map((_, indice) => resultado.cells.reduce((soma, linha) => soma + (linha[indice] ?? 0), 0));
+    const recorte = aplicarColunaDerivada({ ...resultado, rows: [{ key: 'recorte', label: 'recorte', source: 'derived' as const }], cells: [somas] });
+    const indiceColuna = chooseMapColumn(recorte.columns.map((c) => c.key), coluna).index;
+    const casos = recorte.cells[0]?.[indiceColuna] ?? 0;
+    if (!mapTaxaAtiva()) return Number.isFinite(casos) ? casos : undefined;
     // A taxa do recorte inteiro: todos os casos sobre toda a população (somar
     // as taxas de cada lugar não dá taxa nenhuma).
     const habitantes = resultado.rows.reduce((soma, row) => soma + (populationFor(populacao!, row.key, periodo.label) ?? 0), 0);
@@ -7973,8 +8055,9 @@ let mapCompareArmed = false;
 /** O valor de uma área num período (ou no atual), lido da tabulação inteira, sem o recorte do estado. */
 function mapAreaValue(geocode: string, periodName?: string): number | undefined {
   const periodo = periodName ?? mapPeriod;
-  const base = periodo ? mapPeriodResults.get(periodo) : (mapSource === 'tabela' ? currentResult : mapResult);
-  if (!base) return undefined;
+  const lido = periodo ? mapPeriodResults.get(periodo) : (mapSource === 'tabela' ? currentResult : mapResult);
+  if (!lido) return undefined;
+  const base = aplicarColunaDerivada(lido);
   const coluna = chooseMapColumn(base.columns.map((c) => c.key), mapValueColumn.value || undefined).index;
   const chave = geocode.toLowerCase();
   const linha = base.rows.findIndex((row) => row.key.trim().toLowerCase() === chave);
@@ -8177,8 +8260,9 @@ function signedFormat(value: number, unit: string): string {
  * período. Lugar sem população conhecida fica sem valor (cinza), não zero.
  */
 function mapDrawableResult(periodOverride?: string): TabulationResult | null {
-  const bruto = mapDrawableResultBruto(periodOverride);
-  if (bruto && mapAreaCnv()) return regionalizar(bruto, periodOverride ?? mapPeriod);
+  const cru = mapDrawableResultBruto(periodOverride);
+  if (cru && mapAreaCnv()) return aplicarColunaDerivada(regionalizar(cru, periodOverride ?? mapPeriod));
+  const bruto = cru && aplicarColunaDerivada(cru);
   if (!bruto || !mapTaxaAtiva()) return bruto;
   const periodo = periodOverride ?? mapPeriod;
   const rotulo = mapPeriodList().find((item) => item.name === periodo)?.label ?? '';
@@ -8199,6 +8283,8 @@ function mapDrawableResult(periodOverride?: string): TabulationResult | null {
  */
 function mapAreaCnv(): CnvDefinition | undefined {
   const nome = mapAreaLevelSelect.value;
+  // Região de saúde soma casos; a porcentagem por região exigiria somar o
+  // numerador e o total de cada uma, o que a soma das colunas já faz abaixo.
   if (!nome || !mapUfFilter || mapLevel !== 'municipality' || mapClassic) return undefined;
   return cnvByName.get(nome);
 }
@@ -8240,7 +8326,8 @@ function regionalizar(bruto: TabulationResult, periodo: string): TabulationResul
 }
 
 function mapTaxaAtiva(): boolean {
-  return Boolean(populacao) && mapTaxaCheck.checked;
+  // Porcentagem não se divide pela população: já é uma proporção.
+  return Boolean(populacao) && mapTaxaCheck.checked && !mapaPctSelecionado();
 }
 
 function mapDrawableResultBruto(periodOverride?: string): TabulationResult | null {
@@ -8257,7 +8344,8 @@ function mapDrawableResultBruto(periodOverride?: string): TabulationResult | nul
   const base = doPeriodo ?? mapResult;
   if (!base) return currentResult;
   if (mapLevel === 'uf' || mapClassic) return base;
-  return mapUfFilter ? onlyUf(base, mapUfFilter) : aggregateToUf(base);
+  // Com "Separar por", cada coluna é somada por UF (aggregateToUf juntaria todas).
+  return mapUfFilter ? onlyUf(base, mapUfFilter) : base.columns.length > 1 ? aggregateColumnsToUf(base) : aggregateToUf(base);
 }
 
 async function ensureMap(): Promise<void> {
@@ -8271,8 +8359,16 @@ async function ensureMap(): Promise<void> {
   // não tem "MUNIC" no nome. Se as linhas não são lugares, o mapa vai atrás do
   // campo geográfico sozinho.
   const nivelDaTabela = inferMapLevel(currentResult);
-  mapSource = nivelDaTabela ? 'tabela' : 'proprio';
-  if (nivelDaTabela) {
+  // Pedir outro Lugar ou "Separar por" é pedir outra leitura: a tabela da tela
+  // responde pelo campo e pelas colunas dela.
+  const campoDaTabela = currentPlan?.spec.rows.field ?? '';
+  const outroLugar = Boolean(mapGeoFieldChoice) && mapGeoFieldChoice !== campoDaTabela;
+  mapSource = nivelDaTabela && !mapCrossField && !outroLugar ? 'tabela' : 'proprio';
+  if (mapSource === 'tabela' && dbfHeader) {
+    const candidatos = findGeographicFields(dbfHeader.fields);
+    if (candidatos.some((candidato) => candidato.field === campoDaTabela)) renderGeoFieldOptions(candidatos, campoDaTabela);
+  }
+  if (mapSource === 'tabela' && nivelDaTabela) {
     // Não zera `mapResult`: ele é o que alimenta a contagem do painel de
     // recorte, e refazê-lo custaria outra passada pelo arquivo.
     mapLevel = nivelDaTabela;
@@ -8303,6 +8399,7 @@ async function ensureMap(): Promise<void> {
     }
   }
   if (mapSource === 'proprio') mapLevel = mapGeoField?.level ?? null;
+  renderMapCrossOptions();
   // Estado isolado que a tabela nova não tem não pode ficar valendo.
   if (mapSource === 'tabela' && mapUfFilter && !currentResult.rows.some((row) => belongsToUf(row.key, mapUfFilter))) mapUfFilter = '';
 
@@ -12211,9 +12308,19 @@ mapGeoFieldSelect.addEventListener('change', () => {
   void ensureMap().then(() => refreshGeoFilter());
 });
 
+mapCrossFieldSelect.addEventListener('change', () => {
+  mapCrossField = mapCrossFieldSelect.value;
+  // Colunas novas: a escolha de Valor anterior falava de outra variável.
+  mapValueColumn.value = '';
+  mapValueColumn.dataset.chaves = '';
+  activeMap = null;
+  void ensureMap();
+});
+
 mapValueColumn.addEventListener('change', () => {
-  // Trocar de coluna não troca de mapa nem de dado: só repinta.
-  if (activeMap && currentResult) renderMap();
+  // Trocar de coluna não troca de mapa nem de dado: só repinta (e a evolução,
+  // que mostra o total do que o mapa pinta).
+  if (activeMap && currentResult) { renderMapPeriodBar(); renderMap(); }
 });
 
 mapUfSelect.addEventListener('change', () => setMapFocus(mapUfSelect.value));

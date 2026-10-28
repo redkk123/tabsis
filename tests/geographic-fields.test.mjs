@@ -32,6 +32,19 @@ test('residência vem antes de ocorrência', () => {
   assert.match(achados[0].reason, /residência/);
 });
 
+test('LTA: o local provável de infecção e o de notificação também viram mapa, cada um com o seu nome', () => {
+  const achados = findGeographicFields(campos('ID_MUNICIP', 'COMUNINF', 'ID_MN_RESI', 'COUFINF', 'SG_UF_NOT'));
+  assert.deepEqual(achados.map((a) => [a.field, a.reason]), [
+    ['ID_MN_RESI', 'município de residência'],
+    ['COMUNINF', 'município provável de infecção'],
+    ['ID_MUNICIP', 'município de notificação'],
+    ['COUFINF', 'UF provável de infecção'],
+    ['SG_UF_NOT', 'UF de notificação'],
+  ]);
+  // SIH e SIA: o município do estabelecimento é outro mapa, não a residência.
+  assert.deepEqual(findGeographicFields(campos('MUNIC_MOV', 'MUNIC_RES')).map((a) => a.reason), ['município de residência', 'município do estabelecimento']);
+});
+
 test('município vem antes de UF, porque dele se obtém a UF', () => {
   const achados = findGeographicFields(campos('UF', 'CODMUNRES'));
   assert.equal(achados[0].field, 'CODMUNRES');

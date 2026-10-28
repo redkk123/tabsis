@@ -3072,6 +3072,48 @@ test('cartão do município: comparar dois lugares lado a lado, com as duas linh
   await expect(cartao.locator('.map-card-col--b')).toHaveCount(0);
 });
 
+test('mapa: lugar de infecção, separar por uma variável e pintar a porcentagem de um valor', async ({ page }) => {
+  // LTA 2023: 3 mucosas em 8 casos (um em branco). 2024: 1 em 2.
+  const { writeDbf } = await import('../dist/packages/export/src/dbf-writer.js');
+  const campo = (name: string, length: number) => ({ name, type: 'C', length, decimalCount: 0 });
+  const arquivo = (linhas: string[][]) => Buffer.from(writeDbf(
+    linhas.map(([ID_MN_RESI, CLAS_FORMA]) => ({ ID_MN_RESI, COMUNINF: '520060', CLAS_FORMA })),
+    [campo('ID_MN_RESI', 6), campo('COMUNINF', 6), campo('CLAS_FORMA', 1)],
+  ));
+  await page.goto('/');
+  await page.locator('#file-input').setInputFiles([
+    { name: 'LTANBR23.dbf', mimeType: 'application/octet-stream', buffer: arquivo([
+      ['520060', '1'], ['520060', '1'], ['520060', '1'], ['520060', '2'],
+      ['520530', '2'], ['520530', '2'], ['530010', '1'], ['530010', ''],
+    ]) },
+    { name: 'LTANBR24.dbf', mimeType: 'application/octet-stream', buffer: arquivo([['520060', '2'], ['530010', '1']]) },
+  ]);
+  await page.locator('[data-view="map"]').click();
+  await expect(page.locator('#map-period-status')).toContainText('Mostrando todos', { timeout: 20000 });
+
+  // O local provável de infecção aparece como Lugar, com o nome.
+  await expect(page.locator('#map-geo-field option')).toContainText(['município de residência · ID_MN_RESI', 'município provável de infecção · COMUNINF']);
+
+  // Separar pela forma clínica: o Valor oferece cada forma, o total e a porcentagem.
+  await page.locator('#map-cross-field').selectOption('CLAS_FORMA');
+  await expect(page.locator('#map-value-column option')).toContainText(['1 · Cutânea', '2 · Mucosa', 'Em branco', 'Total (todas as colunas)', '% 1 · Cutânea', '% 2 · Mucosa', '% Em branco']);
+  await page.locator('#map-value-column').selectOption({ label: '% 2 · Mucosa' });
+  await expect(page.locator('#map-legend')).toContainText('% 2 · Mucosa no total do lugar');
+  // A evolução é a porcentagem do recorte inteiro, não a soma das porcentagens:
+  // 2023 = 3 em 8 (o branco conta no total); 2024 = 1 em 2.
+  await page.locator('#map-period-select').selectOption({ label: '2023' });
+  await expect(page.locator('#map-period-chart .evo-valor')).toHaveText('37,5');
+  await page.locator('#map-period-select').selectOption({ label: '2024' });
+  await expect(page.locator('#map-period-chart .evo-valor')).toHaveText('50');
+  await page.locator('#map-value-column').selectOption({ label: 'Total (todas as colunas)' });
+  await expect(page.locator('#map-period-chart .evo-valor')).toHaveText('2');
+
+  // Trocar o lugar para o de infecção refaz o mapa e diz o que pinta.
+  await page.locator('#map-cross-field').selectOption('');
+  await page.locator('#map-geo-field').selectOption('COMUNINF');
+  await expect(page.locator('#map-message')).toContainText('município provável de infecção');
+});
+
 test('taxa por 100 mil: a população aberta no mapa troca contagem por taxa, e desliga de volta', async ({ page }) => {
   await page.goto('/');
   await page.locator('#file-input').setInputFiles([
