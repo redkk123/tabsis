@@ -48,6 +48,8 @@ public class MainActivity extends ComponentActivity {
     private static LocalAndroid local;
     private ValueCallback<Uri[]> escolhaPendente;
     private ActivityResultLauncher<Intent> escolherArquivos;
+    private ActivityResultLauncher<String> pedirNotificacao;
+    private boolean jaPediuNotificacao;
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -168,6 +170,9 @@ public class MainActivity extends ComponentActivity {
             escolhaPendente = null;
         });
 
+        // Sem a permissão, o download segue em segundo plano igual; só a barra não mostra o progresso.
+        pedirNotificacao = registerForActivityResult(new ActivityResultContracts.RequestPermission(), concedida -> { });
+
         if (local == null) local = new LocalAndroid(this);
         webView.addJavascriptInterface(new PonteAndroid(this, local), "TabSisAndroid");
 
@@ -208,6 +213,14 @@ public class MainActivity extends ComponentActivity {
             return new WebResourceResponse("application/json", "utf-8", 404, "Not Found", cabecalhos,
                     new java.io.ByteArrayInputStream(erro.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
         }
+    }
+
+    /** Android 13+: a notificação de progresso dos downloads precisa de permissão; pede uma vez, no primeiro download. */
+    void pedirNotificacaoSePreciso() {
+        if (android.os.Build.VERSION.SDK_INT < 33 || jaPediuNotificacao) return;
+        jaPediuNotificacao = true;
+        if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) == android.content.pm.PackageManager.PERMISSION_GRANTED) return;
+        runOnUiThread(() -> pedirNotificacao.launch(android.Manifest.permission.POST_NOTIFICATIONS));
     }
 
     String versao() {

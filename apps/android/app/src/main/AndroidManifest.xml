@@ -3,6 +3,11 @@
 
     <!-- Busca no DATASUS e no IBGE. Os microdados abertos ficam no aparelho. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Downloads em segundo plano: serviço com notificação de progresso, e a CPU acordada enquanto baixa. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <application
         android:allowBackup="false"
@@ -22,5 +27,9 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <service
+            android:name=".DownloadsEmSegundoPlano"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
     </application>
 </manifest>

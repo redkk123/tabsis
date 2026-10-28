@@ -138,6 +138,7 @@ final class PonteAndroid {
     /** As rotas de texto do protocolo; devolve {"status": código, "corpo": JSON}. */
     @JavascriptInterface
     public String localPedido(String metodo, String rota, String corpo) {
+        if ("POST".equals(metodo) && "/downloads".equals(rota)) atividade.pedirNotificacaoSePreciso();
         return local.pedido(metodo, rota, corpo);
     }
 

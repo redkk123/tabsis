@@ -60,6 +60,8 @@ export interface BridgeJob {
   bytesPerSecond: number | null;
   error: string | null;
   path: string | null;
+  /** Quantas vezes a conexão foi aberta; mais de uma quando caiu e o download continuou de onde parou. */
+  attempts?: number;
 }
 
 export interface BridgeClientOptions {
