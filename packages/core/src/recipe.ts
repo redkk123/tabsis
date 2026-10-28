@@ -56,6 +56,11 @@ export interface AnalysisRecipeV1 {
   transformSteps?: RecipeTransformStep[];
   /** Deterministic post-tabulation transforms, replayed in array order. */
   resultOperations?: TableOperation[];
+  /**
+   * Etapas da receita desligadas na aba Microdados: fora de `spec.filters`
+   * (não mudam a tabela salva), guardadas para a pessoa ligar de novo.
+   */
+  disabledFilters?: TabulationSpec['filters'];
   view?: {
     chartType?: 'horizontal-bar' | 'vertical-bar' | 'line' | 'area' | 'pie' | 'points' | 'bubbles' | 'arrows';
     chartTitle?: string;
@@ -206,6 +211,11 @@ export function parseRecipe(json: string): AnalysisRecipeV1 {
       if (stepIds.has(step.id)) throw new Error(`transform step repeats id ${step.id} in TabSis recipe`);
       stepIds.add(step.id);
     }
+  }
+  if (parsed.disabledFilters !== undefined) {
+    if (!Array.isArray(parsed.disabledFilters)) throw new Error('invalid disabled filters in TabSis recipe');
+    // Mesma validação das Seleções ligadas: o plano compila com elas no lugar.
+    compileQueryPlan({ ...parsed.spec, filters: parsed.disabledFilters });
   }
   if (parsed.resultOperations !== undefined) {
     if (!Array.isArray(parsed.resultOperations)) throw new Error('invalid result operations in TabSis recipe');

@@ -1804,6 +1804,60 @@ test('Microdados: receita visual com etapas prontas de LTA, contagem por etapa e
   await expect(page.locator('#receita-status')).toContainText('ficam 3 de 6 registros');
   await page.locator('[data-view="table"]').click();
   await expect(page.locator('#result-table tfoot tr').first().locator('td').first()).toHaveText('3');
+
+  // Arrastar um cartão muda a ordem do caminho (o resultado é o mesmo).
+  await page.locator('[data-view="microdata"]').click();
+  await etapas.nth(3).dragTo(etapas.nth(1));
+  await expect(etapas.nth(1)).toContainText('ID_MN_RESI');
+  await expect(page.locator('#receita-status')).toContainText('ficam 3 de 6 registros');
+});
+
+test('Microdados: receita com idade, período, amostra por etapa e etapa desligada que volta na receita salva', async ({ page }) => {
+  const { writeDbf } = await import('../dist/packages/export/src/dbf-writer.js');
+  const linhas = [['4065', '2023-03-10'], ['4030', '2023-05-01'], ['4070', '2024-02-02'], ['4061', '2024-07-07']]
+    .map(([NU_IDADE_N, data]) => ({ NU_IDADE_N, DT_NOTIFIC: new Date(`${data}T00:00:00Z`), ID_MN_RESI: '530010' }));
+  const dbf = writeDbf(linhas, [
+    { name: 'NU_IDADE_N', type: 'C', length: 4, decimalCount: 0 },
+    { name: 'DT_NOTIFIC', type: 'D', length: 8, decimalCount: 0 },
+    { name: 'ID_MN_RESI', type: 'C', length: 6, decimalCount: 0 },
+  ]);
+  await page.goto('/');
+  await page.locator('#file-input').setInputFiles({ name: 'LTANBR23.dbf', mimeType: 'application/octet-stream', buffer: Buffer.from(dbf) });
+  await expect(page.locator('#run-button')).toBeEnabled();
+  await page.locator('#analysis-form').evaluate((form: HTMLFormElement) => form.requestSubmit());
+  await expect(page.locator('#result-table tbody')).toBeVisible();
+  await page.locator('[data-view="microdata"]').click();
+
+  const configuraveis = page.locator('#receita-configuraveis');
+  await configuraveis.getByLabel('Idade mínima').fill('60');
+  await configuraveis.getByRole('button', { name: 'Acrescentar a etapa de idade' }).click();
+  await expect(page.locator('#receita-status')).toContainText('ficam 3 de 4 registros');
+  await expect(configuraveis.getByLabel('Data usada no período')).toContainText('Ano de');
+  await configuraveis.getByLabel('Primeiro ano').fill('2023');
+  await configuraveis.getByLabel('Último ano').fill('2023');
+  await configuraveis.getByRole('button', { name: 'Acrescentar a etapa de período' }).click();
+  await expect(page.locator('#receita-status')).toContainText('ficam 1 de 4 registros');
+
+  // A amostra de uma etapa mostra os registros que passam até ela, com o campo dela em destaque.
+  const etapas = page.locator('#receita-etapas li');
+  await etapas.nth(1).getByRole('button', { name: /^Ver registros/ }).click();
+  await expect(page.locator('#receita-amostra tbody tr')).toHaveCount(3);
+  await expect(page.locator('#receita-amostra th.values-chosen')).toHaveText('NU_IDADE_N');
+
+  // Desligada, a etapa do período sai da tabela, mas vai na receita salva e volta desligada.
+  await etapas.nth(2).getByRole('button', { name: /^Desligar/ }).click();
+  await expect(page.locator('#receita-status')).toContainText('ficam 3 de 4 registros');
+  const download = page.waitForEvent('download');
+  await openSidebarGroup(page, 'saved');
+  await page.locator('#save-recipe-button').click();
+  const arquivo = await (await download).path();
+  await page.locator('[data-view="microdata"]').click();
+  await etapas.nth(2).getByRole('button', { name: /^Remover/ }).click();
+  await expect(page.locator('#receita-etapas li.receita-desligada')).toHaveCount(0);
+  await page.locator('#recipe-input').setInputFiles(arquivo);
+  await page.locator('[data-view="microdata"]').click();
+  await expect(page.locator('#receita-etapas li.receita-desligada')).toHaveCount(1);
+  await expect(page.locator('#receita-etapas li.receita-desligada')).toContainText('fora da análise');
 });
 
 test('Microdados: atalhos de RIDE-DF e idade, com uma regra por campo', async ({ page }) => {

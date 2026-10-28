@@ -118,7 +118,7 @@ import { criarAbaConsulta, type AbaConsulta } from './aba-consulta.ts';
 import { criarAbaMicrodados, type AbaMicrodados } from './aba-microdados.ts';
 import { CAMPOS_DE_CNES, carregarCnes, normalizarCnes } from './cnes.ts';
 import { BASE_DO_APARELHO, TOKEN_DO_APARELHO, criarFetchDaPonte, temPonteLocal } from './ponte-local-android.ts';
-import { RIDE_DF_LC_163_2018, descreverDefinicao, lerDefinicao } from '../../../packages/core/src/definicao-caso.ts';
+import { RIDE_DF_LC_163_2018, descreverDefinicao, faixaEtariaSim, faixaEtariaSinan, lerDefinicao } from '../../../packages/core/src/definicao-caso.ts';
 import { criarReceitaVisual, type EtapaPronta, type ReceitaVisual } from './receita-visual.ts';
 import {
   tabulationToTabwinPrn,
@@ -11220,6 +11220,7 @@ function saveRecipe(): void {
       ? { transformSteps: appliedTransformSteps as unknown as RecipeTransformStep[] }
       : {}),
     ...(tableOperations.length ? { resultOperations: tableOperations } : {}),
+    ...(filtrosDesligados.length ? { disabledFilters: filtrosDesligados.map(cloneFilter) } : {}),
     view: {
       chartType: chartType.value as ChartType,
       chartTitle: chartTitle.value.trim(),
@@ -11631,13 +11632,16 @@ async function openRecipe(file: File): Promise<void> {
     columnConversion.value = loaded;
     columnStartPosition.value = String(recipe.spec.columns.startPosition ?? 1);
   }
-  configuredFilters = recipe.spec.filters.map((filter) => {
+  const restaurarFiltro = (filter: FilterSpec): FilterSpec => {
     if (filter.kind === 'numeric-range' || filter.kind === 'code-rules') return { ...filter };
     if (!filter.conversionId) return cloneFilter(filter);
     const loaded = conversionNameInRegistry(filter.conversionId);
     if (!loaded) throw new Error(`Carregue a conversão ${displayBaseName(filter.conversionId)} antes de abrir esta análise`);
     return { ...filter, conversionId: loaded, acceptedCategories: [...filter.acceptedCategories] };
-  });
+  };
+  configuredFilters = recipe.spec.filters.map(restaurarFiltro);
+  // As etapas desligadas voltam desligadas, prontas para ligar.
+  filtrosDesligados = (recipe.disabledFilters ?? []).map(restaurarFiltro);
   configuredCrossFieldRules = (recipe.spec.crossFieldRules ?? []).map((rule) => ({
     ...rule,
     conditions: rule.conditions.map((condition) => {
@@ -13376,6 +13380,16 @@ abaMicrodados = criarAbaMicrodados({
   aviso: showToast,
 });
 
+/** O campo de idade que a receita sabe ler: SINAN, SIM (pelo nome do arquivo) ou a idade da mãe (SINASC). */
+function campoDeIdade(): string {
+  const campos = new Set((dbfHeader?.fields ?? []).map((field) => field.name));
+  if (campos.has('NU_IDADE_N')) return 'NU_IDADE_N';
+  const sistema = activeDatasetSources.map((source) => describeDatasusFile(source.name)).find(Boolean)?.system;
+  if (sistema === 'SIM' && campos.has('IDADE')) return 'IDADE';
+  if (campos.has('IDADEMAE')) return 'IDADEMAE';
+  return '';
+}
+
 /** Etapas prontas de saúde: Seleções com a regra da fonte oficial citada. */
 function etapasProntas(): Array<EtapaPronta & { filtros: () => FilterSpec[] }> {
   const campos = new Set((dbfHeader?.fields ?? []).map((field) => field.name));
@@ -13447,9 +13461,78 @@ receitaVisual = criarReceitaVisual({
     // A ordem não muda o resultado (as etapas se somam); muda só o caminho mostrado.
     renderConfiguredFilters();
   },
+  moverPara: (de, para) => {
+    if (de >= configuredFilters.length || para >= configuredFilters.length || de === para) return;
+    const [movido] = configuredFilters.splice(de, 1);
+    configuredFilters.splice(para, 0, movido!);
+    renderConfiguredFilters();
+  },
   remover: (indice) => {
     if (indice < configuredFilters.length) configuredFilters.splice(indice, 1);
     else filtrosDesligados.splice(indice - configuredFilters.length, 1);
+    renderConfiguredFilters();
+    void runAnalysis();
+  },
+  amostraAte: async (n, maximo) => {
+    const campos = (dbfHeader?.fields ?? []).map((field) => field.name);
+    if (!campos.length) return { destaque: '', campos, registros: [] };
+    // O plano compilado traz o que o motor usa para avaliar cada Seleção (o
+    // trecho do registro de uma CNV que atravessa campos, por exemplo).
+    const plan = compilarPlano({
+      compatibilityProfile: currentCompatibilityProfile,
+      rows: { field: campos[0]! },
+      measure: { kind: 'count' as const },
+      filters: configuredFilters.slice(0, n).map(cloneFilter),
+      suppressZeroRows: true,
+      suppressZeroColumns: false,
+    });
+    const { records } = await askDataset<{ records: Array<Record<string, unknown>> }>(
+      { type: 'records', fields: campos, maxRecords: maximo, filters: plan.spec.filters, conversions: conversionsForPlan(plan) },
+      { label: 'Amostra da etapa' },
+    );
+    return { destaque: n ? configuredFilters[n - 1]?.field ?? '' : '', campos, registros: records };
+  },
+  campoDeIdade: () => campoDeIdade(),
+  aplicarIdade: (minimo, maximo) => {
+    const campo = campoDeIdade();
+    if (!campo) return;
+    let filtro: FilterSpec;
+    try {
+      // SINAN e SIM gravam a idade com a unidade no primeiro dígito (4 = anos;
+      // horas, dias e meses entram em "0 ano"); a idade da mãe, em anos.
+      filtro = campo === 'IDADEMAE'
+        ? { field: campo, kind: 'numeric-range', mode: 'include', minimum: minimo, maximum: maximo }
+        : { field: campo, kind: 'code-rules', mode: 'include', include: campo === 'NU_IDADE_N' ? faixaEtariaSinan(minimo, maximo) : faixaEtariaSim(minimo, maximo), exclude: '' };
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error), true);
+      return;
+    }
+    configuredFilters = [...configuredFilters.filter((existente) => existente.field !== campo), filtro];
+    filtrosDesligados = filtrosDesligados.filter((existente) => existente.field !== campo);
+    renderConfiguredFilters();
+    void runAnalysis();
+  },
+  eixosDeAno: () => eixosDeData.filter((eixo) => eixo.id.startsWith('data:ano:')).map((eixo) => ({ id: eixo.id, rotulo: eixo.label })),
+  aplicarAnos: (id, de, ate) => {
+    const eixo = eixosDeData.find((candidato) => candidato.id === id);
+    const cnv = eixo?.conversionId ? cnvByName.get(eixo.conversionId) : undefined;
+    if (!eixo || !cnv) return;
+    const sequencias: string[] = [];
+    for (let ano = de; ano <= ate; ano += 1) {
+      const classe = classifyCnv(cnv, String(ano));
+      if (classe) sequencias.push(String(classe.sequence));
+    }
+    if (!sequencias.length) {
+      showToast(`Nenhum ano entre ${de} e ${ate} na tabela de anos do TabSis.`, true);
+      return;
+    }
+    // Um período por data: trocar o período troca a etapa anterior da mesma data.
+    const mesmoEixo = (filtro: FilterSpec): boolean => filtro.field === eixo.field && filtro.conversionId === eixo.conversionId;
+    configuredFilters = [...configuredFilters.filter((filtro) => !mesmoEixo(filtro)), {
+      field: eixo.field, kind: 'categories', mode: 'include', conversionId: eixo.conversionId!,
+      startPosition: eixo.startPosition ?? 1, acceptedCategories: sequencias,
+    }];
+    filtrosDesligados = filtrosDesligados.filter((filtro) => !mesmoEixo(filtro));
     renderConfiguredFilters();
     void runAnalysis();
   },

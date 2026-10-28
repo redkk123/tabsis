@@ -130,9 +130,12 @@ Transformar a lista de etapas atual numa receita visual.
   → 131.581 casos novos cutâneos → 1.246 no DF e Entorno, iguais ao script.
   Para isso, juntar anos passou a aceitar campos que mudaram de tipo (o
   LTANBR25 mudou quatro campos administrativos): entram como texto, com aviso.
-  Falta: amostra de registros por etapa, etapas de faixa etária e de datas
-  como cartões, arrastar para reordenar, receita salva com as etapas
-  desligadas, e o roteiro de 15 minutos no manual.
+  Depois (mesmo dia): amostra de registros por etapa ("ver registros", com o
+  campo da etapa em destaque), etapas de idade (SINAN) e de período (ano de
+  qualquer data do arquivo), arrastar os cartões para reordenar (setas no
+  celular), receita salva com as etapas desligadas, e o roteiro de 15 minutos
+  no manual. **Fase 1 concluída.** Próxima: Fase 3 (cadernos-modelo), a pedido
+  do Red; a Fase 2 (ponte com o Lab) entra quando os cadernos precisarem.
 
 ### Fase 2 — Ponte de verdade com o Laboratório
 

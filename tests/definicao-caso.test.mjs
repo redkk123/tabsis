@@ -108,3 +108,25 @@ test('atalhos: RIDE-DF com 34 municípios e faixa etária no código do SINAN', 
   assert.equal(casaDefinicao(criancas, '4010'), false);
   assert.throws(() => faixaEtariaSinan(10, 5), /inválida/);
 });
+
+test('a receita salva guarda as etapas desligadas e as confere como as ligadas', async () => {
+  const { parseRecipe, serializeRecipe } = await import('../dist/packages/core/src/recipe.js');
+  const desligada = { field: 'CAUSABAS', mode: 'include', kind: 'code-rules', include: 'B57', exclude: '' };
+  const receita = {
+    schema: 'tabwin-web.recipe', version: 1, conversions: [], sourceHints: [],
+    spec: { compatibilityProfile: 'tabwin-4.15', rows: { field: 'CAUSABAS' }, measure: { kind: 'count' }, filters: [] },
+    disabledFilters: [desligada],
+  };
+  assert.deepEqual(parseRecipe(serializeRecipe(receita)).disabledFilters, [desligada]);
+  assert.throws(() => parseRecipe(serializeRecipe({ ...receita, disabledFilters: [{ ...desligada, include: 'B5#' }] })), /code rules are invalid/);
+});
+
+test('faixa etária no código de idade do SIM (unidade + quantidade, 5 = mais de 100 anos)', async () => {
+  const { faixaEtariaSim } = await import('../dist/packages/core/src/definicao-caso.js');
+  assert.equal(faixaEtariaSim(60, 999), '460-499, 500-599');
+  assert.equal(faixaEtariaSim(0, 9), '100-399, 400-409');
+  const idosos = lerDefinicao(faixaEtariaSim(60, 999), '');
+  for (const idade of ['460', '499', '501']) assert.equal(casaDefinicao(idosos, idade), true, idade);
+  for (const idade of ['459', '311', '230']) assert.equal(casaDefinicao(idosos, idade), false, idade);
+  assert.throws(() => faixaEtariaSim(10, 5), /inválida/);
+});

@@ -158,6 +158,9 @@ interface RecordsRequest {
   maxRecords: number;
   /** Só os registros com `campo = valor`, como o valor sai na tabela sem CNV (branco = ''). */
   where?: { field: string; value: string };
+  /** Só os que passam por estas Seleções (a amostra de uma etapa da receita). */
+  filters?: FilterSpec[];
+  conversions?: ConversionRegistry;
 }
 
 interface CombinationProfileRequest {
@@ -342,7 +345,11 @@ function fieldsForRequest(request: DatasetRequest): readonly string[] | undefine
     case 'profile-numeric':
     case 'distinct': return [request.field];
     case 'profile-combinations': return request.fields;
-    case 'records': return request.where && !request.fields.includes(request.where.field) ? [...request.fields, request.where.field] : request.fields;
+    case 'records': {
+      const extras = [request.where?.field, ...(request.filters ?? []).flatMap((filtro) => [filtro.field, ...(filtro.recordSpan ?? []).map((parte) => parte.field)])]
+        .filter((campo): campo is string => Boolean(campo) && !request.fields.includes(campo!));
+      return extras.length ? [...request.fields, ...new Set(extras)] : request.fields;
+    }
     case 'flows': return [request.originField, request.destinationField, ...(request.weightField ? [request.weightField] : [])];
     case 'open':
     case 'append':
@@ -734,6 +741,7 @@ function handle(request: DatasetRequest): void {
         if (cortado) return;
         for (const record of batch.records) {
           if (request.where && String(record[request.where.field] ?? '') !== request.where.value) continue;
+          if (request.filters && !matchesFilters(record, request.filters, undefined, request.conversions ?? {})) continue;
           if (coletados.length >= request.maxRecords) { cortado = true; return; }
           coletados.push(record);
         }
