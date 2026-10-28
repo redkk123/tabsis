@@ -63,6 +63,7 @@ code { background: var(--soft); padding: 1px 5px; border-radius: 4px; font-size:
       <ul>
         <li>Abre DBC, DBF, DEF e CNV, monta tabelas, gráficos e mapas.</li>
         <li>Busca e baixa do DATASUS pela internet.</li>
+        <li>Relatório com a tabela e os mapas (um por ano), para imprimir ou salvar em PDF.</li>
       </ul>
       <div class="botoes"><a class="botao" href="./">Abrir o TabSis</a></div>
     </article>
@@ -72,7 +73,8 @@ code { background: var(--soft); padding: 1px 5px; border-radius: 4px; font-size:
       <p>O TabSis inteiro dentro de um app, que funciona sem internet para o que já está no celular.</p>
       <ul>
         <li>Abre vários arquivos de uma vez (no seletor, toque e segure o primeiro).</li>
-        <li>Salva tabelas e arquivos em <code>Downloads/TabSis</code>.</li>
+        <li>Já traz o TabSis Local: baixa direto do FTP do DATASUS para <code>Downloads/TabSis</code>, um arquivo de cada vez, e reabre de lá sem baixar de novo.</li>
+        <li>Salva tabelas, relatórios e arquivos em <code>Downloads/TabSis</code>.</li>
       </ul>
       <div class="botoes"><a class="botao" href="https://github.com/redkk123/tabsis/releases/latest/download/TabSis-android.apk">Baixar o APK</a></div>
     </article>
@@ -95,14 +97,14 @@ code { background: var(--soft); padding: 1px 5px; border-radius: 4px; font-size:
   <h2>Qual é a diferença nos downloads do DATASUS?</h2>
   <div class="tabela">
     <table>
-      <thead><tr><th></th><th>Navegador e app Android</th><th>Com o TabSis Local</th></tr></thead>
+      <thead><tr><th></th><th>Navegador</th><th>Com o TabSis Local no computador</th><th>App Android</th></tr></thead>
       <tbody>
-        <tr><th>Quem baixa</th><td>A própria página.</td><td>O TabSis Local, no seu computador. A página só pede e depois abre o arquivo.</td></tr>
-        <tr><th>Se a conexão cair</th><td><span class="aviso">Recomeça do zero.</span> O navegador tem prazos e pode suspender uma aba parada, então um arquivo de centenas de MB às vezes não chega.</td><td><span class="sim">Continua de onde parou</span> na próxima tentativa.</td></tr>
-        <tr><th>Vários arquivos</th><td>Um depois do outro, com a página aberta.</td><td><span class="sim">Uma fila, um de cada vez, em segundo plano.</span> Continua mesmo se você fechar a página.</td></tr>
-        <tr><th>Onde o arquivo fica</th><td>Guardado dentro do navegador (some se você limpar os dados do site).</td><td>Numa pasta comum do computador (<code>Downloads/TabSis</code>), que TabWin, R, Python ou Excel também abrem.</td></tr>
-        <tr><th>Portal do DATASUS fora do ar</th><td>Busca e baixa pelo FTP oficial, por um intermediário na nuvem.</td><td>Busca e baixa direto do FTP oficial, sem intermediário.</td></tr>
-        <tr><th>Abrir de novo</th><td>"Downloads recentes", enquanto o navegador guardar.</td><td>"No computador", sem baixar de novo, um ou vários juntos.</td></tr>
+        <tr><th>Quem baixa</th><td>A própria página.</td><td>O TabSis Local, no seu computador. A página só pede e depois abre o arquivo.</td><td>O próprio app, por baixo da página, já ligado.</td></tr>
+        <tr><th>Se a conexão cair</th><td><span class="aviso">Recomeça do zero.</span> O navegador tem prazos e pode suspender uma aba parada, então um arquivo de centenas de MB às vezes não chega.</td><td><span class="sim">Continua de onde parou</span> na próxima tentativa.</td><td>Recomeça o arquivo. Se o FTP não responder (tem rede que bloqueia), tenta pelo caminho do navegador.</td></tr>
+        <tr><th>Vários arquivos</th><td>Um depois do outro, com a página aberta.</td><td><span class="sim">Uma fila, um de cada vez, em segundo plano.</span> Continua mesmo se você fechar a página.</td><td><span class="sim">Uma fila, um de cada vez,</span> com o app aberto.</td></tr>
+        <tr><th>Onde o arquivo fica</th><td>Guardado dentro do navegador (some se você limpar os dados do site).</td><td>Numa pasta comum do computador (<code>Downloads/TabSis</code>), que TabWin, R, Python ou Excel também abrem.</td><td>Em <code>Downloads/TabSis</code> no celular, que outros apps também abrem.</td></tr>
+        <tr><th>Portal do DATASUS fora do ar</th><td>Busca e baixa pelo FTP oficial, por um intermediário na nuvem.</td><td>Busca e baixa direto do FTP oficial, sem intermediário.</td><td>Baixa direto do FTP oficial, sem intermediário.</td></tr>
+        <tr><th>Abrir de novo</th><td>"Downloads recentes", enquanto o navegador guardar.</td><td>"No computador", sem baixar de novo, um ou vários juntos.</td><td>"No aparelho", sem baixar de novo.</td></tr>
       </tbody>
     </table>
   </div>
@@ -114,7 +116,8 @@ code { background: var(--soft); padding: 1px 5px; border-radius: 4px; font-size:
     <li>Busque no DATASUS normalmente. Com o app conectado, cada arquivo é baixado pela fila do computador, guardado na pasta e aberto no site.</li>
     <li>Para baixar muitos de uma vez sem abrir, marque os arquivos e use <b>Baixar no computador</b>. Eles aparecem depois em <b>No computador</b>.</li>
   </ol>
-  <p class="nota">O TabSis Local também funciona sozinho: escolha sistema, tipo, anos e UF na própria janela e clique em "Procurar e baixar".</p>
+  <p class="nota">O TabSis Local também funciona sozinho: escolha sistema, tipo, anos e UF na própria janela e clique em "Procurar e baixar".
+  No app Android não precisa instalar nada à parte: o TabSis Local já vem dentro dele e se liga sozinho.</p>
 
   <h2>Segurança e instalação</h2>
   <ul class="nota">
