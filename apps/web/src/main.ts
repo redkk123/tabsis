@@ -125,7 +125,8 @@ import {
 } from '../../../packages/export/src/tabwin-formats.ts';
 import { encodeWindows1252 } from '../../../packages/formats/src/windows-1252.ts';
 import { UF_NAMES, describeAuxiliaryFile, describeDatasusFile } from '../../../packages/formats/src/datasus-file-names.ts';
-import { datasusFieldEntry } from '../../../packages/formats/src/datasus-field-dictionary.ts';
+import { datasusFieldEntry, valoresDoDicionario } from '../../../packages/formats/src/datasus-field-dictionary.ts';
+import { UNCLASSIFIED_KEY } from '../../../packages/core/src/execute.ts';
 import { criarGerarDef } from './gerar-def.ts';
 import { criarEditorCnv } from './editor-cnv.ts';
 import {
@@ -10845,6 +10846,7 @@ function showView(view: ViewName): void {
   // refreshing here means the dropdowns are never stale when actually seen,
   // without needing every column-changing code path to know about this tab.
   if (view === 'compare' && compareTableB) renderComparePairs();
+  if (view === 'microdata') abaMicrodados?.aoMostrar();
 }
 
 function exportBaseName(): string {
@@ -12807,5 +12809,58 @@ abaMicrodados = criarAbaMicrodados({
     renderConfiguredFilters();
     void runAnalysis();
   },
+  contarValores: async (campo) => {
+    // Sem as Seleções deste campo: a lista mostra todos os valores, e os já
+    // escolhidos vêm marcados. O branco vira a linha "não classificados".
+    const plan = compilarPlano({
+      compatibilityProfile: currentCompatibilityProfile,
+      rows: { field: campo, unclassifiedPolicy: 'discriminate' as const },
+      measure: { kind: 'count' as const },
+      filters: configuredFilters.filter((filter) => filter.field !== campo).map(cloneFilter),
+      ...(configuredCrossFieldRules.length ? { crossFieldRules: configuredCrossFieldRules.map(cloneCrossFieldRule) } : {}),
+      suppressZeroRows: true,
+      suppressZeroColumns: false,
+    });
+    const { result } = await askDataset<{ result: TabulationResult; cached: boolean }>(
+      { type: 'tabulate', plan, conversions: conversionsForPlan(plan) },
+      { label: 'Valores do campo' },
+    );
+    return result.rows.map((row, indice) => ({
+      valor: row.key === UNCLASSIFIED_KEY ? '' : row.key,
+      registros: result.cells[indice]?.[0] ?? 0,
+    }));
+  },
+  significados: (campo) => valoresDoDicionario(entradaDoDicionario(campo)?.entry.values),
+  descricaoDoCampo: (campo) => {
+    const achado = entradaDoDicionario(campo);
+    return achado ? `${achado.entry.label}: ${achado.entry.description} (${achado.source})` : '';
+  },
+  valoresAceitos: (campo) => {
+    const filtro = configuredFilters.find((filter) => filter.field === campo && filter.kind !== 'code-rules'
+      && filter.kind !== 'numeric-range' && !filter.conversionId && filter.mode !== 'exclude');
+    return filtro && 'acceptedCategories' in filtro ? [...filtro.acceptedCategories] : undefined;
+  },
+  aplicarValores: (campo, valores) => {
+    // Troca tudo o que recortava este campo: dois recortes de inclusão no
+    // mesmo campo se anulam, e a tabela viria vazia.
+    configuredFilters = configuredFilters.filter((filter) => filter.field !== campo);
+    if (valores.length) configuredFilters.push({ field: campo, kind: 'categories', mode: 'include', acceptedCategories: [...valores] });
+    renderConfiguredFilters();
+    updateFilterCount();
+    void runAnalysis();
+  },
+  exemplos: async (campo, valor, maximo) => {
+    const { records } = await askDataset<{ records: Array<Record<string, unknown>>; seen: number; truncated: boolean }>(
+      { type: 'records', fields: (dbfHeader?.fields ?? []).map((field) => field.name), maxRecords: maximo, where: { field: campo, value: valor } },
+      { label: 'Exemplos de registros' },
+    );
+    return records;
+  },
   aviso: showToast,
 });
+
+/** O dicionário oficial do campo, para o arquivo aberto (LTANBR23 → agravo LTAN do SINAN). */
+function entradaDoDicionario(campo: string): ReturnType<typeof datasusFieldEntry> {
+  const tipo = activeDatasetSources.map((source) => describeDatasusFile(source.name)).find(Boolean);
+  return datasusFieldEntry(campo, tipo?.system, tipo?.prefix);
+}

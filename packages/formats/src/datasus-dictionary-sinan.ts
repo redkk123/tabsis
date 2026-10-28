@@ -407,7 +407,35 @@ const VIOL: Readonly<Record<string, DatasusFieldEntry>> = {
   DS_OBS: { label: 'Observações', description: 'Observações adicionais.' },
 };
 
+/** Leishmaniose tegumentar americana: cutânea e mucosa vêm na mesma ficha, separadas por CLAS_FORMA. */
+const LTAN: Readonly<Record<string, DatasusFieldEntry>> = {
+  DT_INVEST: { label: 'Data da investigação', description: 'Data de início da investigação do caso.', values: DATA },
+  ID_OCUPA_N: { label: 'Ocupação', description: 'Atividade exercida pelo paciente (setor formal, informal ou autônomo) ou a última, se desempregado (CBO).' },
+  CLI_CUTANE: { label: 'Lesão cutânea', description: 'Se o paciente apresenta lesão cutânea. Com lesão cutânea e sem lesão mucosa, a forma clínica é preenchida como cutânea.', values: '1 – Sim; 2 – Não' },
+  CLI_MUCOSA: { label: 'Lesão mucosa', description: 'Se o paciente apresenta lesão mucosa. Com lesão mucosa, a forma clínica é preenchida como mucosa, mesmo havendo lesão cutânea.', values: '1 – Sim; 2 – Não' },
+  CLI_CICATR: { label: 'Cicatriz cutânea (com lesão mucosa)', description: 'Em caso de lesão mucosa, se há cicatrizes cutâneas.', values: '1 – Sim; 2 – Não' },
+  CLI_CO_HIV: { label: 'Coinfecção HIV', description: 'Se o paciente apresenta coinfecção LTA/HIV.', values: SIM_NAO_IGN },
+  LAB_PARASI: { label: 'Parasitológico direto', description: 'Resultado do exame parasitológico direto. Positivo leva o critério de confirmação a laboratorial.', values: '1 – Positivo; 2 – Negativo; 3 – Não realizado' },
+  LAB_IRM: { label: 'IRM (Montenegro)', description: 'Resultado da intradermorreação de Montenegro. Positivo leva o critério de confirmação a laboratorial.', values: '1 – Positivo; 2 – Negativo; 3 – Não realizado' },
+  LAB_HISTOP: { label: 'Histopatologia', description: 'Resultado do exame histopatológico. Encontro do parasita ou compatível levam o critério a laboratorial.', values: '1 – Encontro do parasita; 2 – Compatível; 3 – Não compatível; 4 – Não realizado' },
+  CLA_TIPO_N: { label: 'Tipo de entrada', description: 'Tipo de entrada do caso.', values: '1 – Caso novo; 2 – Recidiva; 3 – Transferência; 9 – Ignorado' },
+  CLAS_FORMA: { label: 'Forma clínica', description: 'Forma clínica da leishmaniose tegumentar. Ignorada só nos registros vindos da base antiga (DOS).', values: '1 – Cutânea; 2 – Mucosa; 9 – Ignorada' },
+  DT_INIC_TR: { label: 'Data do início do tratamento', description: 'Data do início do tratamento.', values: DATA },
+  TRA_DROGA_: { label: 'Droga inicial administrada', description: 'Medicamento prescrito para o tratamento inicial.', values: '1 – Antimonial pentavalente; 2 – Anfotericina B; 3 – Pentamidina; 4 – Outras; 5 – Não utilizada' },
+  TRA_PESO: { label: 'Peso (kg)', description: 'Peso do paciente em kg, quando a droga inicial é antimonial pentavalente.' },
+  TRA_DOSE: { label: 'Dose prescrita (mg/kg/dia Sb+5)', description: 'Dose prescrita de antimonial pentavalente, em mg/kg/dia.', values: '1 – Menor que 10; 2 – Maior ou igual a 10 e menor que 15; 3 – Igual a 15; 4 – Maior ou igual a 15 e menor que 20; 5 – Maior ou igual a 20' },
+  TRA_AMPOLA: { label: 'Nº total de ampolas prescritas', description: 'Número total de ampolas prescritas no tratamento inicial com antimonial pentavalente.' },
+  TRA_OUTR_N: { label: 'Outra droga na falência do tratamento inicial', description: 'Droga utilizada na falência do tratamento inicial.', values: '1 – Anfotericina B; 2 – Pentamidina; 3 – Outros; 4 – Não se aplica' },
+  CRITERIO: { label: 'Critério de confirmação', description: 'Critério de confirmação, preenchido a partir do parasitológico direto, da IRM e da histopatologia.', values: '1 – Laboratorial; 2 – Clínico-epidemiológico' },
+  CON_CLASS_: { label: 'Classificação epidemiológica', description: 'Classificação epidemiológica do caso.', values: '1 – Autóctone; 2 – Importado; 3 – Indeterminado' },
+  DOENCA_TRA: { label: 'Doença relacionada ao trabalho', description: 'Se a doença está relacionada ao ambiente de trabalho do paciente.', values: SIM_NAO_IGN },
+  EVOLUCAO: { label: 'Evolução do caso', description: 'Evolução do caso.', values: '1 – Alta por cura; 2 – Abandono; 3 – Óbito por LTA; 4 – Óbito por outras causas; 5 – Transferência; 6 – Mudança de diagnóstico' },
+  DT_OBITO: { label: 'Data do óbito', description: 'Data do óbito.', values: DATA },
+  DT_ENCERRA: { label: 'Data de encerramento', description: 'Data de encerramento do caso.', values: DATA },
+};
+
 export const SINAN_AGRAVOS: Readonly<Record<string, Readonly<Record<string, DatasusFieldEntry>>>> = {
+  LTAN,
   VIOL,
   DENG,
   CHIK: DENG,
@@ -418,6 +446,7 @@ export const SINAN_AGRAVOS: Readonly<Record<string, Readonly<Record<string, Data
 };
 
 export const SINAN_AGRAVO_SOURCES: Readonly<Record<string, string>> = {
+  LTAN: 'Dicionário de dados SINAN NET 5.0 – Leishmaniose tegumentar americana (LTAN_DIC_DADOS.pdf), DATASUS',
   HANS: 'Dicionário de dados SINAN NET 5.0 – Hanseníase (HANSN_DIC_DADOS.pdf), DATASUS',
   TUBE: 'Dicionário de dados SINAN NET – Tuberculose (TUBEN_DIC_DADOS.pdf), DATASUS',
   SIFG: 'Dicionário de dados SINAN NET – Sífilis em gestante (SIFIGEN_DIC_DADOS.pdf), DATASUS',

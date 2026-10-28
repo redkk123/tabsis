@@ -312,3 +312,21 @@ function entradaDeDescricao(descricao: string): DatasusFieldEntry {
 export function datasusDictionaryCount(system: DatasusDictionarySystem): number {
   return Object.keys(DICTIONARIES[system]).length;
 }
+
+/**
+ * Os valores de um campo como o dicionário lista, código → significado:
+ * "1 – Cutânea; 2 – Mucosa" → 1 = Cutânea. Aceita "M ou 1 – Masculino" e
+ * "I, 0 ou 9 – Ignorado" (vários códigos, o mesmo significado) e o "=" dos
+ * Informes Técnicos. O que não tem código (dd/mm/aaaa, texto livre) fica de fora.
+ */
+export function valoresDoDicionario(valores: string | undefined): Map<string, string> {
+  const mapa = new Map<string, string>();
+  for (const parte of (valores ?? '').split(';')) {
+    const achado = /^\s*(.+?)\s+[–=-]\s+(.+?)\s*$/.exec(parte);
+    if (!achado) continue;
+    const codigos = achado[1]!.split(/\s*,\s*|\s+ou\s+/);
+    if (!codigos.every((codigo) => /^[0-9A-Za-z]{1,4}$/.test(codigo))) continue;
+    for (const codigo of codigos) if (!mapa.has(codigo)) mapa.set(codigo, achado[2]!);
+  }
+  return mapa;
+}

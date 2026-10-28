@@ -668,14 +668,37 @@ citada.
 Célula vazia significa **ausente**. Nenhum zero é fabricado para preencher
 lacuna — nem na exportação, nem na leitura do outro lado.
 
+### Microdados: ver e escolher os registros
+
+A aba **Microdados** é o laboratório de microdados sem código. A primeira
+parte mostra o que existe dentro do arquivo:
+
+1. Escolha o **Campo**. Aparecem todos os valores que ele tem nos
+   microdados, com quantos registros e a porcentagem de cada um. Quando o
+   TabSis conhece o arquivo (pelo nome, como `LTANBR23.dbc`), cada código
+   vem com o **significado** tirado do dicionário de dados oficial, e o que
+   o campo é aparece logo abaixo da escolha.
+2. **Buscar valor** filtra a lista por código ou significado (num campo de
+   CID há milhares de valores; a lista mostra 300 de cada vez).
+3. **ver**, ao lado de um valor, mostra os primeiros registros do arquivo
+   com esse valor, com todos os campos, para conferir antes de decidir.
+4. Marque os valores que entram (tocar na linha também marca) e use
+   **Aplicar marcados como Seleção**. A tabela, o mapa e as exportações
+   passam a usar só esses registros. Aplicar de novo no mesmo campo troca a
+   Seleção; marcar todos tira o recorte do campo.
+
+Exemplo: na leishmaniose tegumentar (LTAN), a forma cutânea e a mucosa vêm
+no mesmo arquivo. A aba já abre no campo **Forma clínica** (`CLAS_FORMA`):
+1 = Cutânea, 2 = Mucosa, 9 = Ignorada e os registros em branco. Marcar só o
+1 deixa a análise só com a forma cutânea.
+
 ### Microdados: definição de caso por códigos
 
-A aba **Microdados** é o laboratório de microdados sem código. Serve para
-quando a lista pronta junta coisas diferentes. Por exemplo, a
-"Tripanossomíase" junta a doença de Chagas (B57) com a doença do sono (B56).
+A segunda parte da aba serve para quando a lista pronta junta coisas
+diferentes e os códigos são muitos. Por exemplo, a "Tripanossomíase" junta a
+doença de Chagas (B57) com a doença do sono (B56).
 
-1. Escolha o **Campo** (CAUSABAS no SIM, DIAG_PRINC no SIH, ID_AGRAVO no
-   SINAN; a aba já sugere o campo de código do arquivo).
+1. Escolha o **Campo**, no alto da aba (CAUSABAS no SIM, DIAG_PRINC no SIH).
 2. Em **Incluir códigos**, escreva os que entram: `B57`. Um código sem fim
    pega todos os que começam com ele (`B57` pega B570 a B575); `B570-B572` é
    uma faixa; separe vários por vírgula. Pontos e minúsculas não importam.
