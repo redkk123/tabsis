@@ -569,7 +569,9 @@ export function criarPainel(raiz: HTMLElement, deps: PainelDeps): Painel {
   function renderSelecoes(): void {
     if (!catalogo || !estado) return;
     const ativas = new Set(estado.selecoes.map((selecao) => selecao.eixo));
-    preencherLista(disponiveisLista, catalogo.selecoes.filter((eixo) => !ativas.has(eixo.id)), null, '', false, indisponiveisSelecoes);
+    // Redesenhar (o arquivo terminou de carregar, por exemplo) não tira a marca
+    // da variável escolhida: sem isto, "Incluir" logo depois não fazia nada.
+    preencherLista(disponiveisLista, catalogo.selecoes.filter((eixo) => !ativas.has(eixo.id)), disponiveisLista.value || null, '', false, indisponiveisSelecoes);
     ativasLista.replaceChildren();
     for (const selecao of estado.selecoes) {
       const eixo = catalogo.selecoes.find((item) => item.id === selecao.eixo);
