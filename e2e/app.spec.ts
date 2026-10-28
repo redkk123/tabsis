@@ -1712,6 +1712,62 @@ test('Microdados: definição de caso por códigos, com prévia, vira uma Seleç
   await expect(page.locator('#case-apply')).toBeDisabled();
 });
 
+test('Microdados: ver os valores do campo com o significado e marcar os que entram', async ({ page }) => {
+  // LTA: cutânea e mucosa vêm no mesmo arquivo, separadas pela forma clínica.
+  const { writeDbf } = await import('../dist/packages/export/src/dbf-writer.js');
+  const campos = [
+    { name: 'CLAS_FORMA', type: 'C', length: 1, decimalCount: 0 },
+    { name: 'CS_SEXO', type: 'C', length: 1, decimalCount: 0 },
+  ];
+  const registros = [['1', 'M'], ['1', 'F'], ['1', 'M'], ['2', 'M'], ['2', 'F'], ['', 'F']]
+    .map(([CLAS_FORMA, CS_SEXO]) => ({ CLAS_FORMA, CS_SEXO }));
+  await page.goto('/');
+  await page.locator('#file-input').setInputFiles({ name: 'LTANBR23.dbf', mimeType: 'application/octet-stream', buffer: Buffer.from(writeDbf(registros, campos)) });
+  await expect(page.locator('#run-button')).toBeEnabled();
+  await page.locator('#row-field').selectOption('CS_SEXO');
+  await page.locator('#analysis-form').evaluate((form: HTMLFormElement) => form.requestSubmit());
+  await expect(page.locator('#result-table tbody')).toBeVisible();
+
+  await page.locator('[data-view="microdata"]').click();
+  // Sem campo de CID, a forma clínica já vem escolhida, com o que o dicionário diz dela.
+  await expect(page.locator('#case-field')).toHaveValue('CLAS_FORMA');
+  await expect(page.locator('#values-field-note')).toContainText('Forma clínica');
+  const linhas = page.locator('#values-table tbody tr');
+  await expect(linhas).toHaveCount(3);
+  await expect(linhas.nth(0)).toContainText('Cutânea');
+  await expect(linhas.nth(0)).toContainText('3');
+  await expect(linhas.nth(1)).toContainText('Mucosa');
+  await expect(linhas.nth(2)).toContainText('(em branco)');
+  await expect(page.locator('#values-apply')).toBeDisabled();
+
+  // Ver os registros de um valor, antes de decidir.
+  await linhas.nth(1).getByRole('button', { name: 'ver registros' }).click();
+  await expect(page.locator('#values-examples')).toContainText('CLAS_FORMA = 2 (Mucosa)');
+  await expect(page.locator('#values-examples tbody tr')).toHaveCount(2);
+
+  // Só a cutânea.
+  await linhas.nth(0).getByRole('checkbox').check();
+  await expect(page.locator('#values-status')).toContainText('3 de 6 registros entram');
+  await page.locator('#values-apply').click();
+  await expect(page.locator('#values-status')).toContainText('Aplicado como Seleção: CLAS_FORMA = 1 (Cutânea)');
+  await expect(page.locator('.active-filter')).toHaveCount(1);
+  await page.locator('[data-view="table"]').click();
+  await expect(page.locator('#result-table tfoot tr').first().locator('td').first()).toHaveText('3');
+
+  // Voltando, a lista mostra todos os valores e a cutânea marcada; trocar pela
+  // mucosa + branco troca a Seleção, não empilha.
+  await page.locator('[data-view="microdata"]').click();
+  await expect(linhas.nth(0).getByRole('checkbox')).toBeChecked();
+  await linhas.nth(0).getByRole('checkbox').uncheck();
+  await linhas.nth(1).getByRole('checkbox').check();
+  await linhas.nth(2).locator('td').nth(1).click();
+  await expect(linhas.nth(2).getByRole('checkbox')).toBeChecked();
+  await page.locator('#values-apply').click();
+  await expect(page.locator('.active-filter')).toHaveCount(1);
+  await page.locator('[data-view="table"]').click();
+  await expect(page.locator('#result-table tfoot tr').first().locator('td').first()).toHaveText('3');
+});
+
 test('Microdados: atalhos de RIDE-DF e idade, com uma regra por campo', async ({ page }) => {
   // Residência em Brasília, Alto Paraíso (RIDE), Goiânia (fora) e Unaí (RIDE, MG).
   const csv = [

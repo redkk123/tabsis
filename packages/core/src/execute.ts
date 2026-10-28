@@ -29,7 +29,8 @@ export interface ResolvedPlanRecord {
   columnLabel: string;
 }
 
-const UNCLASSIFIED_KEY = '__tabwin_web_unclassified__';
+/** Chave da linha "Não classificados" (unclassifiedPolicy 'discriminate'): sem CNV, os registros em branco. */
+export const UNCLASSIFIED_KEY = '__tabwin_web_unclassified__';
 const UNCLASSIFIED_LABEL = 'Não classificados';
 /** Prefix of a row key created by "Discriminar" for one unclassified code. */
 const UNCLASSIFIED_CODE_PREFIX = '__tabsis_codigo__:';

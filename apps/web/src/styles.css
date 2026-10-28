@@ -777,7 +777,29 @@ dialog p { color: #676d74; font-size: 13px; line-height: 1.6; }
 .case-table { border-collapse: collapse; font-size: 12.5px; }
 .case-table td { padding: 4px 12px 4px 0; border-bottom: 1px solid var(--line); font-family: ui-monospace, "Cascadia Mono", "Consolas", monospace; }
 .case-table td.numeric { text-align: right; font-variant-numeric: tabular-nums; font-family: inherit; }
-@media (max-width: 720px) { .case-form { grid-template-columns: 1fr; } }
+.values-form, .case-codes-form { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); }
+.values-field-note { margin: 8px 0 0; color: var(--muted); font-size: 12.5px; }
+.values-field-note:empty { display: none; }
+.values-scroll { max-height: 420px; overflow: auto; margin-top: 10px; border: 1px solid var(--line); border-radius: 8px; }
+.values-table { border-collapse: collapse; width: 100%; font-size: 13px; }
+.values-table th { position: sticky; top: 0; background: var(--surface-2, var(--surface)); color: var(--muted); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; font-weight: 600; text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line-strong); }
+.values-table td { padding: 6px 10px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.values-table td:first-child, .values-table td:last-child { cursor: default; }
+.values-table input[type="checkbox"] { width: 18px; height: 18px; }
+.values-table .numeric { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.values-table .values-code { font-family: ui-monospace, "Cascadia Mono", "Consolas", monospace; white-space: nowrap; }
+.values-table tbody tr:hover { background: var(--surface-2, rgba(0,0,0,.03)); }
+.values-examples { margin-top: 14px; }
+.values-examples strong { display: block; font-size: 13px; }
+.values-examples small { display: block; margin: 4px 0 8px; color: var(--muted); font-size: 12px; }
+.values-examples-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
+.values-examples-table { border-collapse: collapse; font-size: 12px; font-family: ui-monospace, "Cascadia Mono", "Consolas", monospace; }
+.values-examples-table th, .values-examples-table td { padding: 4px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; text-align: left; }
+.values-examples-table .values-chosen { background: rgba(37, 106, 191, .12); font-weight: 700; }
+.case-subtitle { margin: 26px 0 0; padding-top: 18px; border-top: 1px solid var(--line); font-size: 15px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+@media (max-width: 720px) { .case-form, .values-form, .case-codes-form { grid-template-columns: 1fr; } }
+@media (max-width: 520px) { .values-table th, .values-table td { padding: 6px 6px; } .values-table th:nth-child(5), .values-table td:nth-child(5) { display: none; } }
 
 /* Prévia pelo TabNet. O aviso de que a pergunta sai daqui precisa ser visível
    sem esforço: é a única exceção à promessa de que nada sai do aparelho. */

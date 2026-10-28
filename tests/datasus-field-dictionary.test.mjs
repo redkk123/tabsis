@@ -71,3 +71,20 @@ test('SINAN: dicionário do agravo pelo prefixo do arquivo', () => {
   // Agravo sem dicionário transcrito: só a ficha.
   assert.equal(datasusFieldEntry('FORMACLINI', 'SINAN', 'MALA'), undefined);
 });
+
+test('LTA: a forma clínica separa cutânea e mucosa, e o significado de cada código sai do dicionário', async () => {
+  const { datasusFieldEntry, valoresDoDicionario } = await import('../dist/packages/formats/src/datasus-field-dictionary.js');
+  const forma = datasusFieldEntry('CLAS_FORMA', 'SINAN', 'LTAN');
+  assert.equal(forma?.entry.label, 'Forma clínica');
+  assert.match(forma?.source ?? '', /LTAN_DIC_DADOS/);
+  const valores = valoresDoDicionario(forma?.entry.values);
+  assert.equal(valores.get('1'), 'Cutânea');
+  assert.equal(valores.get('2'), 'Mucosa');
+  assert.equal(valoresDoDicionario(datasusFieldEntry('EVOLUCAO', 'SINAN', 'LTAN')?.entry.values).get('6'), 'Mudança de diagnóstico');
+  // Vários códigos com o mesmo significado, "=" dos Informes e campos sem código.
+  const sexo = valoresDoDicionario('M ou 1 – Masculino; F ou 2 – Feminino; I, 0 ou 9 – Ignorado');
+  assert.deepEqual([sexo.get('M'), sexo.get('1'), sexo.get('0'), sexo.get('9')], ['Masculino', 'Masculino', 'Ignorado', 'Ignorado']);
+  assert.equal(valoresDoDicionario('0 = não aprovado; 5 = aprovado').get('5'), 'aprovado');
+  assert.equal(valoresDoDicionario('dd/mm/aaaa').size, 0);
+  assert.equal(valoresDoDicionario(undefined).size, 0);
+});
