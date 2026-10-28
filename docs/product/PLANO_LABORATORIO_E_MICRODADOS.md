@@ -155,6 +155,15 @@ Transformar a lista de etapas atual numa receita visual.
   frequente. O código gerado roda no Lab e bate com o TabSis em todas
   (teste automático, como a varredura do TabWin).
 
+- **Andamento (2026-10-28):** **Abrir no R** ao lado do **Abrir no Python**;
+  os dois cadernos levam a tabela da tela (`tabela-tabsis.csv`) e uma célula
+  que refaz a contagem e diz CONFERE ou DIVERGE, e a receita (as Seleções) em
+  pandas ou R, comentada. "Rodar no computador" ganhou `analise.R`. Conferido
+  no Lab de verdade (Pyodide e webR) com arquivos reais de cinco sistemas e
+  agravos (ver o PR). Volume: o limite continua o do Lab (32 MB por arquivo);
+  acima, Seleções ou "Rodar no computador" (o Parquet no navegador fica para
+  quando o webR e o Pyodide lerem Parquet sem pacote extra).
+
 ### Fase 3 — Modelos de análise prontos ("cadernos-modelo")
 
 Cadernos que a pessoa só preenche (agravo, local, período):

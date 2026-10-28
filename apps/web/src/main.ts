@@ -394,6 +394,9 @@ const selectedDbfButton = element<HTMLButtonElement>('#selected-dbf-button');
 const microdatasusCsvButton = element<HTMLButtonElement>('#microdatasus-csv-button');
 const labPackageButton = element<HTMLButtonElement>('#lab-package-button');
 const openPythonButton = element<HTMLButtonElement>('#open-python-button');
+const openRButton = element<HTMLButtonElement>('#open-r-button');
+// O botão do R acompanha o do Python: os dois dependem da mesma tabela pronta.
+new MutationObserver(() => { openRButton.disabled = openPythonButton.disabled; }).observe(openPythonButton, { attributes: true, attributeFilter: ['disabled'] });
 const pythonLocalButton = element<HTMLButtonElement>('#python-local-button');
 const decodeCancelButton = element<HTMLButtonElement>('#decode-cancel-button');
 const combineCompatibleFiles = element<HTMLInputElement>('#combine-compatible-files');
@@ -3931,6 +3934,79 @@ const LIMITE_LAB_BYTES = 32 * 1024 * 1024;
  * resto livre. O mesmo caderno vai para o Laboratório (dados em /data) e para
  * o pacote "Rodar no computador" (dados em ./dados, ao lado do script).
  */
+/**
+ * A tabela da tela, para os cadernos conferirem: uma linha por categoria, com
+ * a frequência. Só quando dá para comparar de igual para igual (contagem de
+ * registros, sem medida extra nem operação de tabela por cima).
+ */
+function tabelaParaConferir(): { linhas: string[] } | null {
+  if (!currentPlan || !currentResult || currentPlan.spec.measure.kind !== 'count' || (currentPlan.spec.measures?.length ?? 0) > 1 || tableOperations.length) return null;
+  const campo = currentPlan.spec.rows.field;
+  const comRotulo = microdatasusFieldSpecs().some((spec) => spec.field === campo && spec.valueMode === 'raw-and-label');
+  const aspas = (texto: string) => `"${texto.replace(/"/g, '""')}"`;
+  return {
+    linhas: ['chave;frequencia', ...currentResult.rows.map((row, indice) => `${aspas(comRotulo ? row.label : row.key)};${(currentResult!.cells[indice] ?? []).reduce((soma, valor) => soma + valor, 0)}`)],
+  };
+}
+
+/** As Seleções da receita em R ou pandas, comentadas: já valem nos dados enviados; servem para outros arquivos. */
+function codigoDaReceita(alvo: 'python' | 'r'): string {
+  if (!configuredFilters.length) return '';
+  const comentario = alvo === 'python' ? '#' : '#';
+  const cabeca = `${comentario} A receita do TabSis (as Seleções) em ${alvo === 'python' ? 'pandas' : 'R'}. Ela JÁ VALE nos dados enviados;\n${comentario} o código fica aqui para aplicar aos microdados inteiros de outros anos ou estados.`;
+  if (configuredFilters.some((filtro) => filtro.conversionId)) {
+    return `${cabeca}\n${comentario} (Alguma Seleção usa uma conversão CNV do TabWin, que não tem equivalente direto aqui.)`;
+  }
+  const codigo = transformPipelineToCode([{ id: 'receita', kind: 'filter-rows', filters: configuredFilters.map(cloneFilter) } as TransformStep], alvo, 'dados');
+  return `${cabeca}\n${codigo.split('\n').map((linha) => `${comentario} ${linha}`).join('\n')}`;
+}
+
+/** O mesmo caderno do Python, em R base (Laboratório com webR, ou RStudio no computador). */
+function celulasR(arquivo: string, registros: number, destino: 'lab' | 'computador'): { titulo: string; celulas: string[] } {
+  const campo = currentPlan?.spec.rows.field ?? '';
+  const comRotulo = microdatasusFieldSpecs().some((spec) => spec.field === campo && spec.valueMode === 'raw-and-label');
+  const coluna = comRotulo ? `${campo}__ROTULO` : campo;
+  const titulo = (resultTitle.textContent ?? '').trim() || datasetName;
+  const caminho = (nome: string) => destino === 'lab' ? JSON.stringify(`/data/${nome}`) : `file.path(${JSON.stringify(PASTA_DADOS)}, ${JSON.stringify(nome)})`;
+  const celulas: string[] = [[
+    `# Microdados enviados pelo TabSis: ${datasetName}`,
+    `# ${integerFormat.format(registros)} registros — os da tabela atual, com Seleções e transformações já aplicadas.`,
+    '# Colunas terminadas em __ROTULO trazem o nome da categoria (CNV); as outras, o código como está no DATASUS.',
+    ...(destino === 'computador' ? ['# No RStudio: Session > Set Working Directory > To Source File Location, e rode.'] : []),
+    `dados <- read.csv(${caminho(arquivo)}, sep = ";", colClasses = "character", na.strings = character(0), check.names = FALSE, encoding = "UTF-8")`,
+    '# A primeira coluna pode vir com a marca BOM do UTF-8 no nome: tira.',
+    'names(dados)[1] <- sub("^\\ufeff|^ï»¿", "", names(dados)[1])',
+    'print(dim(dados))',
+    'head(dados)',
+  ].join('\n')];
+  if (campo) {
+    celulas.push([
+      `# A mesma pergunta da tabela do TabSis: ${titulo}`,
+      `# Contagem de registros por ${coluna} (confira com a coluna de Frequência do TabSis).`,
+      `tabela <- sort(table(dados[[${JSON.stringify(coluna)}]]), decreasing = TRUE)`,
+      ...(destino === 'computador' ? ['write.csv2(as.data.frame(tabela), "resultado-tabela-r.csv", row.names = FALSE)'] : []),
+      'print(head(tabela, 50))',
+    ].join('\n'));
+  }
+  if (tabelaParaConferir() && campo) {
+    celulas.push([
+      '# Conferência: a tabela refeita aqui a partir dos microdados é a mesma do TabSis?',
+      `tabsis <- read.csv(${caminho('tabela-tabsis.csv')}, sep = ";", colClasses = c("character", "numeric"), na.strings = character(0), encoding = "UTF-8")`,
+      `aqui <- table(dados[[${JSON.stringify(coluna)}]])`,
+      'contagem <- as.numeric(aqui[tabsis$chave]); contagem[is.na(contagem)] <- 0',
+      'diferente <- tabsis$frequencia != contagem',
+      'if (any(diferente)) {',
+      '  cat("DIVERGE em", sum(diferente), "linha(s) da tabela:\\n")',
+      '  print(head(data.frame(chave = tabsis$chave, tabsis = tabsis$frequencia, aqui = contagem)[diferente, ], 20), row.names = FALSE)',
+      '} else cat(sprintf("CONFERE: as %d linhas da tabela do TabSis batem com os microdados (%d registros).\\n", nrow(tabsis), as.integer(sum(tabsis$frequencia))))',
+    ].join('\n'));
+  }
+  const receita = codigoDaReceita('r');
+  if (receita) celulas.push(receita);
+  celulas.push('# Daqui em diante é com você: R base (stats, graphics) e o que mais quiser instalar.\n');
+  return { titulo: `TabSis · ${titulo}`.slice(0, 120), celulas };
+}
+
 function celulasPython(arquivo: string, registros: number, destino: 'lab' | 'computador'): { titulo: string; celulas: CelulaPython[] } {
   const campo = currentPlan?.spec.rows.field ?? '';
   const comRotulo = microdatasusFieldSpecs().some((spec) => spec.field === campo && spec.valueMode === 'raw-and-label');
@@ -3961,6 +4037,26 @@ function celulasPython(arquivo: string, registros: number, destino: 'lab' | 'com
       mostrar: destino === 'computador' ? 'tabela.to_string()' : 'tabela',
     });
   }
+  const conferir = tabelaParaConferir();
+  if (conferir && campo && /^[A-Za-z_][A-Za-z0-9_]*$/.test(campo)) {
+    const caminhoTabela = destino === 'lab' ? '"/data/tabela-tabsis.csv"' : `PASTA / ${JSON.stringify(PASTA_DADOS)} / "tabela-tabsis.csv"`;
+    celulas.push({
+      code: [
+        '# Conferência: a tabela refeita aqui a partir dos microdados é a mesma do TabSis?',
+        `tabsis = pd.read_csv(${caminhoTabela}, sep=";", dtype={"chave": str}, keep_default_na=False).set_index("chave")["frequencia"]`,
+        `aqui = dados.groupby(${JSON.stringify(coluna)}).size()`,
+        'diferencas = [(chave, int(n), int(aqui.get(chave, 0))) for chave, n in tabsis.items() if int(aqui.get(chave, 0)) != int(n)]',
+        'if diferencas:',
+        '    print(f"DIVERGE em {len(diferencas)} linha(s) da tabela:")',
+        '    for chave, n_tabsis, n_aqui in diferencas[:20]:',
+        '        print(f"  {chave}: TabSis {n_tabsis}, aqui {n_aqui}")',
+        'else:',
+        '    print(f"CONFERE: as {len(tabsis)} linhas da tabela do TabSis batem com os microdados ({int(tabsis.sum())} registros).")',
+      ].join('\n'),
+    });
+  }
+  const receitaEmCodigo = codigoDaReceita('python');
+  if (receitaEmCodigo) celulas.push({ code: receitaEmCodigo });
   if (appliedTransformSteps.length) {
     celulas.push({
       code: [
@@ -4002,6 +4098,11 @@ async function baixarPythonParaComputador(): Promise<void> {
       entradas[`${pasta}/${nome}`] = [codificar.encode(arquivo.texto), { os: 3, attrs: arquivo.executavel ? ZIP_ATTRS_EXECUTAVEL : ZIP_ATTRS_COMUM }];
     }
     entradas[`${pasta}/${PASTA_DADOS}/${filename}`] = [new Uint8Array(await blob.arrayBuffer()), { os: 3, attrs: ZIP_ATTRS_COMUM, level: bytes > 64 * 1024 * 1024 ? 1 : 6 }];
+    // A tabela da tela, para a conferência dos cadernos, e o mesmo caderno em R (RStudio).
+    const conferir = tabelaParaConferir();
+    if (conferir) entradas[`${pasta}/${PASTA_DADOS}/tabela-tabsis.csv`] = [codificar.encode(`${conferir.linhas.join('\n')}\n`), { os: 3, attrs: ZIP_ATTRS_COMUM }];
+    const emR = celulasR(filename, registros, 'computador');
+    entradas[`${pasta}/analise.R`] = [codificar.encode(`# ${emR.titulo}\n\n${emR.celulas.join('\n\n')}`), { os: 3, attrs: ZIP_ATTRS_COMUM }];
     const pacote = await new Promise<Uint8Array>((resolve, reject) => {
       zip(entradas, { level: 6 }, (error, data) => (error ? reject(error) : resolve(data)));
     });
@@ -4023,7 +4124,7 @@ async function baixarPythonParaComputador(): Promise<void> {
  * página do Lab avisa quando está pronta e recebe os bytes por postMessage;
  * nada passa por servidor.
  */
-async function abrirNoPython(): Promise<void> {
+async function abrirNoPython(linguagem: 'python' | 'r' = 'python'): Promise<void> {
   // Abre a aba já no clique: depois de preparar o CSV, o navegador bloquearia a janela.
   const lab = window.open('./lab/?origem=tabsis', '_blank');
   if (!lab) throw new Error('O navegador bloqueou a nova aba do Laboratório; permita janelas para este site.');
@@ -4040,12 +4141,18 @@ async function abrirNoPython(): Promise<void> {
   try {
     const { blob, filename, registros, bytes } = await microdadosDaTabelaEmCsv(LIMITE_LAB_BYTES);
     const conteudo = await blob.arrayBuffer();
-    const caderno = cadernoParaPython(filename, registros);
+    const caderno = linguagem === 'r'
+      ? (({ titulo, celulas }) => ({ title: titulo, cells: celulas.map((code) => ({ runtime: 'r' as const, code })) }))(celulasR(filename, registros, 'lab'))
+      : cadernoParaPython(filename, registros);
+    // A tabela da tela vai junto, para a célula de conferência.
+    const conferir = tabelaParaConferir();
+    const tabela = conferir ? new TextEncoder().encode(`${conferir.linhas.join('\n')}\n`).buffer as ArrayBuffer : null;
+    const arquivosDoLab = [{ name: filename, bytes: conteudo }, ...(tabela ? [{ name: 'tabela-tabsis.csv', bytes: tabela }] : [])];
     await new Promise<void>((resolve, reject) => {
       const prazo = window.setTimeout(() => reject(new Error('O Laboratório não respondeu em 60 segundos.')), 60_000);
       envio = () => {
         window.clearTimeout(prazo);
-        lab.postMessage({ tipo: 'tabsis:dados', arquivos: [{ name: filename, bytes: conteudo }], caderno }, window.location.origin, [conteudo]);
+        lab.postMessage({ tipo: 'tabsis:dados', arquivos: arquivosDoLab, caderno }, window.location.origin, arquivosDoLab.map((arquivo) => arquivo.bytes));
         resolve();
       };
       if (pronto) envio();
@@ -12184,6 +12291,9 @@ microdatasusCsvButton.addEventListener('click', () => void downloadMicrodatasusC
   showToast(error instanceof Error ? error.message : String(error), true)));
 openPythonButton.addEventListener('click', () => {
   void abrirNoPython().catch((error) => showToast(error instanceof Error ? error.message : String(error), true));
+});
+openRButton.addEventListener('click', () => {
+  void abrirNoPython('r').catch((error) => showToast(error instanceof Error ? error.message : String(error), true));
 });
 pythonLocalButton.addEventListener('click', () => {
   void baixarPythonParaComputador().catch((error) => showToast(error instanceof Error ? error.message : String(error), true));

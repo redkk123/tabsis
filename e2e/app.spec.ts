@@ -1614,6 +1614,9 @@ test('Abrir no Python leva os microdados da tabela e um caderno pronto ao Lab', 
   expect(codigos.length).toBeGreaterThanOrEqual(3);
   expect(codigos[0]).toMatch(/pd\.read_csv\("\/data\/[^"]+-microdados\.csv", sep=";"/);
   expect(codigos[1]).toMatch(/groupby\(/);
+  // A tabela da tela vai junto, e uma célula confere a contagem com ela.
+  await expect(lab.locator('#data-file-list')).toContainText('tabela-tabsis.csv');
+  expect(codigos[2]).toContain('CONFERE');
   // Recarregar não espera dados de novo: o ?origem=tabsis sai da barra.
   expect(new URL(lab.url()).search).toBe('');
 
@@ -1624,6 +1627,19 @@ test('Abrir no Python leva os microdados da tabela e um caderno pronto ao Lab', 
   });
   // A fixture tem três registros e nenhum filtro: os três chegam ao Lab.
   expect(linhas).toBe(3);
+  await lab.close();
+
+  // Abrir no R: o mesmo, num caderno em R base, com a mesma conferência.
+  const popupR = context.waitForEvent('page');
+  await page.locator('#open-r-button').click();
+  const labR = await popupR;
+  await expect(labR.locator('#data-file-list')).toContainText('tabela-tabsis.csv');
+  const emR = await labR.locator('.cell-code').evaluateAll((areas) => areas.map((area) => (area as HTMLTextAreaElement).value));
+  const runtimes = await labR.locator('.cell-runtime').evaluateAll((selects) => selects.map((select) => (select as HTMLSelectElement).value));
+  expect(runtimes.every((runtime) => runtime === 'r')).toBe(true);
+  expect(emR[0]).toMatch(/read\.csv\("\/data\/[^"]+-microdados\.csv", sep = ";"/);
+  expect(emR[1]).toContain('table(dados[[');
+  expect(emR[2]).toContain('CONFERE');
 });
 
 test('Rodar no computador baixa um zip com os microdados, o caderno e um iniciador por sistema', async ({ page }) => {
@@ -1640,8 +1656,8 @@ test('Rodar no computador baixa um zip com os microdados, o caderno e um iniciad
   const entradas = unzipSync(bytes);
   const nomes = Object.keys(entradas).map((nome) => nome.replace(/^microdados-e2e-python\//, '')).sort();
   expect(nomes).toEqual([
-    'LEIA-ME.txt', 'Rodar no Mac.command', 'Rodar no Windows.bat', 'analise.ipynb', 'analise.py',
-    'dados/microdados-e2e-microdados.csv', 'preparar_e_rodar.py', 'requirements.txt', 'rodar-linux.sh',
+    'LEIA-ME.txt', 'Rodar no Mac.command', 'Rodar no Windows.bat', 'analise.R', 'analise.ipynb', 'analise.py',
+    'dados/microdados-e2e-microdados.csv', 'dados/tabela-tabsis.csv', 'preparar_e_rodar.py', 'requirements.txt', 'rodar-linux.sh',
   ]);
   const script = strFromU8(entradas['microdados-e2e-python/analise.py']!);
   expect(script).toContain('PASTA / "dados" / "microdados-e2e-microdados.csv"');
