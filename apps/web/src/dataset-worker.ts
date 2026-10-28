@@ -512,6 +512,7 @@ function headerForSources(request: OpenRequest): DbfHeader {
 
   let recordCount = 0;
   let first_header: DbfHeader | null = null;
+  camposAjustados = [];
   for (const source of request.sources) {
     if (source.kind === 'records') throw new Error('Fontes de tipos diferentes não podem ser combinadas');
     const current = headerOf(source);
@@ -533,28 +534,36 @@ function schemaSignature(value: DbfHeader): string {
 }
 
 /**
+ * Campos que mudaram de tipo ou tamanho entre os arquivos juntados, para a
+ * tela avisar ("NU_LOTE_V (N1 × C7)"). Refeito a cada abertura.
+ */
+let camposAjustados: string[] = [];
+
+/**
  * Junta o esquema de mais um arquivo ao do conjunto. O DATASUS acrescenta
  * campos com os anos (LEIVBR25 tem 11 a mais que LEIVBR24): o campo novo entra
- * no conjunto e fica em branco nos arquivos que não o têm. Um campo que existe
- * nos dois com tipo, tamanho ou decimais diferentes continua recusado — aí a
- * leitura do código mudaria de um ano para o outro.
+ * no conjunto e fica em branco nos arquivos que não o têm.
+ *
+ * Um campo que existe nos dois com tipo, tamanho ou decimais diferentes entra
+ * como texto, do tamanho do maior, e vai para `camposAjustados`: cada arquivo
+ * continua lido pelo próprio cabeçalho, e a tela diz quais campos mudaram. Antes
+ * o ano inteiro era recusado — no LTANBR25 o DATASUS trocou o tipo de quatro
+ * campos administrativos (lotes e data de transferência), e 2025 ficava fora
+ * de qualquer série.
  */
 function mergedSchema(base: DbfHeader, incoming: DbfHeader, name: string): DbfHeader {
   if (schemaSignature(base) === schemaSignature(incoming)) return base;
-  const porNome = new Map(base.fields.map((field) => [field.name, field]));
-  const divergentes = incoming.fields.filter((field) => {
-    const existente = porNome.get(field.name);
-    return existente && (existente.type !== field.type || existente.length !== field.length || existente.decimalCount !== field.decimalCount);
+  const porNome = new Map(incoming.fields.map((field) => [field.name, field]));
+  const nomesDaBase = new Set(base.fields.map((field) => field.name));
+  const fieldsDaBase = base.fields.map((existente) => {
+    const novo = porNome.get(existente.name);
+    if (!novo || (existente.type === novo.type && existente.length === novo.length && existente.decimalCount === novo.decimalCount)) return existente;
+    const aviso = `${existente.name} (${existente.type}${existente.length} × ${novo.type}${novo.length}, em ${name})`;
+    if (!camposAjustados.some((item) => item.startsWith(`${existente.name} `))) camposAjustados.push(aviso);
+    return { ...existente, type: 'C' as const, length: Math.max(existente.length, novo.length, existente.type === 'D' || novo.type === 'D' ? 10 : 0), decimalCount: 0 };
   });
-  if (divergentes.length) {
-    const exemplo = divergentes.slice(0, 3).map((field) => {
-      const existente = porNome.get(field.name)!;
-      return `${field.name} (${existente.type}${existente.length} × ${field.type}${field.length})`;
-    }).join(', ');
-    throw new Error(`${name}: esquema incompatível; campos com tipo ou tamanho diferente: ${exemplo}${divergentes.length > 3 ? '…' : ''}`);
-  }
-  const novos = incoming.fields.filter((field) => !porNome.has(field.name));
-  const fields = [...base.fields, ...novos];
+  const novos = incoming.fields.filter((field) => !nomesDaBase.has(field.name));
+  const fields = [...fieldsDaBase, ...novos];
   return {
     ...base,
     fields,
@@ -617,7 +626,7 @@ function handle(request: DatasetRequest): void {
       sources = request.sources;
       header = nextHeader;
       invalidateDataset();
-      post({ type: 'opened', requestId: request.requestId, header, recordCount: header.recordCount });
+      post({ type: 'opened', requestId: request.requestId, header, recordCount: header.recordCount, ajustes: camposAjustados });
       return;
     }
     case 'append': {
@@ -629,7 +638,7 @@ function handle(request: DatasetRequest): void {
       sources = [...sources, source];
       header = { ...juntado, recordCount: header.recordCount + incoming.recordCount };
       invalidateDataset();
-      post({ type: 'opened', requestId: request.requestId, header, recordCount: header.recordCount });
+      post({ type: 'opened', requestId: request.requestId, header, recordCount: header.recordCount, ajustes: camposAjustados });
       return;
     }
     case 'tabulate': {

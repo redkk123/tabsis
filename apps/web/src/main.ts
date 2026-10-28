@@ -118,7 +118,8 @@ import { criarAbaConsulta, type AbaConsulta } from './aba-consulta.ts';
 import { criarAbaMicrodados, type AbaMicrodados } from './aba-microdados.ts';
 import { CAMPOS_DE_CNES, carregarCnes, normalizarCnes } from './cnes.ts';
 import { BASE_DO_APARELHO, TOKEN_DO_APARELHO, criarFetchDaPonte, temPonteLocal } from './ponte-local-android.ts';
-import { descreverDefinicao, lerDefinicao } from '../../../packages/core/src/definicao-caso.ts';
+import { RIDE_DF_LC_163_2018, descreverDefinicao, lerDefinicao } from '../../../packages/core/src/definicao-caso.ts';
+import { criarReceitaVisual, type EtapaPronta, type ReceitaVisual } from './receita-visual.ts';
 import {
   tabulationToTabwinPrn,
   tabulationToTabwinSql,
@@ -883,6 +884,9 @@ const activeDatasetFiles: File[] = [];
 let activeFilterConversion = '';
 let activeFilterStartPosition: number | undefined;
 let configuredFilters: FilterSpec[] = [];
+/** Etapas da receita desligadas: fora da análise, guardadas para voltar (aba Microdados). */
+let filtrosDesligados: FilterSpec[] = [];
+let receitaVisual: ReceitaVisual | null = null;
 let configuredCrossFieldRules: CrossFieldRuleSpec[] = [];
 /** G017: extra increments laid out beside the primary measure, in add order. */
 let extraMeasures: MeasureSpec[] = [];
@@ -1243,6 +1247,7 @@ function populateControls(preferredField?: string): void {
   populateFlowFields();
   abaConsulta?.atualizarCampos();
   abaMicrodados?.atualizarCampos();
+  receitaVisual?.atualizar();
   if (!dbfHeader) return;
   fieldSearch.value = '';
   const previousRow = preferredField ?? rowField.value;
@@ -2431,6 +2436,7 @@ function renderConfiguredFilters(): void {
   });
   updateFilterCount();
   updateInvestigateRunState();
+  receitaVisual?.atualizar();
 }
 
 function cloneFilter(filter: FilterSpec): FilterSpec {
@@ -3031,6 +3037,7 @@ function updateDatasetStats(): void {
 function resetAnalysisState(): void {
   arquivosDoPainel = null;
   configuredFilters = [];
+  filtrosDesligados = [];
   configuredCrossFieldRules = [];
   extraMeasures = [];
   lastInvestigateResult = null;
@@ -3431,7 +3438,7 @@ async function openDatasetOnce(
 ): Promise<DbfHeader> {
   const candidate = createDatasetWorker();
   const transfer = sources.flatMap((source) => (source.kind === 'binary' ? [source.bytes] : []));
-  let reply: { header: DbfHeader; recordCount: number };
+  let reply: { header: DbfHeader; recordCount: number; ajustes?: string[] };
   try {
     reply = await askDatasetWorker(
       candidate,
@@ -3446,16 +3453,33 @@ async function openDatasetOnce(
   datasetWorker = candidate;
   if (previous && previous !== candidate) previous.terminate();
   datasetRecordCount = reply.recordCount;
+  avisarCamposAjustados(reply.ajustes);
   return reply.header;
+}
+
+/** Campos que mudaram de tipo entre os arquivos juntados (ver mergedSchema no worker). */
+let camposAjustados: string[] = [];
+
+/** Anos juntados com campos que mudaram de tipo: abrem, e a tela diz quais campos. */
+function avisarCamposAjustados(ajustes: string[] | undefined): void {
+  camposAjustados = ajustes ?? [];
+  if (camposAjustados.length) showToast(`${textoDosCamposAjustados()}`.trim());
+}
+
+/** A frase que acompanha o aviso de arquivos juntos, para ela não sumir sob outro aviso. */
+function textoDosCamposAjustados(): string {
+  if (!camposAjustados.length) return '';
+  return ` Campos que mudaram de tipo ou tamanho entre os anos entram como texto: ${camposAjustados.slice(0, 4).join('; ')}${camposAjustados.length > 4 ? '…' : ''}.`;
 }
 
 async function appendDataset(source: DatasetWorkerSource, label: string): Promise<DbfHeader> {
   const transfer = source.kind === 'binary' ? [source.bytes] : [];
-  const reply = await askDataset<{ header: DbfHeader; recordCount: number }>(
+  const reply = await askDataset<{ header: DbfHeader; recordCount: number; ajustes?: string[] }>(
     { type: 'append', source },
     { label, transfer },
   );
   datasetRecordCount = reply.recordCount;
+  avisarCamposAjustados(reply.ajustes);
   return reply.header;
 }
 
@@ -4164,7 +4188,7 @@ async function loadFiles(files: File[], opcoes: { juntar?: boolean } = {}): Prom
       showToast(`${dadosRecusados.length === 1 ? 'Um arquivo não entrou' : `${dadosRecusados.length} arquivos não entraram`} no conjunto: `
         + `${dadosRecusados.slice(0, 2).join('; ')}${dadosRecusados.length > 2 ? '…' : ''}. Os outros foram juntados.`, true);
     } else if (dadosNesteGesto > 1 || (opcoes.juntar && dadosNesteGesto)) {
-      showToast(`${activeDatasetSources.length} arquivos juntos: ${integerFormat.format(datasetRecordCount)} registros. No mapa, a faixa Período mostra um ano de cada vez.`);
+      showToast(`${activeDatasetSources.length} arquivos juntos: ${integerFormat.format(datasetRecordCount)} registros. No mapa, a faixa Período mostra um ano de cada vez.${textoDosCamposAjustados()}`);
     }
     const soAuxiliares = ordered.every((file) => ['DEF', 'CNV', 'MAP'].includes(extensionOf(file.name)));
     if (soAuxiliares && tabelaSemDef && dbfHeader && painel) await painel.executarAgora();
@@ -10135,7 +10159,7 @@ async function openRecentArchivesTogether(summaries: CachedArchiveSummary[], jun
     await loadFiles(abertos.map((aberto) => aberto.file), juntar ? { juntar: true } : {});
     for (const aberto of abertos) await aberto.anotarOrigem();
     renderAudit();
-    setCatalogStatus(`${activeDatasetSources.length} arquivos juntos, sem usar a internet.`);
+    setCatalogStatus(`${activeDatasetSources.length} arquivos juntos, sem usar a internet.${textoDosCamposAjustados()}`);
     if (activeDatasetSources.length > 1) catalogDialog.close();
   } catch (error) {
     setCatalogStatus(error instanceof Error ? error.message : String(error), true);
@@ -11090,7 +11114,7 @@ function showView(view: ViewName): void {
   // refreshing here means the dropdowns are never stale when actually seen,
   // without needing every column-changing code path to know about this tab.
   if (view === 'compare' && compareTableB) renderComparePairs();
-  if (view === 'microdata') abaMicrodados?.aoMostrar();
+  if (view === 'microdata') { abaMicrodados?.aoMostrar(); receitaVisual?.atualizar(); }
 }
 
 function exportBaseName(): string {
@@ -13350,6 +13374,97 @@ abaMicrodados = criarAbaMicrodados({
     return records;
   },
   aviso: showToast,
+});
+
+/** Etapas prontas de saúde: Seleções com a regra da fonte oficial citada. */
+function etapasProntas(): Array<EtapaPronta & { filtros: () => FilterSpec[] }> {
+  const campos = new Set((dbfHeader?.fields ?? []).map((field) => field.name));
+  const tipo = activeDatasetSources.map((source) => describeDatasusFile(source.name)).find(Boolean);
+  const prontas: Array<EtapaPronta & { filtros: () => FilterSpec[] }> = [];
+  if (tipo?.prefix === 'LTAN' && campos.has('CLA_TIPO_N') && campos.has('EVOLUCAO')) {
+    prontas.push({
+      id: 'lta-caso-novo', rotulo: 'Caso novo (LTA)',
+      fonte: 'Caderno de Indicadores – Leishmaniose Tegumentar e Visceral (Ministério da Saúde, 2018), indicador 1: tipo de entrada "caso novo" (CLA_TIPO_N = 1) e evolução diferente de "mudança de diagnóstico" (EVOLUCAO ≠ 6).',
+      filtros: () => [
+        { field: 'CLA_TIPO_N', kind: 'categories', mode: 'include', acceptedCategories: ['1'] },
+        { field: 'EVOLUCAO', kind: 'categories', mode: 'exclude', acceptedCategories: ['6'] },
+      ],
+    });
+  }
+  if (tipo?.prefix === 'LTAN' && campos.has('CLAS_FORMA')) {
+    for (const [codigo, nome] of [['1', 'cutânea'], ['2', 'mucosa']] as const) {
+      prontas.push({
+        id: `lta-forma-${codigo}`, rotulo: `Forma ${nome}`,
+        fonte: `Dicionário de dados do SINAN – LTA (LTAN_DIC_DADOS.pdf): forma clínica CLAS_FORMA = ${codigo} (${nome}). Cutânea e mucosa vêm no mesmo arquivo.`,
+        filtros: () => [{ field: 'CLAS_FORMA', kind: 'categories', mode: 'include', acceptedCategories: [codigo] }],
+      });
+    }
+  }
+  const residencia = dbfHeader ? findGeographicFields(dbfHeader.fields).find((candidato) => candidato.level === 'municipality') : undefined;
+  if (residencia) {
+    prontas.push({
+      id: 'ride-df', rotulo: 'DF e Entorno (RIDE-DF)',
+      fonte: `Os 34 municípios da RIDE-DF (Lei Complementar nº 163/2018), no ${residencia.reason} (${residencia.field}).`,
+      filtros: () => [{ field: residencia.field, kind: 'code-rules', mode: 'include', include: RIDE_DF_LC_163_2018.join(', '), exclude: '' }],
+    });
+  }
+  return prontas;
+}
+
+receitaVisual = criarReceitaVisual({
+  etapas: () => [
+    ...configuredFilters.map((filtro) => ({ descricao: describeFilter(filtro, filtro.mode === 'exclude' ? 'Excluir' : 'Incluir'), ligada: true })),
+    ...filtrosDesligados.map((filtro) => ({ descricao: describeFilter(filtro, filtro.mode === 'exclude' ? 'Excluir' : 'Incluir'), ligada: false })),
+  ],
+  contarAte: async (n) => {
+    const campo = dbfHeader?.fields[0]?.name;
+    if (!campo) return 0;
+    const plan = compilarPlano({
+      compatibilityProfile: currentCompatibilityProfile,
+      rows: { field: campo, unclassifiedPolicy: 'discriminate' as const },
+      measure: { kind: 'count' as const },
+      filters: configuredFilters.slice(0, n).map(cloneFilter),
+      suppressZeroRows: true,
+      suppressZeroColumns: false,
+    });
+    const { result } = await askDataset<{ result: TabulationResult; cached: boolean }>(
+      { type: 'tabulate', plan, conversions: conversionsForPlan(plan) },
+      { label: 'Etapas da receita' },
+    );
+    return result.recordsAccepted;
+  },
+  registrosNoConjunto: () => datasetRecordCount,
+  alternar: (indice) => {
+    if (indice < configuredFilters.length) filtrosDesligados.push(...configuredFilters.splice(indice, 1));
+    else configuredFilters.push(...filtrosDesligados.splice(indice - configuredFilters.length, 1));
+    renderConfiguredFilters();
+    void runAnalysis();
+  },
+  mover: (indice, para) => {
+    const destino = indice + para;
+    if (indice >= configuredFilters.length || destino < 0 || destino >= configuredFilters.length) return;
+    [configuredFilters[indice], configuredFilters[destino]] = [configuredFilters[destino]!, configuredFilters[indice]!];
+    // A ordem não muda o resultado (as etapas se somam); muda só o caminho mostrado.
+    renderConfiguredFilters();
+  },
+  remover: (indice) => {
+    if (indice < configuredFilters.length) configuredFilters.splice(indice, 1);
+    else filtrosDesligados.splice(indice - configuredFilters.length, 1);
+    renderConfiguredFilters();
+    void runAnalysis();
+  },
+  prontas: () => etapasProntas(),
+  aplicarPronta: (id) => {
+    const pronta = etapasProntas().find((candidata) => candidata.id === id);
+    if (!pronta) return;
+    const novos = pronta.filtros();
+    // A etapa pronta troca o que já recortava os mesmos campos (ligado ou desligado).
+    const campos = new Set(novos.map((filtro) => filtro.field));
+    configuredFilters = [...configuredFilters.filter((filtro) => !campos.has(filtro.field)), ...novos];
+    filtrosDesligados = filtrosDesligados.filter((filtro) => !campos.has(filtro.field));
+    renderConfiguredFilters();
+    void runAnalysis();
+  },
 });
 
 /**

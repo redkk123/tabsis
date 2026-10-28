@@ -1201,3 +1201,18 @@ dialog p { color: #676d74; font-size: 13px; line-height: 1.6; }
   html:has(body[data-print-target="relatorio"]), body[data-print-target="relatorio"] { background: #fff !important; }
   @page { margin: 14mm; }
 }
+
+/* Receita visual (aba Microdados): as Seleções como etapas, com a contagem de cada uma. */
+.receita { margin-top: 12px; }
+.receita-titulo { margin: 0 0 4px; font-size: 15px; }
+.receita-prontas { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: 10px 0 0; font-size: 12.5px; }
+.receita-prontas > span { color: var(--muted); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; font-weight: 600; }
+.receita-etapas { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; }
+.receita-etapa { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; padding: 9px 12px; border: 1px solid var(--line); border-left: 4px solid #256abf; border-radius: 8px; background: var(--surface); }
+.receita-inicio { border-left-color: var(--line-strong); background: var(--surface-2); }
+.receita-desligada { border-left-color: var(--line-strong); opacity: .65; border-style: dashed; }
+.receita-texto { display: grid; gap: 2px; min-width: 0; }
+.receita-texto strong { font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.receita-conta { color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.receita-acoes { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.receita-acoes .text-button { min-height: 32px; }

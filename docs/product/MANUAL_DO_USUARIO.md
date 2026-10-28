@@ -697,6 +697,30 @@ citada.
 Célula vazia significa **ausente**. Nenhum zero é fabricado para preencher
 lacuna — nem na exportação, nem na leitura do outro lado.
 
+### Microdados: a receita
+
+No alto da aba **Microdados**, a **receita** mostra o caminho dos registros:
+cada Seleção em vigor é um cartão, na ordem em que é aplicada, com quantos
+registros sobram depois dela e quantos saíram. **desligar** tira a etapa da
+análise sem apagá-la (o cartão fica tracejado, para ligar de novo); as setas
+mudam a ordem do caminho (o resultado é o mesmo); **remover** apaga.
+
+As **etapas prontas** montam a Seleção com a regra da fonte oficial (passe o
+mouse no botão para ver qual). Na leishmaniose tegumentar (LTAN): **Caso novo
+(LTA)** — tipo de entrada "caso novo" e evolução diferente de "mudança de
+diagnóstico", como no indicador 1 do Caderno de Indicadores do Ministério da
+Saúde —, **Forma cutânea** e **Forma mucosa**; em qualquer arquivo com
+município, **DF e Entorno (RIDE-DF)**.
+
+Exemplo, conferido com os arquivos oficiais de 2016 a 2025: abra os 10
+arquivos LTANBR16 a LTANBR25 juntos e toque em *Caso novo (LTA)*, *Forma
+cutânea* e *DF e Entorno*. A receita mostra 153.302 notificações, 131.581
+casos novos cutâneos no Brasil e 1.246 no DF e Entorno.
+
+Arquivos de anos diferentes às vezes trazem um campo com outro tipo ou
+tamanho (no LTANBR25 o DATASUS mudou quatro campos administrativos). Eles
+juntam assim mesmo: o campo entra como texto, e o aviso diz quais foram.
+
 ### Microdados: ver e escolher os registros
 
 A aba **Microdados** é o laboratório de microdados sem código. A primeira
